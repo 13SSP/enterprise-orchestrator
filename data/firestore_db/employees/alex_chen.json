@@ -1,0 +1,21 @@
+{
+  "employee_id": "alex_chen",
+  "first_name": "Alex",
+  "last_name": "Chen",
+  "email": "alex.dev@company.internal",
+  "department_id": "dept-eng",
+  "role": "employee",
+  "title": "Staff Backend Systems Engineer",
+  "manager_id": "sarah_connor",
+  "status": "ACTIVE",
+  "employment_type": "FULL_TIME",
+  "skills": [
+    "FastAPI",
+    "Python",
+    "Kafka",
+    "PostgreSQL",
+    "gRPC"
+  ],
+  "date_of_joining": "2023-08-20",
+  "created_at": "2023-08-20T09:00:00Z"
+}

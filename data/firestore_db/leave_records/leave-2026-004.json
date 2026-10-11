@@ -1,0 +1,12 @@
+{
+  "leave_id": "leave-2026-004",
+  "employee_id": "alice_hr",
+  "leave_type": "ANNUAL_PTO",
+  "start_date": "2026-08-01",
+  "end_date": "2026-08-05",
+  "days_count": 4,
+  "reason": "Mid-year wellness break",
+  "status": "APPROVED",
+  "approved_by": "sarah_connor",
+  "applied_at": "2026-07-15T09:00:00Z"
+}

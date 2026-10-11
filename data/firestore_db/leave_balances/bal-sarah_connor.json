@@ -1,0 +1,11 @@
+{
+  "balance_id": "bal-sarah_connor",
+  "employee_id": "sarah_connor",
+  "year": 2026,
+  "annual_pto_total": 25,
+  "annual_pto_used": 8,
+  "annual_pto_pending": 0,
+  "sick_leave_total": 10,
+  "sick_leave_used": 0,
+  "rollover_days": 0
+}

@@ -1,0 +1,11 @@
+{
+  "balance_id": "bal-alice_hr",
+  "employee_id": "alice_hr",
+  "year": 2026,
+  "annual_pto_total": 22,
+  "annual_pto_used": 4,
+  "annual_pto_pending": 0,
+  "sick_leave_total": 10,
+  "sick_leave_used": 1,
+  "rollover_days": 2
+}

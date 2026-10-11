@@ -1,0 +1,12 @@
+{
+  "salary_id": "sal-kiran",
+  "employee_id": "kiran_sec",
+  "base_salary": 195000.0,
+  "currency": "USD",
+  "pay_frequency": "ANNUAL",
+  "bonus_target_pct": 20.0,
+  "effective_date": "2026-01-01",
+  "bank_account_masked": "****4410",
+  "tax_id_masked": "***-**-4410",
+  "updated_at": "2026-10-11T18:28:50.963769"
+}

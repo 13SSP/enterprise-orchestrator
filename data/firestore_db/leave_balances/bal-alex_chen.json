@@ -1,0 +1,11 @@
+{
+  "balance_id": "bal-alex_chen",
+  "employee_id": "alex_chen",
+  "year": 2026,
+  "annual_pto_total": 20,
+  "annual_pto_used": 10,
+  "annual_pto_pending": 5,
+  "sick_leave_total": 10,
+  "sick_leave_used": 3,
+  "rollover_days": 0
+}

@@ -1,0 +1,12 @@
+{
+  "salary_id": "sal-charlie",
+  "employee_id": "charlie_fin",
+  "base_salary": 155000.0,
+  "currency": "USD",
+  "pay_frequency": "ANNUAL",
+  "bonus_target_pct": 15.0,
+  "effective_date": "2026-01-01",
+  "bank_account_masked": "****7742",
+  "tax_id_masked": "***-**-7742",
+  "updated_at": "2026-10-11T18:28:50.963769"
+}

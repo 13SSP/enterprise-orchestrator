@@ -1,0 +1,12 @@
+{
+  "salary_id": "sal-sarah",
+  "employee_id": "sarah_connor",
+  "base_salary": 240000.0,
+  "currency": "USD",
+  "pay_frequency": "ANNUAL",
+  "bonus_target_pct": 25.0,
+  "effective_date": "2026-01-01",
+  "bank_account_masked": "****9182",
+  "tax_id_masked": "***-**-9182",
+  "updated_at": "2026-10-11T18:28:50.963769"
+}

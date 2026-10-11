@@ -1,0 +1,71 @@
+[
+  {
+    "id": "71deeff1-c241-4e27-8632-75b55f45d1f3",
+    "title": "Employee Paid Time Off (PTO) & Leave Policy 2026",
+    "scope": "hr_policies",
+    "content": "All full-time employees accrue 20 days of Paid Time Off (PTO) per calendar year, plus 10 company holidays.\nBereavement leave is 5 days of paid time. Unused PTO up to 5 days rolls over into Q1 of the next year.\nRequests exceeding 3 consecutive days require manager approval in Workday 2 weeks in advance.\nParental leave: 16 weeks of 100% paid leave for all new parents following birth or adoption.",
+    "source_type": "document_ai_pdf",
+    "author_team": "Human Resources",
+    "tags": [
+      "hr",
+      "pto",
+      "leave",
+      "benefits"
+    ]
+  },
+  {
+    "id": "7c94b684-f11b-4e9a-aac5-0f362e610d41",
+    "title": "Health, Dental, and Vision Benefits Summary",
+    "scope": "benefits_handbook",
+    "content": "The company provides comprehensive health coverage through Blue Cross Blue Shield PPO and Kaiser HMO.\nDental insurance covers 100% of preventive care, 80% of basic procedures, and 50% of major services.\nAnnual wellness stipend: $1,200 per employee for gym memberships, mental wellness apps, or ergonomic office gear.",
+    "source_type": "document_ai_pdf",
+    "author_team": "Human Resources",
+    "tags": [
+      "benefits",
+      "insurance",
+      "wellness"
+    ]
+  },
+  {
+    "id": "d2f2752f-0d91-4515-b768-5390f5928ae8",
+    "title": "Cloud Production Incident Runbook (Sev-1 & Sev-2)",
+    "scope": "it_runbooks",
+    "content": "In the event of an outage or degraded latency > 500ms on core APIs:\n1. Declare incident in #incident-war-room on Slack and tag @oncall-ops.\n2. Check Grafana dashboards at https://metrics.internal.corp/dashboards/cluster-prod.\n3. If bad deployment caused regression, execute rollback via CLI or trigger rollback tool.\n4. For deadlocks, initiate rolling restart with health verification.\nPost-mortem documentation must be filed in Jira within 48 hours.",
+    "source_type": "markdown_runbook",
+    "author_team": "IT & Operations",
+    "tags": [
+      "devops",
+      "incident",
+      "kubernetes",
+      "runbook"
+    ]
+  },
+  {
+    "id": "5a2f4987-b7e0-4d48-9cf6-90369eafd3f6",
+    "title": "Corporate Travel and Expense Reimbursement Policy",
+    "scope": "finance_guidelines",
+    "content": "Meals during business travel are capped at $75 per day (receipts required for expenses above $25).\nFlights under 6 hours must be booked in Economy / Main Cabin class.\nHotel accommodation cap is $250/night for tier-1 cities (NYC, SF, London) and $180/night for other locations.\nAll expense reports must be submitted within 30 days of travel via the Finance Portal.",
+    "source_type": "document_ai_pdf",
+    "author_team": "Finance",
+    "tags": [
+      "finance",
+      "expenses",
+      "travel",
+      "policy"
+    ]
+  },
+  {
+    "id": "c058935b-3093-49cf-8a51-a2e962ac6a79",
+    "title": "Zero Trust Security Architecture & Access Standards",
+    "scope": "security_standards",
+    "content": "All internal services must be protected by Identity-Aware Proxy (IAP) or Google Cloud Identity Platform.\nService-to-service communication requires mutual TLS (mTLS) with short-lived SPIFFE/SPIRE certificates.\nProduction database access requires ephemeral JIT (Just-In-Time) privilege elevation with multi-party approval.",
+    "source_type": "markdown_runbook",
+    "author_team": "Security Ops",
+    "tags": [
+      "security",
+      "zero-trust",
+      "iam",
+      "compliance"
+    ]
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "leave_id": "leave-2026-002",
+  "employee_id": "bob_ops",
+  "leave_type": "SICK_LEAVE",
+  "start_date": "2026-02-10",
+  "end_date": "2026-02-11",
+  "days_count": 2,
+  "reason": "Dental surgery recovery",
+  "status": "APPROVED",
+  "approved_by": "sarah_connor",
+  "applied_at": "2026-02-09T08:30:00Z"
+}

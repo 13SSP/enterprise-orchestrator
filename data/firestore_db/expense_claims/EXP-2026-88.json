@@ -1,0 +1,15 @@
+{
+  "claim_id": "EXP-2026-88",
+  "employee_id": "bob_ops",
+  "department_id": "dept-ops",
+  "amount": 250.0,
+  "currency": "USD",
+  "category": "TRAVEL",
+  "merchant": "Delta Airlines",
+  "description": "Regional flight ticket for Annual Cloud Reliability & SRE Summit",
+  "receipt_url": "https://storage.googleapis.com/enterprise-claims/receipts/exp_88_delta.pdf",
+  "status": "APPROVED",
+  "approver_id": "sarah_connor",
+  "submitted_at": "2026-10-05T14:30:00Z",
+  "payout_date": "2026-10-16"
+}

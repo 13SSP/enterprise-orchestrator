@@ -1,0 +1,15 @@
+{
+  "claim_id": "EXP-2026-90",
+  "employee_id": "alice_hr",
+  "department_id": "dept-hr",
+  "amount": 120.0,
+  "currency": "USD",
+  "category": "SOFTWARE",
+  "merchant": "Zoom Video Communications",
+  "description": "Department team webinar license for virtual all-hands and candidate interviews",
+  "receipt_url": "https://storage.googleapis.com/enterprise-claims/receipts/exp_90_zoom.pdf",
+  "status": "PAID",
+  "approver_id": "sarah_connor",
+  "submitted_at": "2026-09-25T10:15:00Z",
+  "payout_date": "2026-09-30"
+}

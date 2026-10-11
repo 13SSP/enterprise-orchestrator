@@ -1,0 +1,12 @@
+{
+  "leave_id": "leave-2026-001",
+  "employee_id": "bob_ops",
+  "leave_type": "ANNUAL_PTO",
+  "start_date": "2026-06-15",
+  "end_date": "2026-06-20",
+  "days_count": 5,
+  "reason": "Family summer vacation trip",
+  "status": "APPROVED",
+  "approved_by": "sarah_connor",
+  "applied_at": "2026-05-10T11:00:00Z"
+}

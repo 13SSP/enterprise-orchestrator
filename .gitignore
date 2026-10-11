@@ -1,0 +1,41 @@
+# Environment & Secrets (NEVER COMMIT)
+.env
+*.env.local
+*.env.*.local
+
+# Node & Frontend
+node_modules/
+.angular/
+dist/
+.npm/
+
+# Python runtime & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+
+# Process and runtime artifacts
+.running_pids
+.logs/
+*.log
+
+# Generated test output & local files
+database/firestore_storage/
+integrations/m365-connector/generated_files/*.docx
+integrations/m365-connector/generated_files/*.pptx
+integrations/m365-connector/drafts/*.json
+!integrations/m365-connector/generated_files/.gitkeep
+!integrations/m365-connector/drafts/.gitkeep
+
+# IDE & OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

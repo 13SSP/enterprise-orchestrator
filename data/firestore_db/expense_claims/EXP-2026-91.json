@@ -1,0 +1,15 @@
+{
+  "claim_id": "EXP-2026-91",
+  "employee_id": "charlie_fin",
+  "department_id": "dept-fin",
+  "amount": 1850.0,
+  "currency": "USD",
+  "category": "OFFICE",
+  "merchant": "Deloitte Advisory & Audit Services",
+  "description": "Retainer consulting invoice for annual corporate tax compliance audit",
+  "receipt_url": "https://storage.googleapis.com/enterprise-claims/receipts/exp_91_deloitte.pdf",
+  "status": "APPROVED",
+  "approver_id": "sarah_connor",
+  "submitted_at": "2026-10-02T13:45:00Z",
+  "payout_date": "2026-10-25"
+}

@@ -1,0 +1,21 @@
+{
+  "employee_id": "sarah_connor",
+  "first_name": "Sarah",
+  "last_name": "Connor",
+  "email": "s.connor@company.internal",
+  "department_id": "dept-eng",
+  "role": "admin",
+  "title": "VP of Engineering",
+  "manager_id": null,
+  "status": "ACTIVE",
+  "employment_type": "FULL_TIME",
+  "skills": [
+    "Distributed Systems",
+    "Cloud Architecture",
+    "Go",
+    "Python",
+    "Executive Leadership"
+  ],
+  "date_of_joining": "2021-03-15",
+  "created_at": "2021-03-15T09:00:00Z"
+}

@@ -1,0 +1,11 @@
+{
+  "balance_id": "bal-charlie_fin",
+  "employee_id": "charlie_fin",
+  "year": 2026,
+  "annual_pto_total": 20,
+  "annual_pto_used": 5,
+  "annual_pto_pending": 0,
+  "sick_leave_total": 10,
+  "sick_leave_used": 0,
+  "rollover_days": 0
+}

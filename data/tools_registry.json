@@ -1,0 +1,356 @@
+[
+  {
+    "name": "get_system_health",
+    "description": "Check real-time health, CPU, memory, and uptime of cloud services.",
+    "method": "GET",
+    "path": "/api/v1/ops/health",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "cluster": {
+          "type": "string",
+          "description": "Cluster name, e.g. prod-us-east"
+        }
+      }
+    },
+    "is_write": false,
+    "require_confirmation": false,
+    "target_url": null,
+    "tags": [
+      "it",
+      "infrastructure"
+    ],
+    "owner_agent": "it_agent"
+  },
+  {
+    "name": "lookup_jira_issue",
+    "description": "Retrieve details, assignee, status, and comments of a Jira issue ticket.",
+    "method": "GET",
+    "path": "/api/v1/jira/issue",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "issue_key": {
+          "type": "string",
+          "description": "e.g. PROJ-102"
+        }
+      },
+      "required": [
+        "issue_key"
+      ]
+    },
+    "is_write": false,
+    "require_confirmation": false,
+    "target_url": null,
+    "tags": [
+      "it",
+      "jira"
+    ],
+    "owner_agent": "it_agent"
+  },
+  {
+    "name": "restart_cloud_service",
+    "description": "Initiate a graceful rolling restart of a designated cloud production service.",
+    "method": "POST",
+    "path": "/api/v1/ops/restart",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "service_name": {
+          "type": "string",
+          "description": "Name of service to restart"
+        }
+      },
+      "required": [
+        "service_name"
+      ]
+    },
+    "is_write": true,
+    "require_confirmation": true,
+    "target_url": null,
+    "tags": [
+      "it",
+      "ops",
+      "write"
+    ],
+    "owner_agent": "it_agent"
+  },
+  {
+    "name": "check_pto_balance",
+    "description": "Look up remaining paid time off (PTO), sick days, and holiday allowance for an employee.",
+    "method": "GET",
+    "path": "/api/v1/hr/pto",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "employee_id": {
+          "type": "string",
+          "description": "Employee ID or current user"
+        }
+      }
+    },
+    "is_write": false,
+    "require_confirmation": false,
+    "target_url": null,
+    "tags": [
+      "hr",
+      "pto"
+    ],
+    "owner_agent": "hr_agent"
+  },
+  {
+    "name": "lookup_employee",
+    "description": "Search the company employee directory by name, role, or team.",
+    "method": "GET",
+    "path": "/api/v1/hr/directory",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Name or title"
+        }
+      }
+    },
+    "is_write": false,
+    "require_confirmation": false,
+    "target_url": null,
+    "tags": [
+      "hr",
+      "directory"
+    ],
+    "owner_agent": "hr_agent"
+  },
+  {
+    "name": "submit_timeoff_request",
+    "description": "Submit a formal vacation or leave request for managerial approval.",
+    "method": "POST",
+    "path": "/api/v1/hr/timeoff/submit",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "start_date": {
+          "type": "string"
+        },
+        "end_date": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_date",
+        "end_date"
+      ]
+    },
+    "is_write": true,
+    "require_confirmation": true,
+    "target_url": null,
+    "tags": [
+      "hr",
+      "write"
+    ],
+    "owner_agent": "hr_agent"
+  },
+  {
+    "name": "check_expense_status",
+    "description": "Check current status, approval phase, and payout date of an expense reimbursement claim.",
+    "method": "GET",
+    "path": "/api/v1/finance/expenses/status",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "report_id": {
+          "type": "string",
+          "description": "e.g. EXP-2026-88"
+        }
+      },
+      "required": [
+        "report_id"
+      ]
+    },
+    "is_write": false,
+    "require_confirmation": false,
+    "target_url": null,
+    "tags": [
+      "finance"
+    ],
+    "owner_agent": "finance_agent"
+  },
+  {
+    "name": "get_budget_overview",
+    "description": "Retrieve current fiscal year allocated vs spent budget for a specified department.",
+    "method": "GET",
+    "path": "/api/v1/finance/budget",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "department": {
+          "type": "string",
+          "description": "e.g. Engineering, Marketing"
+        }
+      },
+      "required": [
+        "department"
+      ]
+    },
+    "is_write": false,
+    "require_confirmation": false,
+    "target_url": null,
+    "tags": [
+      "finance"
+    ],
+    "owner_agent": "finance_agent"
+  },
+  {
+    "name": "submit_expense_claim",
+    "description": "Submit a new expense reimbursement request with merchant and dollar amount.",
+    "method": "POST",
+    "path": "/api/v1/finance/expenses/claim",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "merchant": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount",
+        "merchant"
+      ]
+    },
+    "is_write": true,
+    "require_confirmation": true,
+    "target_url": null,
+    "tags": [
+      "finance",
+      "write"
+    ],
+    "owner_agent": "finance_agent"
+  },
+  {
+    "name": "scan_security_posture",
+    "description": "Remote SecOps check to audit cloud VPC security groups and exposed endpoints.",
+    "method": "GET",
+    "path": "/api/v1/secops/posture",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "target_env": {
+          "type": "string",
+          "description": "staging or prod"
+        }
+      }
+    },
+    "is_write": false,
+    "require_confirmation": false,
+    "target_url": null,
+    "tags": [
+      "security"
+    ],
+    "owner_agent": "security_remote_agent"
+  },
+  {
+    "name": "get_deployment_status",
+    "description": "[Read-only query] Retrieve current status of microservice deployments. Path: /deployments/status",
+    "method": "GET",
+    "path": "/deployments/status",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "service_name": {
+          "type": "string",
+          "description": "Microservice name e.g. auth-service, payment-api (in query)"
+        }
+      },
+      "required": [
+        "service_name"
+      ]
+    },
+    "is_write": false,
+    "require_confirmation": false,
+    "target_url": "https://devops.internal.corp/api/v1",
+    "tags": [
+      "openapi_imported",
+      "read"
+    ],
+    "owner_agent": "it_agent"
+  },
+  {
+    "name": "rollback_service_deployment",
+    "description": "[Write/Mutation operation (requires confirmation)] Rollback a microservice to previous stable release. Path: /deployments/rollback",
+    "method": "POST",
+    "path": "/deployments/rollback",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "service_name": {
+          "type": "string",
+          "description": "Body param: service_name"
+        },
+        "target_version": {
+          "type": "string",
+          "description": "Body param: target_version"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Body param: reason"
+        }
+      },
+      "required": [
+        "service_name",
+        "target_version"
+      ]
+    },
+    "is_write": true,
+    "require_confirmation": true,
+    "target_url": "https://devops.internal.corp/api/v1",
+    "tags": [
+      "openapi_imported",
+      "write"
+    ],
+    "owner_agent": "it_agent"
+  },
+  {
+    "name": "trigger_incident_pager",
+    "description": "[Write/Mutation operation (requires confirmation)] Declare a P1 or P2 incident in PagerDuty & Slack. Path: /incidents/create",
+    "method": "POST",
+    "path": "/incidents/create",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Body param: title"
+        },
+        "severity": {
+          "type": "string",
+          "description": "Body param: severity"
+        },
+        "impact_summary": {
+          "type": "string",
+          "description": "Body param: impact_summary"
+        }
+      },
+      "required": [
+        "severity",
+        "title"
+      ]
+    },
+    "is_write": true,
+    "require_confirmation": true,
+    "target_url": "https://devops.internal.corp/api/v1",
+    "tags": [
+      "openapi_imported",
+      "write"
+    ],
+    "owner_agent": "it_agent"
+  }
+]

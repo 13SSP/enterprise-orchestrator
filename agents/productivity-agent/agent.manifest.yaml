@@ -1,0 +1,19 @@
+id: productivity_agent
+name: "Productivity & Documents Agent"
+owner_team: "Executive & Productivity Operations"
+description: "Drafts emails, generates Word memos/reports (.docx), and creates PowerPoint slide decks (.pptx) by integrating cross-team operational data."
+preferred_model: "external/gpt-4o"
+fallback_models:
+  - "google/gemini-2.5-flash"
+  - "offline/stub"
+allowed_tools:
+  - "create_email_draft"
+  - "get_calendar_availability"
+  - "generate_word_document"
+  - "generate_powerpoint_presentation"
+  - "list_tickets"
+  - "get_leave_balance"
+knowledge_scopes:
+  - "corporate_communication_standards"
+  - "presentation_templates"
+active: true

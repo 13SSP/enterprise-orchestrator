@@ -1,0 +1,21 @@
+{
+  "ticket_key": "FIN-402",
+  "title": "Q3 Cloud Infrastructure Cost & FinOps Reconciliation",
+  "description": "Reconcile GCP billing report by department labels and alert on budget variance.",
+  "issue_type": "TASK",
+  "priority": "MEDIUM",
+  "status": "IN_PROGRESS",
+  "reporter_id": "charlie_fin",
+  "assignee_id": "charlie_fin",
+  "department_id": "dept-fin",
+  "components": [
+    "billing",
+    "finops"
+  ],
+  "labels": [
+    "finance",
+    "cloud-budget"
+  ],
+  "created_at": "2026-10-02T11:00:00Z",
+  "updated_at": "2026-10-11T09:30:00Z"
+}

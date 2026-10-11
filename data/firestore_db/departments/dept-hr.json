@@ -1,0 +1,12 @@
+{
+  "department_id": "dept-hr",
+  "name": "People Operations & HR",
+  "code": "HR",
+  "head_employee_id": "alice_hr",
+  "budget_allocated": 650000.0,
+  "budget_spent": 340000.0,
+  "currency": "USD",
+  "location": "Building 1, Executive Wing",
+  "description": "Talent acquisition, total rewards, employee relations, and leave management.",
+  "created_at": "2025-01-10T08:00:00Z"
+}

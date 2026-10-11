@@ -1,0 +1,12 @@
+{
+  "leave_id": "leave-2026-003",
+  "employee_id": "alex_chen",
+  "leave_type": "ANNUAL_PTO",
+  "start_date": "2026-11-01",
+  "end_date": "2026-11-05",
+  "days_count": 5,
+  "reason": "Attending developer summit and personal rest",
+  "status": "PENDING",
+  "approved_by": null,
+  "applied_at": "2026-10-08T15:20:00Z"
+}

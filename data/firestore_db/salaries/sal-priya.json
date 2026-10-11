@@ -1,0 +1,12 @@
+{
+  "salary_id": "sal-priya",
+  "employee_id": "priya_sharma",
+  "base_salary": 98000.0,
+  "currency": "USD",
+  "pay_frequency": "ANNUAL",
+  "bonus_target_pct": 8.0,
+  "effective_date": "2026-01-01",
+  "bank_account_masked": "****8201",
+  "tax_id_masked": "***-**-8201",
+  "updated_at": "2026-10-11T18:28:50.963769"
+}

@@ -1,0 +1,22 @@
+{
+  "ticket_key": "SEC-204",
+  "title": "Remediate open SSH port 22 on staging compute instances",
+  "description": "Automated security scan flagged public SSH port 22 exposed without IAP tunneling.",
+  "issue_type": "INCIDENT",
+  "priority": "CRITICAL",
+  "status": "OPEN",
+  "reporter_id": "kiran_sec",
+  "assignee_id": "bob_ops",
+  "department_id": "dept-sec",
+  "components": [
+    "firewall",
+    "vpc",
+    "security"
+  ],
+  "labels": [
+    "security",
+    "cis-benchmark"
+  ],
+  "created_at": "2026-10-10T08:15:00Z",
+  "updated_at": "2026-10-11T10:00:00Z"
+}

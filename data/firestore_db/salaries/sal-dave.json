@@ -1,0 +1,12 @@
+{
+  "salary_id": "sal-dave",
+  "employee_id": "dave_contractor",
+  "base_salary": 115000.0,
+  "currency": "USD",
+  "pay_frequency": "ANNUAL",
+  "bonus_target_pct": 0.0,
+  "effective_date": "2026-01-15",
+  "bank_account_masked": "****1104",
+  "tax_id_masked": "***-**-1104",
+  "updated_at": "2026-10-11T18:28:50.963769"
+}

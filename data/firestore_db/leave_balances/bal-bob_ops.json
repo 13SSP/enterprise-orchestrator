@@ -1,0 +1,11 @@
+{
+  "balance_id": "bal-bob_ops",
+  "employee_id": "bob_ops",
+  "year": 2026,
+  "annual_pto_total": 20,
+  "annual_pto_used": 6,
+  "annual_pto_pending": 0,
+  "sick_leave_total": 10,
+  "sick_leave_used": 2,
+  "rollover_days": 0
+}

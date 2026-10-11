@@ -1,0 +1,20 @@
+{
+  "employee_id": "kiran_sec",
+  "first_name": "Kiran",
+  "last_name": "Patel",
+  "email": "kiran.sec@company.internal",
+  "department_id": "dept-sec",
+  "role": "employee",
+  "title": "Head of Cybersecurity & Threat Defense",
+  "manager_id": "sarah_connor",
+  "status": "ACTIVE",
+  "employment_type": "FULL_TIME",
+  "skills": [
+    "Zero-Trust IAM",
+    "Cloud Security",
+    "CIS Benchmarks",
+    "Incident Response"
+  ],
+  "date_of_joining": "2022-09-15",
+  "created_at": "2022-09-15T09:00:00Z"
+}

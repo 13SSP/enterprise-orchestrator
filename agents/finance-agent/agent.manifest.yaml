@@ -1,0 +1,19 @@
+id: finance_agent
+name: "Finance & Treasury Agent"
+owner_team: "Finance"
+description: "Handles corporate expense claims, budget overviews, receipt parsing, and authorized salary inquiries."
+preferred_model: "google/gemini-2.5-flash"
+fallback_models:
+  - "google/gemini-1.5-pro"
+  - "offline/stub"
+allowed_tools:
+  - "list_claims"
+  - "get_claim"
+  - "submit_claim"
+  - "parse_receipt_document_ai"
+  - "list_all_salaries"
+  - "get_employee_salary"
+knowledge_scopes:
+  - "finance_guidelines"
+  - "travel_expense_policy"
+active: true

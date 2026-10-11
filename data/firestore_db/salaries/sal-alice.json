@@ -1,0 +1,12 @@
+{
+  "salary_id": "sal-alice",
+  "employee_id": "alice_hr",
+  "base_salary": 140000.0,
+  "currency": "USD",
+  "pay_frequency": "ANNUAL",
+  "bonus_target_pct": 12.0,
+  "effective_date": "2026-01-01",
+  "bank_account_masked": "****3391",
+  "tax_id_masked": "***-**-3391",
+  "updated_at": "2026-10-11T18:28:50.963769"
+}

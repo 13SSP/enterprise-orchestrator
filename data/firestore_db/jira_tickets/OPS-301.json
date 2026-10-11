@@ -1,0 +1,21 @@
+{
+  "ticket_key": "OPS-301",
+  "title": "Configure automated canary rolling restart for payments-api",
+  "description": "Implement automated health check validation during zero-downtime rolling restarts.",
+  "issue_type": "FEATURE",
+  "priority": "MEDIUM",
+  "status": "RESOLVED",
+  "reporter_id": "alex_chen",
+  "assignee_id": "bob_ops",
+  "department_id": "dept-ops",
+  "components": [
+    "ci-cd",
+    "cloud-run"
+  ],
+  "labels": [
+    "ops",
+    "automation"
+  ],
+  "created_at": "2026-09-20T10:00:00Z",
+  "updated_at": "2026-10-05T17:00:00Z"
+}

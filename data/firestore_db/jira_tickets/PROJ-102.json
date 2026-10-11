@@ -1,0 +1,21 @@
+{
+  "ticket_key": "PROJ-102",
+  "title": "Fix latency spike in payment webhook processor",
+  "description": "Payment webhook processor exceeds p99 threshold (800ms) during traffic bursts.",
+  "issue_type": "BUG",
+  "priority": "HIGH",
+  "status": "IN_PROGRESS",
+  "reporter_id": "bob_ops",
+  "assignee_id": "alex_chen",
+  "department_id": "dept-eng",
+  "components": [
+    "payments-api",
+    "webhooks"
+  ],
+  "labels": [
+    "performance",
+    "payments"
+  ],
+  "created_at": "2026-10-09T14:22:00Z",
+  "updated_at": "2026-10-11T12:00:00Z"
+}

@@ -1,0 +1,17 @@
+id: it_support_agent
+name: "IT Support Agent"
+owner_team: "IT & Engineering"
+description: "Assists with Jira tickets, technical incident reports, and system issue triage."
+preferred_model: "google/gemini-2.5-flash"
+fallback_models:
+  - "google/gemini-1.5-pro"
+  - "offline/stub"
+allowed_tools:
+  - "list_tickets"
+  - "get_ticket"
+  - "create_ticket"
+  - "update_ticket_status"
+knowledge_scopes:
+  - "it_runbooks"
+  - "incident_playbooks"
+active: true

@@ -1,0 +1,17 @@
+id: ops_agent
+name: "Cloud Operations & SRE Agent"
+owner_team: "Cloud Infrastructure"
+description: "Monitors infrastructure cluster health, services status, and rolling deployment canaries."
+preferred_model: "google/gemini-2.5-flash"
+fallback_models:
+  - "google/gemini-1.5-pro"
+  - "offline/stub"
+allowed_tools:
+  - "list_tickets"
+  - "get_ticket"
+  - "get_system_health"
+  - "restart_cloud_service"
+knowledge_scopes:
+  - "ops_runbooks"
+  - "sre_standards"
+active: true

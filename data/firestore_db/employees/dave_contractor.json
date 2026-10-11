@@ -1,0 +1,20 @@
+{
+  "employee_id": "dave_contractor",
+  "first_name": "Dave",
+  "last_name": "Miller",
+  "email": "dave.external@partner.com",
+  "department_id": "dept-eng",
+  "role": "contractor",
+  "title": "Restricted External Contractor (Frontend)",
+  "manager_id": "bob_ops",
+  "status": "ACTIVE",
+  "employment_type": "CONTRACTOR",
+  "skills": [
+    "React",
+    "TypeScript",
+    "TailwindCSS",
+    "Vite"
+  ],
+  "date_of_joining": "2026-01-15",
+  "created_at": "2026-01-15T09:00:00Z"
+}

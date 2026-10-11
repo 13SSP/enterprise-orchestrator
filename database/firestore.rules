@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Departments: Read by authenticated users, write restricted to admin
+    match /departments/{deptId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.role == 'admin';
+    }
+
+    // Employees: Read by all authenticated users, write by hr_manager / admin
+    match /employees/{employeeId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.role in ['admin', 'hr_manager'];
+    }
+
+    // Salaries: Strictly restricted to finance_officer and the employee themselves
+    match /salaries/{salaryId} {
+      allow read: if request.auth != null && (request.auth.token.role in ['admin', 'finance_officer'] || resource.data.employee_id == request.auth.uid);
+      allow write: if request.auth != null && request.auth.token.role in ['admin', 'finance_officer'];
+    }
+
+    // Leave Balances & Records: Read by employee, manager, or HR
+    match /leave_balances/{balanceId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.role in ['admin', 'hr_manager'];
+    }
+
+    match /leave_records/{recordId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && request.auth.token.role in ['admin', 'hr_manager'];
+    }
+
+    // Jira Tickets: Read and create by authenticated users
+    match /jira_tickets/{ticketId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Expense Claims: Read by employee, finance; write by employee
+    match /expense_claims/{claimId} {
+      allow read: if request.auth != null && (request.auth.token.role in ['admin', 'finance_officer'] || resource.data.employee_id == request.auth.uid);
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && request.auth.token.role in ['admin', 'finance_officer'];
+    }
+  }
+}

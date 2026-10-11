@@ -1,0 +1,82 @@
+<div class="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans antialiased">
+  <!-- Navbar Component -->
+  <app-navbar></app-navbar>
+
+  <!-- Main View Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex-1 w-full flex flex-col">
+    <!-- Tab Controls Navigation -->
+    <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-5">
+      <nav class="flex space-x-2" aria-label="Tabs">
+        <!-- Tab: Chat -->
+        <button 
+          (click)="setTab('chat')" 
+          [class]="(activeTab() === 'chat' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60') + ' px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition cursor-pointer'"
+        >
+          <span>💬</span>
+          <span>AI Chat & Orchestrator</span>
+        </button>
+
+        <!-- Tab: Onboard Agent -->
+        <button 
+          (click)="setTab('onboard')" 
+          [class]="(activeTab() === 'onboard' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60') + ' px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition cursor-pointer'"
+        >
+          <span>➕</span>
+          <span>Onboard Team Agent</span>
+          <span class="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full font-mono">
+            {{ orchestrator.agents().length }}
+          </span>
+        </button>
+
+        <!-- Tab: Swagger / OpenAPI -->
+        <button 
+          (click)="setTab('swagger')" 
+          [class]="(activeTab() === 'swagger' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60') + ' px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition cursor-pointer'"
+        >
+          <span>⚡</span>
+          <span>Swagger to ADK Tools</span>
+          <span class="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full font-mono">
+            {{ orchestrator.tools().length }}
+          </span>
+        </button>
+
+        <!-- Tab: RAG Stores -->
+        <button 
+          (click)="setTab('rag')" 
+          [class]="(activeTab() === 'rag' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60') + ' px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition cursor-pointer'"
+        >
+          <span>🗄️</span>
+          <span>Vertex RAG Stores</span>
+        </button>
+
+        <!-- Tab: Cloud Audit & Trace -->
+        <button 
+          (click)="setTab('audit')" 
+          [class]="(activeTab() === 'audit' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60') + ' px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition cursor-pointer'"
+        >
+          <span>📊</span>
+          <span>Cloud Audit & Trace</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        </button>
+      </nav>
+
+      <!-- Architecture Pipeline Badge -->
+      <div class="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full font-mono">
+        <span class="text-blue-400 font-semibold">Router</span>
+        <span>&rarr;</span>
+        <span class="text-amber-400 font-semibold">Policy Gate</span>
+        <span>&rarr;</span>
+        <span class="text-emerald-400 font-semibold">Sub-Agent / Tools</span>
+      </div>
+    </div>
+
+    <!-- Active Tab Component Views -->
+    <div class="flex-1 flex flex-col">
+      <app-chat *ngIf="activeTab() === 'chat'"></app-chat>
+      <app-onboarding *ngIf="activeTab() === 'onboard'"></app-onboarding>
+      <app-tool-builder *ngIf="activeTab() === 'swagger'"></app-tool-builder>
+      <app-rag-stores *ngIf="activeTab() === 'rag'"></app-rag-stores>
+      <app-audit-trail *ngIf="activeTab() === 'audit'"></app-audit-trail>
+    </div>
+  </main>
+</div>

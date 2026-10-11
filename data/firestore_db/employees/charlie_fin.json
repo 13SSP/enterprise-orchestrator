@@ -1,0 +1,20 @@
+{
+  "employee_id": "charlie_fin",
+  "first_name": "Charlie",
+  "last_name": "Zhao",
+  "email": "charlie.fin@company.internal",
+  "department_id": "dept-fin",
+  "role": "finance_officer",
+  "title": "Finance & Treasury Manager",
+  "manager_id": null,
+  "status": "ACTIVE",
+  "employment_type": "FULL_TIME",
+  "skills": [
+    "Financial Modeling",
+    "Corporate Audit",
+    "ERP Systems",
+    "Tax Strategy"
+  ],
+  "date_of_joining": "2023-04-12",
+  "created_at": "2023-04-12T09:00:00Z"
+}

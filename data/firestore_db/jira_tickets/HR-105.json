@@ -1,0 +1,21 @@
+{
+  "ticket_key": "HR-105",
+  "title": "Publish revised 2026 PTO and Parental Leave Handbook",
+  "description": "Update corporate intranet knowledge base with 2026 paid time off policies.",
+  "issue_type": "TASK",
+  "priority": "MEDIUM",
+  "status": "CLOSED",
+  "reporter_id": "alice_hr",
+  "assignee_id": "priya_sharma",
+  "department_id": "dept-hr",
+  "components": [
+    "intranet",
+    "policies"
+  ],
+  "labels": [
+    "hr",
+    "handbook"
+  ],
+  "created_at": "2026-09-01T09:00:00Z",
+  "updated_at": "2026-09-28T14:00:00Z"
+}

@@ -1,0 +1,20 @@
+{
+  "employee_id": "alice_hr",
+  "first_name": "Alice",
+  "last_name": "Henderson",
+  "email": "alice.hr@company.internal",
+  "department_id": "dept-hr",
+  "role": "hr_manager",
+  "title": "Senior People Operations Manager",
+  "manager_id": null,
+  "status": "ACTIVE",
+  "employment_type": "FULL_TIME",
+  "skills": [
+    "People Management",
+    "Workday HRIS",
+    "Compensation",
+    "Labor Compliance"
+  ],
+  "date_of_joining": "2022-01-10",
+  "created_at": "2022-01-10T09:00:00Z"
+}

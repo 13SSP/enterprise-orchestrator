@@ -1,0 +1,99 @@
+[
+  {
+    "id": "it_agent",
+    "name": "IT & Cloud Ops Agent",
+    "description": "Handles IT infrastructure queries, Jira issue lookups, system restart requests, cloud server status, and developer workspace operations.",
+    "owner_team": "IT & Operations",
+    "system_prompt": "You are the IT & Operations Agent. Assist users with technical queries, infrastructure checks, and Jira tickets. For destructive or write operations, always explain what will be changed.",
+    "allowed_tools": [
+      "get_system_health",
+      "lookup_jira_issue",
+      "restart_cloud_service",
+      "get_deployment_status",
+      "rollback_service_deployment",
+      "trigger_incident_pager"
+    ],
+    "knowledge_scopes": [
+      "it_runbooks",
+      "cloud_architecture"
+    ],
+    "agent_type": "local_adk",
+    "remote_endpoint": null,
+    "active": true,
+    "created_at": null
+  },
+  {
+    "id": "hr_agent",
+    "name": "HR & People Operations Agent",
+    "description": "Assists employees with PTO balance queries, company benefits, employee directory searches, internal leave policies, and onboarding questions.",
+    "owner_team": "Human Resources",
+    "system_prompt": "You are the HR Assistant. Provide helpful, confidential, and accurate information on benefits, time off, and company policies.",
+    "allowed_tools": [
+      "check_pto_balance",
+      "lookup_employee",
+      "submit_timeoff_request"
+    ],
+    "knowledge_scopes": [
+      "hr_policies",
+      "benefits_handbook"
+    ],
+    "agent_type": "local_adk",
+    "remote_endpoint": null,
+    "active": true,
+    "created_at": null
+  },
+  {
+    "id": "finance_agent",
+    "name": "Finance & Expenses Agent",
+    "description": "Handles corporate expense report inquiries, reimbursement status, departmental budget checks, and financial compliance questions.",
+    "owner_team": "Finance & Accounting",
+    "system_prompt": "You are the Finance & Expenses Specialist. Assist with budget lookups and expense reports accurately.",
+    "allowed_tools": [
+      "check_expense_status",
+      "get_budget_overview",
+      "submit_expense_claim"
+    ],
+    "knowledge_scopes": [
+      "finance_guidelines",
+      "procurement_policy"
+    ],
+    "agent_type": "local_adk",
+    "remote_endpoint": null,
+    "active": true,
+    "created_at": null
+  },
+  {
+    "id": "security_remote_agent",
+    "name": "SecOps Remote Agent (A2A)",
+    "description": "Remote Agent running over Agent-to-Agent (A2A) protocol for enterprise security audits, vulnerability scanning, and IAM compliance reviews.",
+    "owner_team": "Security Ops",
+    "system_prompt": "You are the SecOps A2A Agent. Conduct security posture checks and firewall rule reviews.",
+    "allowed_tools": [
+      "scan_security_posture"
+    ],
+    "knowledge_scopes": [
+      "security_standards"
+    ],
+    "agent_type": "remote_a2a",
+    "remote_endpoint": "https://secops.internal.corp/a2a/v1/agent",
+    "active": true,
+    "created_at": null
+  },
+  {
+    "id": "analytics_test_agent",
+    "name": "Data Analytics Agent",
+    "description": "Handles SQL queries, BigQuery analytics, and dashboard metrics.",
+    "owner_team": "Data Platform",
+    "system_prompt": "You are the Data Analytics Agent.",
+    "allowed_tools": [
+      "get_budget_overview"
+    ],
+    "knowledge_scopes": [
+      "finance_guidelines"
+    ],
+    "agent_type": "local_adk",
+    "remote_endpoint": null,
+    "active": true,
+    "created_at": null
+  }
+]

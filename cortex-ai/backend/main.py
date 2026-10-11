@@ -1,0 +1,94 @@
+"""
+cortex.ai - Central Orchestration Hub Service (Port 8000)
+Initializes Agent Registry, Tool Factory, Model Gateway, Zero-Trust Access Control, and REST API.
+"""
+
+import sys
+import os
+import importlib.util
+from pathlib import Path
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+root_dir = Path(__file__).resolve().parent.parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
+
+backend_dir = Path(__file__).resolve().parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
+from api.routes import router_api
+from agent_registry.registry import agent_registry
+from tool_factory.generator import tool_factory
+from tool_registry.registry import tool_registry
+
+app = FastAPI(
+    title="cortex.ai Enterprise Orchestrator Hub",
+    description="Multi-agent routing, tool factory, zero-trust access control, and model gateway on Google Cloud & Firebase.",
+    version="1.0.0",
+    docs_url="/docs",
+    openapi_url="/openapi.json"
+)
+
+# Enable CORS for Angular frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include API routes
+app.include_router(router_api)
+
+# Mount generated files download directory
+generated_dir = root_dir / "integrations" / "m365-connector" / "generated_files"
+generated_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/downloads", StaticFiles(directory=str(generated_dir)), name="downloads")
+
+def load_app_spec(app_path: Path, module_name: str):
+    spec = importlib.util.spec_from_file_location(module_name, app_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.app.openapi()
+
+@app.on_event("startup")
+def startup_event():
+    print("[cortex.ai Hub] Auto-discovering team agents from manifests...")
+    agent_registry.discover_agents()
+    print(f"[cortex.ai Hub] Successfully onboarded {len(agent_registry.list_agents())} team agents.")
+
+    print("[cortex.ai Hub] Ingesting OpenAPI tool catalogs from domain microservices...")
+    try:
+        hr_spec = load_app_spec(root_dir / "apps" / "hr-api" / "src" / "main.py", "hr_mod")
+        payroll_spec = load_app_spec(root_dir / "apps" / "payroll-api" / "src" / "main.py", "payroll_mod")
+        it_spec = load_app_spec(root_dir / "apps" / "it-support-api" / "src" / "main.py", "it_mod")
+        expense_spec = load_app_spec(root_dir / "apps" / "expense-api" / "src" / "main.py", "expense_mod")
+        m365_spec = load_app_spec(root_dir / "integrations" / "m365-connector" / "src" / "main.py", "m365_mod")
+
+        tool_factory.parse_openapi_spec("hr-api", "http://127.0.0.1:8001", hr_spec)
+        tool_factory.parse_openapi_spec("payroll-api", "http://127.0.0.1:8002", payroll_spec)
+        tool_factory.parse_openapi_spec("it-support-api", "http://127.0.0.1:8003", it_spec)
+        tool_factory.parse_openapi_spec("expense-api", "http://127.0.0.1:8004", expense_spec)
+        tool_factory.parse_openapi_spec("m365-connector", "http://127.0.0.1:8005", m365_spec)
+        print(f"[cortex.ai Hub] Successfully generated {len(tool_registry.list_tools())} ADK tools into tool registry.")
+    except Exception as e:
+        print(f"[cortex.ai Hub] Notice while loading tool specs: {e}")
+
+@app.get("/health", tags=["System"])
+def health():
+    return {
+        "status": "healthy",
+        "service": "cortex-backend",
+        "port": 8000,
+        "agents_count": len(agent_registry.list_agents()),
+        "tools_count": len(tool_registry.list_tools())
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
