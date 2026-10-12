@@ -34,6 +34,19 @@ interface ChatMessage {
   };
 }
 
+interface PromptItem {
+  id: string;
+  category: string;
+  title: string;
+  description: string;
+  prompt: string;
+  recommended_persona: string;
+  persona_name: string;
+  target_agent: string;
+  tags: string[];
+  hackathon_highlight: string;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -70,6 +83,9 @@ interface ChatMessage {
             <button (click)="activeTab = 'chat'" [class.bg-blue-600]="activeTab === 'chat'" [class.text-white]="activeTab === 'chat'" [class.text-slate-400]="activeTab !== 'chat'" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition hover:bg-slate-800">
               💬 <span>Chat Assistant</span>
             </button>
+            <button (click)="activeTab = 'prompts'; loadPrompts()" [class.bg-blue-600]="activeTab === 'prompts'" [class.text-white]="activeTab === 'prompts'" [class.text-slate-400]="activeTab !== 'prompts'" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition hover:bg-slate-800">
+              📚 <span>Prompt Library ({{ promptsList.length || 18 }})</span>
+            </button>
             <button (click)="activeTab = 'agents'; loadAgents()" [class.bg-blue-600]="activeTab === 'agents'" [class.text-white]="activeTab === 'agents'" [class.text-slate-400]="activeTab !== 'agents'" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition hover:bg-slate-800">
               🤖 <span>Team Agents (5)</span>
             </button>
@@ -100,7 +116,7 @@ interface ChatMessage {
         <!-- Top Status Bar -->
         <header class="h-14 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/40">
           <div class="flex items-center gap-3">
-            <h2 class="text-sm font-semibold capitalize text-slate-200">{{ activeTab }} Workspace</h2>
+            <h2 class="text-sm font-semibold capitalize text-slate-200">{{ activeTab === 'prompts' ? 'Prompt Library' : activeTab }} Workspace</h2>
             <span class="px-2 py-0.5 text-[10px] rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
               Role: {{ getPersonaRole() }}
             </span>
@@ -262,16 +278,93 @@ interface ChatMessage {
               </div>
             </div>
           </div>
+
+          <!-- 6. PROMPT LIBRARY VIEW -->
+          <div *ngIf="activeTab === 'prompts'" class="max-w-6xl mx-auto space-y-5">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 class="text-lg font-bold text-slate-100">Enterprise Prompt Library</h3>
+                <p class="text-xs text-slate-400">Curated, domain-specific templates designed for zero-prompt-engineering workflows across IT, HR, Finance, Operations, M365, and Security.</p>
+              </div>
+              <div class="w-full md:w-72">
+                <input type="text" [(ngModel)]="promptSearchQuery" placeholder="🔍 Search prompts, tags, agents..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+
+            <!-- Category Filter Pills -->
+            <div class="flex flex-wrap gap-2 pt-1 border-b border-slate-800/80 pb-3">
+              <button *ngFor="let cat of promptCategories" (click)="selectedPromptCategory = cat" [class.bg-blue-600]="selectedPromptCategory === cat" [class.text-white]="selectedPromptCategory === cat" [class.bg-slate-900]="selectedPromptCategory !== cat" [class.text-slate-400]="selectedPromptCategory !== cat" class="px-3 py-1.5 rounded-lg text-xs font-medium transition border border-slate-800 hover:text-slate-200">
+                {{ cat }}
+              </button>
+            </div>
+
+            <!-- Prompts Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+              <div *ngFor="let p of filteredPrompts" class="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700/80 transition flex flex-col justify-between space-y-4 shadow-sm">
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">{{ p.category }}</span>
+                    <span class="text-[11px] font-mono text-cyan-400">🤖 {{ p.target_agent }}</span>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-sm text-slate-100">{{ p.title }}</h4>
+                    <p class="text-xs text-slate-400 mt-1 leading-relaxed">{{ p.description }}</p>
+                  </div>
+                  <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/90 text-xs font-mono text-slate-200 select-all leading-relaxed">
+                    "{{ p.prompt }}"
+                  </div>
+                  <div class="p-2.5 rounded-lg bg-amber-950/20 border border-amber-900/30 text-[11px] text-amber-300/90 space-y-1">
+                    <div class="font-semibold flex items-center gap-1.5">💡 Hackathon Demo Note:</div>
+                    <div class="text-amber-400/80 leading-normal">{{ p.hackathon_highlight }}</div>
+                  </div>
+                  <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono pt-1">
+                    <span>👤 Recommended: <strong class="text-slate-300">{{ p.persona_name }}</strong></span>
+                  </div>
+                  <div class="flex flex-wrap gap-1.5 pt-1">
+                    <span *ngFor="let tag of p.tags" class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700/60">{{ tag }}</span>
+                  </div>
+                </div>
+                <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                  <button (click)="copyPrompt(p.prompt, $event)" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition flex items-center gap-1.5">
+                    📋 Copy Prompt
+                  </button>
+                  <button (click)="tryPromptInChat(p)" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+                    🚀 Try in Chat
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>
   `
 })
 export class AppComponent implements OnInit {
-  activeTab: 'chat' | 'agents' | 'tools' | 'models' | 'audit' = 'chat';
+  activeTab: 'chat' | 'prompts' | 'agents' | 'tools' | 'models' | 'audit' = 'chat';
   currentPersona: string = 'bob_ops';
   currentInput: string = '';
   loading: boolean = false;
+
+  promptsList: PromptItem[] = [];
+  promptCategories: string[] = ['All'];
+  selectedPromptCategory: string = 'All';
+  promptSearchQuery: string = '';
+
+  get filteredPrompts(): PromptItem[] {
+    const cat = this.selectedPromptCategory;
+    const q = this.promptSearchQuery.toLowerCase().trim();
+    return this.promptsList.filter(p => {
+      const matchesCat = (cat === 'All' || p.category === cat);
+      const matchesQuery = !q ||
+        p.title.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        p.prompt.toLowerCase().includes(q) ||
+        p.target_agent.toLowerCase().includes(q) ||
+        (p.tags && p.tags.some(t => t.toLowerCase().includes(q)));
+      return matchesCat && matchesQuery;
+    });
+  }
 
   messages: ChatMessage[] = [
     {
@@ -293,6 +386,7 @@ export class AppComponent implements OnInit {
   ];
 
   ngOnInit() {
+    this.loadPrompts();
     this.loadAgents();
     this.loadModels();
   }
@@ -408,5 +502,36 @@ export class AppComponent implements OnInit {
       const data = await res.json();
       this.auditList = data.events || [];
     } catch (e) {}
+  }
+
+  async loadPrompts() {
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/prompts');
+      const data = await res.json();
+      this.promptsList = data.prompts || [];
+      this.promptCategories = data.categories || ['All'];
+    } catch (e) {}
+  }
+
+  copyPrompt(text: string, event: Event) {
+    const btn = event.currentTarget as HTMLElement;
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.innerText;
+      btn.innerText = '✓ Copied!';
+      btn.classList.add('bg-emerald-600', 'text-white');
+      setTimeout(() => {
+        btn.innerText = orig;
+        btn.classList.remove('bg-emerald-600', 'text-white');
+      }, 2000);
+    });
+  }
+
+  tryPromptInChat(p: PromptItem) {
+    if (p.recommended_persona) {
+      this.currentPersona = p.recommended_persona;
+    }
+    this.activeTab = 'chat';
+    this.currentInput = p.prompt;
+    this.submitPrompt();
   }
 }

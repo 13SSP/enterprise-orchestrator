@@ -12,9 +12,9 @@ from pathlib import Path
 PORT = 4200
 FRONTEND_DIR = Path(__file__).resolve().parent
 
-# Generate standalone web distribution if not already built
+# Generate standalone web distribution
 DIST_HTML = FRONTEND_DIR / "index.html"
-if not DIST_HTML.exists():
+def build_dist_html():
     src_html = (FRONTEND_DIR / "src" / "index.html").read_text(encoding="utf-8")
     # Write self-contained Angular web shell
     app_html = """
@@ -44,6 +44,7 @@ if not DIST_HTML.exists():
 
           <nav class="space-y-1">
             <button onclick="switchTab('chat')" id="tab-chat" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition">💬 Chat Assistant</button>
+            <button onclick="switchTab('prompts')" id="tab-prompts" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">📚 Prompt Library (18)</button>
             <button onclick="switchTab('agents')" id="tab-agents" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">🤖 Team Agents (5)</button>
             <button onclick="switchTab('tools')" id="tab-tools" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">🛠️ Tool Catalog (25)</button>
             <button onclick="switchTab('models')" id="tab-models" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">🧠 Model Gateway</button>
@@ -121,8 +122,9 @@ if not DIST_HTML.exists():
 
       async function switchTab(tab) {
         currentTab = tab;
-        ['chat', 'agents', 'tools', 'models', 'audit'].forEach(t => {
+        ['chat', 'prompts', 'agents', 'tools', 'models', 'audit'].forEach(t => {
           const btn = document.getElementById('tab-' + t);
+          if (!btn) return;
           if (t === tab) {
             btn.className = 'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition';
           } else {
@@ -148,7 +150,15 @@ if not DIST_HTML.exists():
         const dv = document.getElementById('dynamicView');
         dv.innerHTML = '<div class="text-slate-500 font-mono text-xs">Loading ' + tab + '...</div>';
         try {
-          if (tab === 'agents') {
+          if (tab === 'prompts') {
+            const r = await fetch('http://127.0.0.1:8000/api/prompts');
+            const d = await r.json();
+            window._allPrompts = d.prompts || [];
+            window._allPromptCategories = d.categories || [];
+            if (!window._activePromptCat) window._activePromptCat = 'All';
+            renderPromptLibrary();
+            return;
+          } else if (tab === 'agents') {
             const r = await fetch('http://127.0.0.1:8000/api/agents');
             const d = await r.json();
             let html = '<h3 class="text-base font-bold text-slate-200">Onboarded Team Agents</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
@@ -300,6 +310,148 @@ if not DIST_HTML.exists():
         mc.scrollTop = mc.scrollHeight;
       }
 
+      function renderPromptLibrary() {
+        const dv = document.getElementById('dynamicView');
+        if (!dv) return;
+        const cat = window._activePromptCat || 'All';
+        const query = (window._promptSearchQuery || '').toLowerCase().trim();
+        const categories = window._allPromptCategories || ['All'];
+        const allPrompts = window._allPrompts || [];
+
+        const filtered = allPrompts.filter(p => {
+          const matchesCat = (cat === 'All' || p.category === cat);
+          const matchesQuery = !query ||
+            p.title.toLowerCase().includes(query) ||
+            p.description.toLowerCase().includes(query) ||
+            p.prompt.toLowerCase().includes(query) ||
+            p.target_agent.toLowerCase().includes(query) ||
+            (p.tags && p.tags.some(t => t.toLowerCase().includes(query)));
+          return matchesCat && matchesQuery;
+        });
+
+        const categoryPills = categories.map(c => {
+          const isActive = (c === cat);
+          const activeClass = isActive 
+            ? 'bg-blue-600 text-white shadow-sm' 
+            : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800';
+          return `<button onclick="setPromptCategory('${c}')" class="px-3 py-1.5 rounded-lg text-xs font-medium transition ${activeClass}">${c}</button>`;
+        }).join('');
+
+        let cardsHtml = '';
+        if (filtered.length === 0) {
+          cardsHtml = `<div class="col-span-full p-8 text-center bg-slate-900/50 rounded-2xl border border-slate-800/80 text-slate-500 text-xs">No enterprise prompts match your search query "${query}".</div>`;
+        } else {
+          cardsHtml = filtered.map(p => {
+            const encPrompt = encodeURIComponent(p.prompt);
+            const encPersona = encodeURIComponent(p.recommended_persona);
+            const tagsHtml = (p.tags || []).map(t => `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700/60">${t}</span>`).join('');
+            
+            return `
+            <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700/80 transition flex flex-col justify-between space-y-4 shadow-sm">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">${p.category}</span>
+                  <span class="text-[11px] font-mono text-cyan-400">🤖 ${p.target_agent}</span>
+                </div>
+                <div>
+                  <h4 class="font-bold text-sm text-slate-100">${p.title}</h4>
+                  <p class="text-xs text-slate-400 mt-1 leading-relaxed">${p.description}</p>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/90 text-xs font-mono text-slate-200 select-all leading-relaxed">
+                  "${p.prompt}"
+                </div>
+                <div class="p-2.5 rounded-lg bg-amber-950/20 border border-amber-900/30 text-[11px] text-amber-300/90 space-y-1">
+                  <div class="font-semibold flex items-center gap-1.5">💡 Hackathon Demo Note:</div>
+                  <div class="text-amber-400/80 leading-normal">${p.hackathon_highlight}</div>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono pt-1">
+                  <span>👤 Recommended: <strong class="text-slate-300">${p.persona_name}</strong></span>
+                </div>
+                <div class="flex flex-wrap gap-1.5 pt-1">
+                  ${tagsHtml}
+                </div>
+              </div>
+              <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                <button onclick="copyPromptText('${encPrompt}', this)" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition flex items-center gap-1.5">
+                  📋 Copy Prompt
+                </button>
+                <button onclick="tryPromptInChat('${encPrompt}', '${encPersona}')" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+                  🚀 Try in Chat
+                </button>
+              </div>
+            </div>`;
+          }).join('');
+        }
+
+        dv.innerHTML = `
+          <div class="space-y-5">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 class="text-lg font-bold text-slate-100">Enterprise Prompt Library</h3>
+                <p class="text-xs text-slate-400">Curated, domain-specific templates designed for zero-prompt-engineering workflows across IT, HR, Finance, Operations, M365, and Security.</p>
+              </div>
+              <div class="w-full md:w-72">
+                <input type="text" id="promptSearchInput" value="${window._promptSearchQuery || ''}" oninput="searchPrompts(this.value)" placeholder="🔍 Search prompts, tags, agents..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2 pt-1 border-b border-slate-800/80 pb-3">
+              ${categoryPills}
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+              ${cardsHtml}
+            </div>
+          </div>
+        `;
+      }
+
+      function setPromptCategory(cat) {
+        window._activePromptCat = cat;
+        renderPromptLibrary();
+      }
+
+      function searchPrompts(query) {
+        window._promptSearchQuery = query;
+        renderPromptLibrary();
+        const input = document.getElementById('promptSearchInput');
+        if (input) {
+          input.focus();
+          input.selectionStart = input.selectionEnd = input.value.length;
+        }
+      }
+
+      function copyPromptText(encodedPrompt, btn) {
+        const text = decodeURIComponent(encodedPrompt);
+        navigator.clipboard.writeText(text).then(() => {
+          const orig = btn.innerHTML;
+          btn.innerHTML = '✓ Copied!';
+          btn.classList.add('bg-emerald-600', 'text-white');
+          setTimeout(() => {
+            btn.innerHTML = orig;
+            btn.classList.remove('bg-emerald-600', 'text-white');
+          }, 2000);
+        }).catch(() => {
+          alert('Copied to clipboard: ' + text);
+        });
+      }
+
+      function tryPromptInChat(encodedPrompt, encodedPersona) {
+        const text = decodeURIComponent(encodedPrompt);
+        const persona = decodeURIComponent(encodedPersona);
+        const personaSel = document.getElementById('personaSelect');
+        if (personaSel && persona) {
+          personaSel.value = persona;
+          personaSel.dispatchEvent(new Event('change'));
+        }
+        switchTab('chat');
+        const input = document.getElementById('promptInput');
+        if (input) {
+          input.value = text;
+          handleSend();
+        }
+      }
+
       async function loadModels() {
         try {
           const res = await fetch('http://127.0.0.1:8000/api/models');
@@ -331,6 +483,8 @@ if not DIST_HTML.exists():
     """
     final_html = src_html.replace("<app-root></app-root>", app_html)
     DIST_HTML.write_text(final_html, encoding="utf-8")
+
+build_dist_html()
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
