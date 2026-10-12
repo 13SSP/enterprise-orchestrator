@@ -16,13 +16,13 @@
           <span>AI Chat & Orchestrator</span>
         </button>
 
-        <!-- Tab: Onboard Agent -->
+        <!-- Tab: Agents Hub -->
         <button 
-          (click)="setTab('onboard')" 
-          [class]="(activeTab() === 'onboard' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60') + ' px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition cursor-pointer'"
+          (click)="setTab('agents')" 
+          [class]="(activeTab() === 'agents' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60') + ' px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition cursor-pointer'"
         >
-          <span>➕</span>
-          <span>Onboard Team Agent</span>
+          <span>🤖</span>
+          <span>Agents Hub</span>
           <span class="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full font-mono">
             {{ orchestrator.agents().length }}
           </span>
@@ -73,7 +73,7 @@
     <!-- Active Tab Component Views -->
     <div class="flex-1 flex flex-col">
       <app-chat *ngIf="activeTab() === 'chat'"></app-chat>
-      <app-onboarding *ngIf="activeTab() === 'onboard'"></app-onboarding>
+      <app-agents-list *ngIf="activeTab() === 'agents' || activeTab() === 'onboard'" (selectAgentForChat)="handleChatWithAgent($event)"></app-agents-list>
       <app-tool-builder *ngIf="activeTab() === 'swagger'"></app-tool-builder>
       <app-rag-stores *ngIf="activeTab() === 'rag'"></app-rag-stores>
       <app-audit-trail *ngIf="activeTab() === 'audit'"></app-audit-trail>

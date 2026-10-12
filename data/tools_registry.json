@@ -20,7 +20,11 @@
       "it",
       "infrastructure"
     ],
-    "owner_agent": "it_agent"
+    "owner_agent": "it_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "lookup_jira_issue",
@@ -46,7 +50,11 @@
       "it",
       "jira"
     ],
-    "owner_agent": "it_agent"
+    "owner_agent": "it_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "restart_cloud_service",
@@ -73,7 +81,11 @@
       "ops",
       "write"
     ],
-    "owner_agent": "it_agent"
+    "owner_agent": "it_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "check_pto_balance",
@@ -96,7 +108,11 @@
       "hr",
       "pto"
     ],
-    "owner_agent": "hr_agent"
+    "owner_agent": "hr_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "lookup_employee",
@@ -119,7 +135,11 @@
       "hr",
       "directory"
     ],
-    "owner_agent": "hr_agent"
+    "owner_agent": "hr_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "submit_timeoff_request",
@@ -151,7 +171,11 @@
       "hr",
       "write"
     ],
-    "owner_agent": "hr_agent"
+    "owner_agent": "hr_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "check_expense_status",
@@ -176,7 +200,11 @@
     "tags": [
       "finance"
     ],
-    "owner_agent": "finance_agent"
+    "owner_agent": "finance_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "get_budget_overview",
@@ -201,7 +229,11 @@
     "tags": [
       "finance"
     ],
-    "owner_agent": "finance_agent"
+    "owner_agent": "finance_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "submit_expense_claim",
@@ -233,7 +265,11 @@
       "finance",
       "write"
     ],
-    "owner_agent": "finance_agent"
+    "owner_agent": "finance_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "scan_security_posture",
@@ -255,7 +291,11 @@
     "tags": [
       "security"
     ],
-    "owner_agent": "security_remote_agent"
+    "owner_agent": "security_remote_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "get_deployment_status",
@@ -281,7 +321,11 @@
       "openapi_imported",
       "read"
     ],
-    "owner_agent": "it_agent"
+    "owner_agent": "it_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "rollback_service_deployment",
@@ -316,7 +360,11 @@
       "openapi_imported",
       "write"
     ],
-    "owner_agent": "it_agent"
+    "owner_agent": "it_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   },
   {
     "name": "trigger_incident_pager",
@@ -351,6 +399,42 @@
       "openapi_imported",
       "write"
     ],
-    "owner_agent": "it_agent"
+    "owner_agent": "it_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
+  },
+  {
+    "name": "scale_nodepool",
+    "description": "[Write/Mutation operation (requires confirmation)] Scale nodepool capacity. Path: /nodepools/scale",
+    "method": "POST",
+    "path": "/nodepools/scale",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "nodepool_id": {
+          "type": "string",
+          "description": "Body param: nodepool_id"
+        },
+        "target_nodes": {
+          "type": "integer",
+          "description": "Body param: target_nodes"
+        }
+      },
+      "required": []
+    },
+    "is_write": true,
+    "require_confirmation": true,
+    "target_url": "https://api.internal.corp",
+    "tags": [
+      "openapi_imported",
+      "write"
+    ],
+    "owner_agent": "kubernetes_cluster_scaling_api_agent",
+    "enabled": true,
+    "allowed_roles": [
+      "*"
+    ]
   }
 ]

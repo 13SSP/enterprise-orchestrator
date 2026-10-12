@@ -3,15 +3,16 @@ import json
 import yaml
 import requests
 from typing import Dict, List, Any, Tuple, Optional
-from app.core.registry import ToolDefinition, registry
+from app.core.registry import ToolDefinition, AgentManifest, registry
 
 class OpenAPIImporter:
     """
-    Parses OpenAPI 3.0.x and Swagger 2.0 specs into executable ADK Tool definitions.
+    Parses OpenAPI 3.0.x and Swagger 2.0 specs into executable ADK Tool definitions
+    and instantiates new intelligent Agents with access controls.
     - Classifies operations as READ or WRITE.
     - Enforces write confirmation policies.
-    - Enriches human-readable descriptions for optimal Gemini routing.
-    - Stores generated tool metadata into Registry.
+    - Synthesizes Agent personas and prompts from OpenAPI metadata.
+    - Limits access to agents and tools via RBAC and team scoping.
     """
 
     @staticmethod
@@ -171,6 +172,98 @@ class OpenAPIImporter:
         }
 
         return generated_tools, metadata
+
+    @classmethod
+    def generate_agent_and_tools(
+        cls,
+        spec_data: Dict[str, Any],
+        author: Optional[str] = None,
+        author_id: Optional[str] = None,
+        owner_team: Optional[str] = None,
+        agent_id_override: Optional[str] = None,
+        agent_name_override: Optional[str] = None,
+        agent_description_override: Optional[str] = None,
+        system_prompt_override: Optional[str] = None,
+        icon: Optional[str] = "wrench",
+        is_public: bool = True,
+        allowed_roles: Optional[List[str]] = None,
+        allowed_teams: Optional[List[str]] = None,
+        tool_overrides: Optional[Dict[str, Dict[str, Any]]] = None,
+        auto_register: bool = True
+    ) -> Tuple[AgentManifest, List[ToolDefinition], Dict[str, Any]]:
+        """
+        Synthesizes both an Agent Manifest and all corresponding Tool Definitions
+        directly from an OpenAPI / Swagger spec, applying fine-grained access control.
+        """
+        title = spec_data.get("info", {}).get("title", "Enterprise Service API")
+        raw_desc = spec_data.get("info", {}).get("description", "")
+
+        # 1. Synthesize Agent Identifier
+        if agent_id_override:
+            agent_id = re.sub(r"[^a-zA-Z0-9_]", "_", agent_id_override).lower().strip("_")
+        else:
+            slug = re.sub(r"[^a-zA-Z0-9_]+", "_", title).lower().strip("_")
+            agent_id = f"{slug}_agent" if not slug.endswith("_agent") else slug
+
+        # 2. Synthesize Display Name & Prompts
+        agent_name = agent_name_override or f"{title} Agent"
+        description = agent_description_override or (
+            f"{raw_desc.strip()} Agent specialized in {title} capabilities. Routes and fulfills operations using registered API tools."
+            if raw_desc else f"Intelligent ADK Agent for {title}. Automatically routes API queries and mutations."
+        )
+        system_prompt = system_prompt_override or (
+            f"You are the {agent_name}. You have authorized access to tools for {title}. "
+            "Assist users accurately, invoke appropriate tools, and describe side-effects for write/mutation operations."
+        )
+
+        # 3. Generate Tools from Spec
+        tools, meta = cls.import_spec(
+            spec_data=spec_data,
+            target_agent_id=agent_id,
+            auto_register=False
+        )
+
+        # 4. Apply Tool Access Overrides & Register Tools
+        tool_overrides = tool_overrides or {}
+        for t in tools:
+            if t.name in tool_overrides:
+                ov = tool_overrides[t.name]
+                if "enabled" in ov:
+                    t.enabled = bool(ov["enabled"])
+                if "require_confirmation" in ov:
+                    t.require_confirmation = bool(ov["require_confirmation"])
+                if "allowed_roles" in ov:
+                    t.allowed_roles = ov["allowed_roles"]
+            if auto_register:
+                registry.register_tool(t)
+
+        enabled_tools = [t.name for t in tools if t.enabled]
+
+        # 5. Build and Register Agent Manifest
+        manifest = AgentManifest(
+            id=agent_id,
+            name=agent_name,
+            description=description,
+            owner_team=owner_team or "Engineering",
+            author=author or "Enterprise User",
+            author_id=author_id or "user",
+            icon=icon or "wrench",
+            system_prompt=system_prompt,
+            allowed_tools=enabled_tools,
+            knowledge_scopes=[],
+            agent_type="local_adk",
+            active=True,
+            is_public=is_public,
+            allowed_roles=allowed_roles if allowed_roles is not None else ["*"],
+            allowed_teams=allowed_teams if allowed_teams is not None else ["*"],
+        )
+
+        if auto_register:
+            registry.register_agent(manifest)
+
+        meta["agent_id"] = agent_id
+        meta["agent_name"] = agent_name
+        return manifest, tools, meta
 
 
 # Sample OpenAPI Spec for immediate Hackathon testing

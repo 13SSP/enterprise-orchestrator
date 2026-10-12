@@ -61,9 +61,9 @@
           <span>AI Chat & Orchestrator</span>
         </button>
         <button id="tabOnboardBtn" class="tab-btn px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
-          <i data-lucide="user-plus" class="w-4 h-4"></i>
-          <span>Onboard Team Agent</span>
-          <span id="agentsBadge" class="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full">4</span>
+          <i data-lucide="bot" class="w-4 h-4"></i>
+          <span>Agents Hub</span>
+          <span id="agentsBadge" class="bg-slate-700 text-slate-300 text-xs px-2 py-0.5 rounded-full font-mono">10</span>
         </button>
         <button id="tabSwaggerBtn" class="tab-btn px-3.5 py-2 rounded-lg text-sm font-medium flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
           <i data-lucide="file-code" class="w-4 h-4"></i>
@@ -157,93 +157,414 @@
       </form>
     </div>
 
-    <!-- TAB 2: Onboard Team Agent Studio -->
+    <!-- TAB 2: Agents Hub Directory (Matching reference design) -->
     <div id="tabOnboard" class="tab-content hidden flex-1 flex-col gap-6">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <!-- Manifest Form -->
-        <div class="lg:col-span-7 bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                <i data-lucide="user-plus" class="w-5 h-5 text-indigo-400"></i>
-                Submit Agent Manifest
-              </h2>
-              <p class="text-xs text-slate-400">Registers a new team agent into Firestore. Loaded dynamically as ADK sub-agents.</p>
-            </div>
-            <button id="fillSampleAgentBtn" class="text-xs bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-900/60 px-3 py-1 rounded-lg">
-              Auto-fill Marketing Agent
-            </button>
+      <!-- Top Header & Create Button -->
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-2xl font-bold text-white tracking-tight">Agents</h2>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Discover, invoke, and manage intelligent enterprise ADK sub-agents across your organization.
+          </p>
+        </div>
+        <button id="openCreateAgentModalBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm px-4 py-2 rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-2 cursor-pointer transition">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span>Create an agent</span>
+        </button>
+      </div>
+
+      <!-- Search and Filter Bar -->
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <!-- Search Input -->
+        <div class="relative flex-1 max-w-lg">
+          <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+          </span>
+          <input 
+            id="agentSearchInput" 
+            type="text" 
+            placeholder="Search agents" 
+            class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-8 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+          />
+          <button id="clearAgentSearchBtn" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-white text-xs cursor-pointer">
+            ✕
+          </button>
+        </div>
+
+        <!-- Filter Scope Pills: All vs Your agents (No Starred) -->
+        <div class="flex items-center bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs font-medium space-x-1">
+          <button id="filterAllAgentsBtn" class="scope-pill bg-slate-800 text-white shadow-sm px-4 py-1.5 rounded-lg transition cursor-pointer">
+            All
+          </button>
+          <button id="filterMyAgentsBtn" class="scope-pill text-slate-400 hover:text-white px-4 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5">
+            <span>Your agents</span>
+            <span id="myAgentsCountBadge" class="bg-slate-700/80 text-slate-300 text-[10px] px-1.5 py-0.2 rounded-full font-mono">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Agents Cards Grid (Matching reference screenshot) -->
+      <div id="agentsDirectoryGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Rendered dynamically by loadAgents() -->
+      </div>
+    </div>
+
+    <!-- ==================================================================== -->
+    <!-- CREATE AGENT MODAL (From Swagger, Custom Manifest, & Guide)         -->
+    <!-- ==================================================================== -->
+    <div id="createAgentModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-5 my-8 max-h-[90vh] flex flex-col">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3 flex-shrink-0">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i data-lucide="bot" class="w-5 h-5 text-indigo-400"></i>
+              Create an Agent
+            </h2>
+            <p class="text-xs text-slate-400">
+              Instantly generate tools and an ADK agent from OpenAPI/Swagger or register custom manifests.
+            </p>
           </div>
+          <button id="closeCreateAgentModalBtn" class="text-slate-400 hover:text-white text-xl cursor-pointer">&times;</button>
+        </div>
 
-          <form id="onboardForm" class="space-y-4 text-xs">
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block font-semibold text-slate-300 mb-1">Agent ID</label>
-                <input id="agentIdInput" type="text" required placeholder="e.g. marketing_agent" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
-              </div>
-              <div>
-                <label class="block font-semibold text-slate-300 mb-1">Display Name</label>
-                <input id="agentNameInput" type="text" required placeholder="e.g. Growth & Marketing Agent" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+        <!-- Modal Mode Tabs -->
+        <div class="flex border-b border-slate-800 text-xs font-medium space-x-4 flex-shrink-0">
+          <button id="modalTabSwaggerBtn" class="modal-tab text-indigo-400 border-b-2 border-indigo-500 font-bold pb-2.5 transition cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+            <span>From Swagger / OpenAPI (Automated)</span>
+          </button>
+          <button id="modalTabManifestBtn" class="modal-tab text-slate-400 hover:text-white pb-2.5 transition cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+            <span>Custom Manifest Form</span>
+          </button>
+          <button id="modalTabGuideBtn" class="modal-tab text-slate-400 hover:text-white pb-2.5 transition cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+            <span>Onboarding Instructions & Steps</span>
+          </button>
+        </div>
+
+        <!-- Modal Body (Scrollable) -->
+        <div class="overflow-y-auto flex-1 pr-1 space-y-4 text-xs">
+          
+          <!-- TAB 1: SWAGGER AUTO-GENERATION -->
+          <div id="modalContentSwagger" class="space-y-4">
+            <div class="flex items-center justify-between bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+              <span class="text-slate-400">Quick-load sample Swagger spec:</span>
+              <div class="flex gap-2">
+                <button type="button" id="modalSampleDevOpsBtn" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-2.5 py-1 rounded-lg cursor-pointer">
+                  DevOps API Spec
+                </button>
+                <button type="button" id="modalSampleFinanceBtn" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 px-2.5 py-1 rounded-lg cursor-pointer">
+                  ERP Payments Spec
+                </button>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-300 mb-1">
+                OpenAPI 3.0 / Swagger 2.0 Spec (YAML or JSON)
+              </label>
+              <textarea id="modalSwaggerSpecInput" rows="7" class="w-full font-mono text-[11px] bg-slate-950 border border-slate-700 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-indigo-500" placeholder="Paste OpenAPI YAML or JSON here..."></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block font-semibold text-slate-300 mb-1">Agent Name (Optional override)</label>
+                <input id="modalSwaggerAgentName" type="text" placeholder="Auto-derived from spec title" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none">
+              </div>
               <div>
                 <label class="block font-semibold text-slate-300 mb-1">Owner Team</label>
-                <input id="agentTeamInput" type="text" required placeholder="e.g. Marketing" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+                <input id="modalSwaggerOwnerTeam" type="text" placeholder="e.g. Engineering" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none">
               </div>
               <div>
-                <label class="block font-semibold text-slate-300 mb-1">Agent Type</label>
-                <select id="agentTypeSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
-                  <option value="local_adk">Local ADK Sub-Agent</option>
-                  <option value="remote_a2a">Remote Agent (A2A Protocol)</option>
+                <label class="block font-semibold text-slate-300 mb-1">Icon Category</label>
+                <select id="modalSwaggerIconSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none cursor-pointer">
+                  <option value="wrench">🔧 Wrench / Ops</option>
+                  <option value="chart">📊 Chart / Analytics</option>
+                  <option value="shield">🛡️ Shield / Security</option>
+                  <option value="docs">📄 Docs / Content</option>
+                  <option value="cart">🛒 Cart / Commerce</option>
+                  <option value="user">👤 User / HR</option>
+                  <option value="bot">🤖 Bot / AI</option>
                 </select>
               </div>
             </div>
 
-            <div id="remoteEndpointRow" class="hidden">
-              <label class="block font-semibold text-slate-300 mb-1">Remote A2A Protocol Endpoint</label>
-              <input id="agentEndpointInput" type="url" placeholder="https://agent.partner.corp/a2a/v1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
-            </div>
-
-            <div>
-              <label class="block font-semibold text-slate-300 mb-1">Semantic Description (Used for Gemini Router Selection)</label>
-              <textarea id="agentDescInput" rows="2" required placeholder="Describe what tasks this agent handles, e.g. campaign analytics, brand guidelines..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"></textarea>
-            </div>
-
-            <div>
-              <label class="block font-semibold text-slate-300 mb-1">System Prompt / Instructions</label>
-              <textarea id="agentPromptInput" rows="2" required placeholder="Instructions and persona for this ADK sub-agent..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"></textarea>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block font-semibold text-slate-300 mb-1">Allowed Tools (comma-separated)</label>
-                <input id="agentToolsInput" type="text" placeholder="e.g. get_system_health, check_expense_status" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+            <!-- ACCESS LIMITATION SECTION -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="font-bold text-white flex items-center gap-1.5">
+                    <i data-lucide="lock" class="w-4 h-4 text-amber-400"></i>
+                    Limit Access to Agent & Tools
+                  </h3>
+                  <p class="text-[11px] text-slate-400">
+                    Define enterprise RBAC roles, team boundaries, and Human-in-the-Loop write confirmations.
+                  </p>
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input id="modalSwaggerIsPublic" type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-indigo-500">
+                  <span class="text-xs font-semibold text-slate-300">Public (All Employees)</span>
+                </label>
               </div>
-              <div>
-                <label class="block font-semibold text-slate-300 mb-1">Knowledge Scopes (comma-separated)</label>
-                <input id="agentScopesInput" type="text" placeholder="e.g. marketing_guidelines, brand_book" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+
+              <div id="modalSwaggerRestrictedSection" class="hidden space-y-2 pt-2 border-t border-slate-800">
+                <label class="block font-semibold text-slate-300">Allowed Enterprise Roles:</label>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px]">
+                  <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 cursor-pointer">
+                    <input type="checkbox" value="devops_admin" class="modal-swagger-role rounded bg-slate-800 border-slate-700 text-indigo-600">
+                    <span class="text-slate-200">DevOps Admin</span>
+                  </label>
+                  <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 cursor-pointer">
+                    <input type="checkbox" value="it_engineer" class="modal-swagger-role rounded bg-slate-800 border-slate-700 text-indigo-600">
+                    <span class="text-slate-200">IT Engineer</span>
+                  </label>
+                  <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 cursor-pointer">
+                    <input type="checkbox" value="hr_manager" class="modal-swagger-role rounded bg-slate-800 border-slate-700 text-indigo-600">
+                    <span class="text-slate-200">HR Manager</span>
+                  </label>
+                  <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 cursor-pointer">
+                    <input type="checkbox" value="finance_officer" class="modal-swagger-role rounded bg-slate-800 border-slate-700 text-indigo-600">
+                    <span class="text-slate-200">Finance Officer</span>
+                  </label>
+                  <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 cursor-pointer">
+                    <input type="checkbox" value="employee" class="modal-swagger-role rounded bg-slate-800 border-slate-700 text-indigo-600">
+                    <span class="text-slate-200">General Employee</span>
+                  </label>
+                  <label class="flex items-center gap-1.5 bg-slate-900 px-2 py-1.5 rounded-lg border border-slate-800 cursor-pointer">
+                    <input type="checkbox" value="contractor" class="modal-swagger-role rounded bg-slate-800 border-slate-700 text-indigo-600">
+                    <span class="text-slate-200">Contractor</span>
+                  </label>
+                </div>
+
+                <div class="pt-1">
+                  <label class="block font-semibold text-slate-300 mb-1">Allowed Teams (comma-separated):</label>
+                  <input id="modalSwaggerAllowedTeams" type="text" placeholder="e.g. Engineering, IT & Operations" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none">
+                </div>
+              </div>
+
+              <div class="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-lg flex items-center gap-2">
+                <i data-lucide="shield" class="w-4 h-4 text-indigo-400"></i>
+                <span>All write operations (`POST`, `PUT`, `DELETE`) will automatically require Human-in-the-Loop write confirmation by default.</span>
               </div>
             </div>
 
-            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl shadow-lg transition">
-              Onboard & Register Agent
+            <button type="button" id="modalSubmitSwaggerBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer">
+              <i data-lucide="zap" class="w-4 h-4"></i>
+              <span>Generate Agent & Register Tools</span>
             </button>
-          </form>
+          </div>
+
+          <!-- TAB 2: MANUAL MANIFEST ONBOARDING -->
+          <div id="modalContentManifest" class="hidden space-y-4">
+            <form id="onboardForm" class="space-y-4 text-xs">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block font-semibold text-slate-300 mb-1">Agent ID</label>
+                  <input id="agentIdInput" type="text" required placeholder="e.g. marketing_agent" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-300 mb-1">Display Name</label>
+                  <input id="agentNameInput" type="text" required placeholder="e.g. Growth & Marketing Agent" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block font-semibold text-slate-300 mb-1">Owner Team</label>
+                  <input id="agentTeamInput" type="text" required placeholder="e.g. Marketing" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-300 mb-1">Agent Type</label>
+                  <select id="agentTypeSelect" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none cursor-pointer">
+                    <option value="local_adk">Local ADK Sub-Agent</option>
+                    <option value="remote_a2a">Remote Agent (A2A Protocol)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="remoteEndpointRow" class="hidden">
+                <label class="block font-semibold text-slate-300 mb-1">Remote A2A Protocol Endpoint</label>
+                <input id="agentEndpointInput" type="url" placeholder="https://agent.partner.corp/a2a/v1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none">
+              </div>
+
+              <div>
+                <label class="block font-semibold text-slate-300 mb-1">Semantic Description (Used for Gemini Router Selection)</label>
+                <textarea id="agentDescInput" rows="2" required placeholder="Describe what tasks this agent handles..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none"></textarea>
+              </div>
+
+              <div>
+                <label class="block font-semibold text-slate-300 mb-1">System Prompt / Instructions</label>
+                <textarea id="agentPromptInput" rows="2" required placeholder="Instructions and persona for this ADK sub-agent..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none"></textarea>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block font-semibold text-slate-300 mb-1">Allowed Tools (comma-separated)</label>
+                  <input id="agentToolsInput" type="text" placeholder="e.g. get_system_health, check_expense_status" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-300 mb-1">Knowledge Scopes (comma-separated)</label>
+                  <input id="agentScopesInput" type="text" placeholder="e.g. marketing_guidelines, brand_book" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none">
+                </div>
+              </div>
+
+              <div class="flex justify-between items-center pt-2">
+                <button type="button" id="fillSampleAgentBtn" class="text-xs text-indigo-400 hover:underline">
+                  Auto-fill Sample Marketing Agent
+                </button>
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 px-6 rounded-xl shadow-lg transition">
+                  Onboard & Register Agent
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- TAB 3: ONBOARDING INSTRUCTIONS & STEPS -->
+          <div id="modalContentGuide" class="hidden space-y-4 text-slate-300 leading-relaxed">
+            <div class="bg-indigo-950/40 border border-indigo-900/60 p-4 rounded-xl space-y-2">
+              <h3 class="font-bold text-indigo-200 text-sm flex items-center gap-2">
+                <i data-lucide="book-open" class="w-4 h-4 text-indigo-400"></i>
+                How to Onboard a New Agent to Enterprise Orchestrator
+              </h3>
+              <p class="text-xs text-indigo-300/90">
+                The platform supports four standardized pathways for teams to deploy and register agents into the Gemini Orchestrator Router.
+              </p>
+            </div>
+
+            <!-- Pathway 1 -->
+            <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <h4 class="font-bold text-white text-xs flex items-center gap-2">
+                <span class="bg-indigo-600 text-white w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px]">1</span>
+                Low-Code Swagger / OpenAPI Auto-Generation (Fastest)
+              </h4>
+              <p class="text-slate-400 text-xs">
+                Provide any OpenAPI 3.0 or Swagger 2.0 YAML or JSON specification. The engine automatically parses endpoints into ADK tools, synthesizes a semantic description and system prompt, and binds them to the new agent.
+              </p>
+              <ul class="list-disc list-inside text-[11px] text-slate-400 space-y-1">
+                <li>Paste the spec in the <strong>"From Swagger / OpenAPI"</strong> tab.</li>
+                <li>Configure Role Limits (`allowed_roles`) and Team Limits.</li>
+                <li>Click <strong>Generate Agent & Register Tools</strong>. The agent is immediately active in the router!</li>
+              </ul>
+            </div>
+
+            <!-- Pathway 2 -->
+            <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <h4 class="font-bold text-white text-xs flex items-center gap-2">
+                <span class="bg-indigo-600 text-white w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px]">2</span>
+                Manifest-Driven Registration
+              </h4>
+              <p class="text-slate-400 text-xs">
+                For existing sub-agents or custom agents without OpenAPI definitions, register an <code>AgentManifest</code> via the UI form or <code>POST /api/agents/onboard</code>.
+              </p>
+            </div>
+
+            <!-- Pathway 3 -->
+            <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <h4 class="font-bold text-white text-xs flex items-center gap-2">
+                <span class="bg-indigo-600 text-white w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px]">3</span>
+                Native ADK Code Sub-Agent (Python Package)
+              </h4>
+              <p class="text-slate-400 text-xs">
+                For deep reasoning agents with custom Python workflows, implement a sub-agent package under <code>agents/&lt;agent-name&gt;/</code>.
+              </p>
+            </div>
+
+            <!-- Pathway 4 -->
+            <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <h4 class="font-bold text-white text-xs flex items-center gap-2">
+                <span class="bg-indigo-600 text-white w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px]">4</span>
+                Remote Microservice via Agent-to-Agent (A2A) Protocol
+              </h4>
+              <p class="text-slate-400 text-xs">
+                Deploy an external microservice on Cloud Run or Kubernetes implementing the A2A spec, then register its URL as <code>agent_type: "remote_a2a"</code>.
+              </p>
+            </div>
+
+            <!-- Verification Checklist -->
+            <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1.5">
+              <h4 class="font-bold text-emerald-400 text-xs">✓ Post-Onboarding Verification Checklist</h4>
+              <p class="text-[11px] text-slate-400">1. Verify your agent card appears under "All" and "Your agents".</p>
+              <p class="text-[11px] text-slate-400">2. Prompt the AI Chat to verify semantic routing directs queries to the new agent.</p>
+              <p class="text-[11px] text-slate-400">3. Switch identity to test role access enforcement and human write confirmation.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================================================================== -->
+    <!-- ACCESS LIMITS MODAL (For editing existing agent permissions)         -->
+    <!-- ==================================================================== -->
+    <div id="agentAccessModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 id="editAccessModalTitle" class="font-bold text-white flex items-center gap-2 text-base">
+            <i data-lucide="lock" class="w-4 h-4 text-amber-400"></i>
+            Access Limits
+          </h3>
+          <button id="closeAgentAccessModalBtn" class="text-slate-400 hover:text-white text-lg cursor-pointer">&times;</button>
         </div>
 
-        <!-- Currently Registered Agents List -->
-        <div class="lg:col-span-5 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 flex flex-col">
-          <h2 class="text-lg font-bold text-white flex items-center justify-between mb-4">
-            <span class="flex items-center gap-2">
-              <i data-lucide="layers" class="w-5 h-5 text-sky-400"></i>
-              Active Agent Registry
-            </span>
-            <span id="agentsCount" class="text-xs font-normal text-slate-400">4 agents loaded</span>
-          </h2>
-          <div id="registeredAgentsList" class="space-y-3 overflow-y-auto max-h-[500px] flex-1 pr-1">
-            <!-- Dynamic Agent Cards -->
+        <p class="text-xs text-slate-400">
+          Configure which enterprise personas, roles, and departments have permission to invoke this agent.
+        </p>
+
+        <div class="space-y-3 text-xs">
+          <label class="flex items-center gap-2 cursor-pointer bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <input id="editAccessIsPublic" type="checkbox" class="rounded bg-slate-800 border-slate-700 text-indigo-600">
+            <div>
+              <span class="font-bold text-white block">Public Agent (All Employees)</span>
+              <span class="text-[10px] text-slate-400">When checked, any employee persona can invoke this agent.</span>
+            </div>
+          </label>
+
+          <div id="editAccessRestrictedArea" class="space-y-3 pt-2">
+            <div>
+              <label class="block font-semibold text-slate-300 mb-1.5">Authorized Roles:</label>
+              <div class="grid grid-cols-2 gap-2 text-[11px]">
+                <label class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800 cursor-pointer">
+                  <input type="checkbox" value="devops_admin" class="edit-role-check rounded bg-slate-800 border-slate-700 text-indigo-600">
+                  <span class="text-slate-300">DevOps Admin</span>
+                </label>
+                <label class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800 cursor-pointer">
+                  <input type="checkbox" value="it_engineer" class="edit-role-check rounded bg-slate-800 border-slate-700 text-indigo-600">
+                  <span class="text-slate-300">IT Engineer</span>
+                </label>
+                <label class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800 cursor-pointer">
+                  <input type="checkbox" value="hr_manager" class="edit-role-check rounded bg-slate-800 border-slate-700 text-indigo-600">
+                  <span class="text-slate-300">HR Manager</span>
+                </label>
+                <label class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800 cursor-pointer">
+                  <input type="checkbox" value="finance_officer" class="edit-role-check rounded bg-slate-800 border-slate-700 text-indigo-600">
+                  <span class="text-slate-300">Finance Officer</span>
+                </label>
+                <label class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800 cursor-pointer">
+                  <input type="checkbox" value="employee" class="edit-role-check rounded bg-slate-800 border-slate-700 text-indigo-600">
+                  <span class="text-slate-300">General Employee</span>
+                </label>
+                <label class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800 cursor-pointer">
+                  <input type="checkbox" value="contractor" class="edit-role-check rounded bg-slate-800 border-slate-700 text-indigo-600">
+                  <span class="text-slate-300">Contractor</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-300 mb-1">Authorized Teams (comma-separated):</label>
+              <input id="editAccessTeamsInput" type="text" placeholder="e.g. Engineering, Finance" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none">
+            </div>
+          </div>
+
+          <div class="flex gap-2 pt-2">
+            <button id="cancelEditAccessBtn" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2.5 rounded-xl cursor-pointer">
+              Cancel
+            </button>
+            <button id="saveEditAccessBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl cursor-pointer">
+              Save Access Limits
+            </button>
           </div>
         </div>
       </div>

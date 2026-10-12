@@ -65,6 +65,27 @@ export class OrchestratorService {
     );
   }
 
+  generateAgentFromSwagger(req: any): Observable<{ status: string; agent: AgentManifest; tools: ToolDefinition[]; metadata: any; trace_id: string }> {
+    return this.http.post<any>(`${this.apiUrl}/agents/generate-from-swagger`, req).pipe(
+      tap(() => {
+        this.refreshAgents();
+        this.refreshTools();
+      })
+    );
+  }
+
+  updateAgentAccess(agentId: string, access: { is_public: boolean; allowed_roles: string[]; allowed_teams: string[] }): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/agents/${agentId}/access`, access).pipe(
+      tap(() => this.refreshAgents())
+    );
+  }
+
+  updateToolAccess(toolName: string, access: { enabled: boolean; require_confirmation: boolean; allowed_roles: string[] }): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/tools/${toolName}/access`, access).pipe(
+      tap(() => this.refreshTools())
+    );
+  }
+
   // 4. Swagger / OpenAPI Tool Builder
   refreshTools(): void {
     this.http.get<{ tools: ToolDefinition[] }>(`${this.apiUrl}/tools`).subscribe({

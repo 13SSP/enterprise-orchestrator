@@ -4,6 +4,9 @@
     "name": "IT & Cloud Ops Agent",
     "description": "Handles IT infrastructure queries, Jira issue lookups, system restart requests, cloud server status, and developer workspace operations.",
     "owner_team": "IT & Operations",
+    "author": "Bob Martinez",
+    "author_id": "bob_ops",
+    "icon": "wrench",
     "system_prompt": "You are the IT & Operations Agent. Assist users with technical queries, infrastructure checks, and Jira tickets. For destructive or write operations, always explain what will be changed.",
     "allowed_tools": [
       "get_system_health",
@@ -20,6 +23,13 @@
     "agent_type": "local_adk",
     "remote_endpoint": null,
     "active": true,
+    "is_public": true,
+    "allowed_roles": [
+      "*"
+    ],
+    "allowed_teams": [
+      "*"
+    ],
     "created_at": null
   },
   {
@@ -27,6 +37,9 @@
     "name": "HR & People Operations Agent",
     "description": "Assists employees with PTO balance queries, company benefits, employee directory searches, internal leave policies, and onboarding questions.",
     "owner_team": "Human Resources",
+    "author": "Alice Henderson",
+    "author_id": "alice_hr",
+    "icon": "user",
     "system_prompt": "You are the HR Assistant. Provide helpful, confidential, and accurate information on benefits, time off, and company policies.",
     "allowed_tools": [
       "check_pto_balance",
@@ -40,6 +53,13 @@
     "agent_type": "local_adk",
     "remote_endpoint": null,
     "active": true,
+    "is_public": true,
+    "allowed_roles": [
+      "*"
+    ],
+    "allowed_teams": [
+      "*"
+    ],
     "created_at": null
   },
   {
@@ -47,6 +67,9 @@
     "name": "Finance & Expenses Agent",
     "description": "Handles corporate expense report inquiries, reimbursement status, departmental budget checks, and financial compliance questions.",
     "owner_team": "Finance & Accounting",
+    "author": "Charlie Zhao",
+    "author_id": "charlie_fin",
+    "icon": "cart",
     "system_prompt": "You are the Finance & Expenses Specialist. Assist with budget lookups and expense reports accurately.",
     "allowed_tools": [
       "check_expense_status",
@@ -60,6 +83,13 @@
     "agent_type": "local_adk",
     "remote_endpoint": null,
     "active": true,
+    "is_public": true,
+    "allowed_roles": [
+      "*"
+    ],
+    "allowed_teams": [
+      "*"
+    ],
     "created_at": null
   },
   {
@@ -67,6 +97,9 @@
     "name": "SecOps Remote Agent (A2A)",
     "description": "Remote Agent running over Agent-to-Agent (A2A) protocol for enterprise security audits, vulnerability scanning, and IAM compliance reviews.",
     "owner_team": "Security Ops",
+    "author": "Francisco Barciella",
+    "author_id": "francisco_gov",
+    "icon": "shield",
     "system_prompt": "You are the SecOps A2A Agent. Conduct security posture checks and firewall rule reviews.",
     "allowed_tools": [
       "scan_security_posture"
@@ -77,6 +110,13 @@
     "agent_type": "remote_a2a",
     "remote_endpoint": "https://secops.internal.corp/a2a/v1/agent",
     "active": true,
+    "is_public": true,
+    "allowed_roles": [
+      "*"
+    ],
+    "allowed_teams": [
+      "*"
+    ],
     "created_at": null
   },
   {
@@ -84,6 +124,9 @@
     "name": "Data Analytics Agent",
     "description": "Handles SQL queries, BigQuery analytics, and dashboard metrics.",
     "owner_team": "Data Platform",
+    "author": null,
+    "author_id": null,
+    "icon": "wrench",
     "system_prompt": "You are the Data Analytics Agent.",
     "allowed_tools": [
       "get_budget_overview"
@@ -94,6 +137,169 @@
     "agent_type": "local_adk",
     "remote_endpoint": null,
     "active": true,
+    "is_public": true,
+    "allowed_roles": [
+      "*"
+    ],
+    "allowed_teams": [
+      "*"
+    ],
+    "created_at": null
+  },
+  {
+    "id": "usage_pricing_agent",
+    "name": "Usage Pricing Insights Agent",
+    "description": "Strategic knowledge assistant that synthesises internal thinking, documentation, and decisions on consumption and usage-based pricing to help build scalable models.",
+    "owner_team": "Product Strategy",
+    "author": "Adam Furness",
+    "author_id": "adam_pricing",
+    "icon": "chart",
+    "system_prompt": "You are the Usage Pricing Insights Agent. Synthesise strategic pricing documentation and consumption data.",
+    "allowed_tools": [
+      "get_budget_overview"
+    ],
+    "knowledge_scopes": [
+      "finance_guidelines"
+    ],
+    "agent_type": "local_adk",
+    "remote_endpoint": null,
+    "active": true,
+    "is_public": true,
+    "allowed_roles": [
+      "*"
+    ],
+    "allowed_teams": [
+      "*"
+    ],
+    "created_at": null
+  },
+  {
+    "id": "ela_feedback_analyst",
+    "name": "ELA customer feedback analyst",
+    "description": "Analyzes Gong calls, customer sentiment, and feedback trends for ELA accounts to inform product retention strategies.",
+    "owner_team": "Customer Success",
+    "author": "Sarah Croft",
+    "author_id": "sarah_cs",
+    "icon": "docs",
+    "system_prompt": "You are the ELA Customer Feedback Analyst. Parse Gong transcript summaries and customer feedback.",
+    "allowed_tools": [],
+    "knowledge_scopes": [
+      "benefits_handbook"
+    ],
+    "agent_type": "local_adk",
+    "remote_endpoint": null,
+    "active": true,
+    "is_public": true,
+    "allowed_roles": [
+      "*"
+    ],
+    "allowed_teams": [
+      "*"
+    ],
+    "created_at": null
+  },
+  {
+    "id": "policy_bot",
+    "name": "Policy Bot",
+    "description": "Agent to assist with compliance policy inquiries, security controls, and regulatory audit queries.",
+    "owner_team": "Governance",
+    "author": "Francisco Barciella",
+    "author_id": "francisco_gov",
+    "icon": "shield",
+    "system_prompt": "You are the Policy Bot. Assist with compliance checks and corporate governance policies.",
+    "allowed_tools": [
+      "scan_security_posture"
+    ],
+    "knowledge_scopes": [
+      "security_standards"
+    ],
+    "agent_type": "local_adk",
+    "remote_endpoint": null,
+    "active": false,
+    "is_public": true,
+    "allowed_roles": [
+      "*"
+    ],
+    "allowed_teams": [
+      "*"
+    ],
+    "created_at": null
+  },
+  {
+    "id": "commerce_intake_agent",
+    "name": "Commerce Intake Agent",
+    "description": "Streamlines B2B checkout intake, vendor procurement orders, and merchant billing contract verification.",
+    "owner_team": "Commercial Ops",
+    "author": "Jai Ganesh Kamalakannan",
+    "author_id": "jai_ops",
+    "icon": "cart",
+    "system_prompt": "You are the Commerce Intake Agent. Assist with corporate purchase intakes and contract approvals.",
+    "allowed_tools": [
+      "check_expense_status"
+    ],
+    "knowledge_scopes": [
+      "finance_guidelines"
+    ],
+    "agent_type": "local_adk",
+    "remote_endpoint": null,
+    "active": true,
+    "is_public": true,
+    "allowed_roles": [
+      "*"
+    ],
+    "allowed_teams": [
+      "*"
+    ],
+    "created_at": null
+  },
+  {
+    "id": "ticket_manager_review",
+    "name": "Ticket Manager Review",
+    "description": "Analyzes Jira tickets and provides key insights on sprint health, SLA tracking, and ticket escalation bottlenecks.",
+    "owner_team": "Engineering",
+    "author": "Christiane Delazeri",
+    "author_id": "christiane_eng",
+    "icon": "wrench",
+    "system_prompt": "You are the Ticket Manager Review agent.",
+    "allowed_tools": [
+      "lookup_jira_issue"
+    ],
+    "knowledge_scopes": [
+      "it_runbooks"
+    ],
+    "agent_type": "local_adk",
+    "remote_endpoint": null,
+    "active": false,
+    "is_public": true,
+    "allowed_roles": [
+      "*"
+    ],
+    "allowed_teams": [
+      "*"
+    ],
+    "created_at": null
+  },
+  {
+    "id": "file_creator_agent",
+    "name": "file creator",
+    "description": "Agent to help create downloadable files, spreadsheets, and document templates for enterprise teams.",
+    "owner_team": "General",
+    "author": "Eurley Balentina",
+    "author_id": "eurley_dev",
+    "icon": "docs",
+    "system_prompt": "You are the file creator agent. Generate structured report documents and download templates.",
+    "allowed_tools": [],
+    "knowledge_scopes": [],
+    "agent_type": "local_adk",
+    "remote_endpoint": null,
+    "active": true,
+    "is_public": true,
+    "allowed_roles": [
+      "*"
+    ],
+    "allowed_teams": [
+      "*"
+    ],
     "created_at": null
   }
 ]

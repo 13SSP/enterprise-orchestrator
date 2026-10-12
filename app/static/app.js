@@ -3,6 +3,10 @@ let currentPersona = "devops_admin";
 let personasData = {};
 let currentJwtToken = "";
 let auditPollingInterval = null;
+let allAgentsList = [];
+let agentSearchQuery = "";
+let agentScopeFilter = "all";
+let currentEditingAgent = null;
 
 // Initialize on page load
 document.addEventListener("DOMContentLoaded", async () => {
@@ -57,6 +61,7 @@ function setupEventListeners() {
       currentJwtToken = personasData[currentPersona].jwt;
     }
     appendSystemNotice(`Switched active persona to <strong>${personaSelect.options[personaSelect.selectedIndex].text}</strong>. New JWT claims applied.`);
+    renderAgentsDirectory();
   });
 
   // JWT Modal
@@ -76,6 +81,115 @@ function setupEventListeners() {
       input.focus();
     });
   });
+
+  // Agents Hub Directory Search & Filter Listeners
+  const searchInput = document.getElementById("agentSearchInput");
+  const clearSearchBtn = document.getElementById("clearAgentSearchBtn");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      agentSearchQuery = e.target.value.trim();
+      if (clearSearchBtn) {
+        if (agentSearchQuery) clearSearchBtn.classList.remove("hidden");
+        else clearSearchBtn.classList.add("hidden");
+      }
+      renderAgentsDirectory();
+    });
+  }
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener("click", () => {
+      if (searchInput) searchInput.value = "";
+      agentSearchQuery = "";
+      clearSearchBtn.classList.add("hidden");
+      renderAgentsDirectory();
+    });
+  }
+
+  const filterAllBtn = document.getElementById("filterAllAgentsBtn");
+  const filterMyBtn = document.getElementById("filterMyAgentsBtn");
+  if (filterAllBtn && filterMyBtn) {
+    filterAllBtn.addEventListener("click", () => {
+      agentScopeFilter = "all";
+      filterAllBtn.classList.add("bg-slate-800", "text-white", "shadow-sm");
+      filterAllBtn.classList.remove("text-slate-400");
+      filterMyBtn.classList.remove("bg-slate-800", "text-white", "shadow-sm");
+      filterMyBtn.classList.add("text-slate-400");
+      renderAgentsDirectory();
+    });
+    filterMyBtn.addEventListener("click", () => {
+      agentScopeFilter = "mine";
+      filterMyBtn.classList.add("bg-slate-800", "text-white", "shadow-sm");
+      filterMyBtn.classList.remove("text-slate-400");
+      filterAllBtn.classList.remove("bg-slate-800", "text-white", "shadow-sm");
+      filterAllBtn.classList.add("text-slate-400");
+      renderAgentsDirectory();
+    });
+  }
+
+  // Create Agent Modal Listeners
+  const openCreateModalBtn = document.getElementById("openCreateAgentModalBtn");
+  const closeCreateModalBtn = document.getElementById("closeCreateAgentModalBtn");
+  const createModal = document.getElementById("createAgentModal");
+  if (openCreateModalBtn && createModal) {
+    openCreateModalBtn.addEventListener("click", () => {
+      createModal.classList.remove("hidden");
+      setCreateModalTab("swagger");
+    });
+  }
+  if (closeCreateModalBtn && createModal) {
+    closeCreateModalBtn.addEventListener("click", () => {
+      createModal.classList.add("hidden");
+    });
+  }
+
+  // Modal Tab Switching
+  document.getElementById("modalTabSwaggerBtn")?.addEventListener("click", () => setCreateModalTab("swagger"));
+  document.getElementById("modalTabManifestBtn")?.addEventListener("click", () => setCreateModalTab("manifest"));
+  document.getElementById("modalTabGuideBtn")?.addEventListener("click", () => setCreateModalTab("guide"));
+
+  // Swagger Public Checkbox toggle
+  const modalSwaggerPublicCheck = document.getElementById("modalSwaggerIsPublic");
+  const modalSwaggerRestrictedSec = document.getElementById("modalSwaggerRestrictedSection");
+  if (modalSwaggerPublicCheck && modalSwaggerRestrictedSec) {
+    modalSwaggerPublicCheck.addEventListener("change", (e) => {
+      if (e.target.checked) modalSwaggerRestrictedSec.classList.add("hidden");
+      else modalSwaggerRestrictedSec.classList.remove("hidden");
+    });
+  }
+
+  // Swagger Quick Samples in Modal
+  document.getElementById("modalSampleDevOpsBtn")?.addEventListener("click", () => {
+    fetch("/api/sample-specs").then(r => r.json()).then(res => {
+      document.getElementById("modalSwaggerSpecInput").value = res.devops_sample || "";
+      document.getElementById("modalSwaggerAgentName").value = "DevOps & Incident Manager";
+      document.getElementById("modalSwaggerOwnerTeam").value = "Engineering";
+      document.getElementById("modalSwaggerIconSelect").value = "wrench";
+    });
+  });
+  document.getElementById("modalSampleFinanceBtn")?.addEventListener("click", () => {
+    fetch("/api/sample-specs").then(r => r.json()).then(res => {
+      document.getElementById("modalSwaggerSpecInput").value = res.finance_sample || "";
+      document.getElementById("modalSwaggerAgentName").value = "ERP & Vendor Payment Agent";
+      document.getElementById("modalSwaggerOwnerTeam").value = "Finance";
+      document.getElementById("modalSwaggerIconSelect").value = "cart";
+    });
+  });
+
+  // Submit Swagger Generate Agent & Tools
+  document.getElementById("modalSubmitSwaggerBtn")?.addEventListener("click", handleModalSwaggerSubmit);
+
+  // Access Limits Modal Listeners
+  document.getElementById("closeAgentAccessModalBtn")?.addEventListener("click", () => {
+    document.getElementById("agentAccessModal").classList.add("hidden");
+  });
+  document.getElementById("cancelEditAccessBtn")?.addEventListener("click", () => {
+    document.getElementById("agentAccessModal").classList.add("hidden");
+  });
+  document.getElementById("editAccessIsPublic")?.addEventListener("change", (e) => {
+    const area = document.getElementById("editAccessRestrictedArea");
+    if (e.target.checked) area.classList.add("hidden");
+    else area.classList.remove("hidden");
+  });
+  document.getElementById("saveEditAccessBtn")?.addEventListener("click", handleSaveAgentAccess);
 
   // Onboarding Form
   document.getElementById("onboardForm").addEventListener("submit", handleOnboardSubmit);
@@ -347,62 +461,356 @@ function appendSystemNotice(text, type = "info") {
   chatHistory.scrollTop = chatHistory.scrollHeight;
 }
 
-// ----------------- Agent Onboarding -----------------
+// ----------------- Agent Directory & Hub -----------------
 
 async function loadAgents() {
   try {
     const res = await fetch("/api/agents");
     const data = await res.json();
-    const agents = data.agents || [];
+    allAgentsList = data.agents || [];
 
-    document.getElementById("agentsBadge").innerText = agents.length;
-    document.getElementById("agentsCount").innerText = `${agents.length} agents loaded`;
+    const badge = document.getElementById("agentsBadge");
+    if (badge) badge.innerText = allAgentsList.length;
 
     // Populate dropdown in Swagger tab
     const select = document.getElementById("swaggerTargetAgent");
-    select.innerHTML = '<option value="">-- No specific agent (Global Registry) --</option>';
-    agents.forEach(a => {
-      const opt = document.createElement("option");
-      opt.value = a.id;
-      opt.innerText = `${a.name} (${a.owner_team})`;
-      select.appendChild(opt);
-    });
+    if (select) {
+      select.innerHTML = '<option value="">-- No specific agent (Global Registry) --</option>';
+      allAgentsList.forEach(a => {
+        const opt = document.createElement("option");
+        opt.value = a.id;
+        opt.innerText = `${a.name} (${a.owner_team})`;
+        select.appendChild(opt);
+      });
+    }
 
-    // Populate Registered Agents List
-    const container = document.getElementById("registeredAgentsList");
-    container.innerHTML = "";
-    agents.forEach(agent => {
-      const card = document.createElement("div");
-      card.className = "p-3.5 rounded-xl bg-slate-800/70 border border-slate-700/80 text-xs space-y-2 hover:border-slate-600 transition";
-      const isRemote = agent.agent_type === "remote_a2a";
-
-      card.innerHTML = `
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full ${agent.active ? 'bg-emerald-400' : 'bg-slate-500'}"></span>
-            <span class="font-bold text-white text-sm">${escapeHtml(agent.name)}</span>
-          </div>
-          <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${isRemote ? 'bg-sky-950 text-sky-300 border border-sky-800' : 'bg-indigo-950 text-indigo-300 border border-indigo-800'}">
-            ${isRemote ? 'Remote A2A' : 'ADK Sub-Agent'}
-          </span>
-        </div>
-        <p class="text-slate-300 leading-snug">${escapeHtml(agent.description)}</p>
-        <div class="flex flex-wrap gap-1 text-[10px] text-slate-400">
-          <span class="bg-slate-900 px-2 py-0.5 rounded">Team: <strong>${escapeHtml(agent.owner_team)}</strong></span>
-          <span class="bg-slate-900 px-2 py-0.5 rounded">Tools: <strong>${agent.allowed_tools.length}</strong></span>
-          <span class="bg-slate-900 px-2 py-0.5 rounded">Scopes: <strong>${agent.knowledge_scopes.join(', ') || 'None'}</strong></span>
-        </div>
-        <div class="flex items-center justify-between pt-1 border-t border-slate-700/50">
-          <span class="text-[10px] text-slate-500 font-mono">ID: ${agent.id}</span>
-          <button onclick="toggleAgentActive('${agent.id}')" class="text-[11px] text-slate-300 hover:text-white underline">
-            ${agent.active ? 'Deactivate' : 'Activate'}
-          </button>
-        </div>
-      `;
-      container.appendChild(card);
-    });
+    renderAgentsDirectory();
   } catch (err) {
     console.error("Error loading agents:", err);
+  }
+}
+
+function renderAgentsDirectory() {
+  const container = document.getElementById("agentsDirectoryGrid");
+  if (!container) return;
+
+  const currentPersonaData = personasData[currentPersona]?.user;
+  const userSub = currentPersonaData?.sub;
+  const userTeam = currentPersonaData?.team;
+  const allowedAgentIds = currentPersonaData?.allowed_agent_ids || ["*"];
+
+  // Calculate my agents count
+  const myCount = allAgentsList.filter(agent => {
+    const isAuthor = agent.author_id === userSub || (agent.author && agent.author.toLowerCase().includes(currentPersonaData?.name.toLowerCase()));
+    const isMyTeam = userTeam && agent.owner_team.toLowerCase() === userTeam.toLowerCase();
+    const isAssigned = allowedAgentIds.includes("*") || allowedAgentIds.includes(agent.id);
+    return isAuthor || isMyTeam || isAssigned;
+  }).length;
+
+  const myBadge = document.getElementById("myAgentsCountBadge");
+  if (myBadge) myBadge.innerText = myCount;
+
+  // Filter agents based on scope and search
+  const filtered = allAgentsList.filter(agent => {
+    if (agentScopeFilter === "mine") {
+      const isAuthor = agent.author_id === userSub || (agent.author && agent.author.toLowerCase().includes(currentPersonaData?.name.toLowerCase()));
+      const isMyTeam = userTeam && agent.owner_team.toLowerCase() === userTeam.toLowerCase();
+      const isAssigned = allowedAgentIds.includes("*") || allowedAgentIds.includes(agent.id);
+      if (!isAuthor && !isMyTeam && !isAssigned) return false;
+    }
+    if (!agentSearchQuery) return true;
+    const q = agentSearchQuery.toLowerCase();
+    return (
+      agent.name.toLowerCase().includes(q) ||
+      agent.description.toLowerCase().includes(q) ||
+      agent.owner_team.toLowerCase().includes(q) ||
+      (agent.author && agent.author.toLowerCase().includes(q)) ||
+      agent.allowed_tools.some(t => t.toLowerCase().includes(q))
+    );
+  });
+
+  container.innerHTML = "";
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-1 md:col-span-2 bg-slate-900/40 border border-slate-800/80 rounded-2xl p-12 text-center max-w-md mx-auto space-y-3">
+        <span class="text-4xl block">🔍</span>
+        <h3 class="text-base font-semibold text-white">No agents found</h3>
+        <p class="text-xs text-slate-400">
+          No agents match your query "${escapeHtml(agentSearchQuery)}" in ${agentScopeFilter === 'mine' ? 'Your agents' : 'All agents'}.
+        </p>
+      </div>
+    `;
+    return;
+  }
+
+  filtered.forEach(agent => {
+    const card = document.createElement("div");
+    card.className = "bg-slate-900/80 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 flex flex-col justify-between transition group shadow-sm";
+    const isRemote = agent.agent_type === "remote_a2a";
+
+    const badgeIconClass = getAgentBadgeClass(agent.icon, agent.owner_team);
+    const iconSymbol = getAgentIconSymbol(agent.icon, agent.owner_team);
+
+    card.innerHTML = `
+      <div>
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div class="${badgeIconClass} w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 shadow-inner">
+            <span>${iconSymbol}</span>
+          </div>
+          <div class="flex items-center gap-1.5 flex-wrap justify-end">
+            <span class="${agent.is_public !== false ? 'bg-slate-800 text-slate-300 border-slate-700/60' : 'bg-amber-950 text-amber-300 border-amber-800/60'} border text-[10px] px-2 py-0.5 rounded-full">
+              ${agent.is_public !== false ? 'Public' : 'Restricted'}
+            </span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-mono border ${isRemote ? 'bg-sky-950 text-sky-300 border-sky-800' : 'bg-indigo-950 text-indigo-300 border-indigo-800'}">
+              ${isRemote ? 'Remote A2A' : 'ADK Agent'}
+            </span>
+          </div>
+        </div>
+
+        <h3 class="text-base font-bold text-white group-hover:text-indigo-300 transition-colors">
+          ${escapeHtml(agent.name)}
+        </h3>
+
+        <div class="text-xs text-slate-400 mt-0.5 mb-2.5 flex items-center gap-1.5 flex-wrap">
+          <span>by</span>
+          <a href="javascript:void(0)" onclick="filterByAuthor('${escapeHtml(agent.author || agent.owner_team)}')" class="text-blue-400 hover:text-blue-300 hover:underline inline-flex items-center gap-0.5">
+            <span>${escapeHtml(agent.author || agent.owner_team)}</span>
+            <span class="text-[10px]">↗</span>
+          </a>
+          ${!agent.active ? '<span class="text-slate-500 font-normal">(deactivated)</span>' : ''}
+        </div>
+
+        <p class="text-xs text-slate-300 leading-relaxed line-clamp-3 mb-4">
+          ${escapeHtml(agent.description)}
+        </p>
+      </div>
+
+      <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+        <div class="flex items-center gap-2 text-[11px] font-mono">
+          <span class="bg-slate-800/80 px-2 py-0.5 rounded text-slate-300">
+            Team: <strong>${escapeHtml(agent.owner_team)}</strong>
+          </span>
+          <span class="bg-slate-800/80 px-2 py-0.5 rounded text-slate-300">
+            Tools: <strong>${agent.allowed_tools.length}</strong>
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="openAgentAccessModal('${agent.id}')" class="text-[11px] text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded-lg transition cursor-pointer" title="Manage Access Limits and Roles">
+            ⚙️ Limits
+          </button>
+          <button onclick="toggleAgentActive('${agent.id}')" class="text-[11px] text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded-lg transition cursor-pointer">
+            ${agent.active ? 'Deactivate' : 'Activate'}
+          </button>
+          <button onclick="chatWithAgent('${agent.id}')" class="text-[11px] bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-2.5 py-1 rounded-lg transition cursor-pointer shadow-sm">
+            💬 Chat
+          </button>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function filterByAuthor(authorName) {
+  const searchInput = document.getElementById("agentSearchInput");
+  if (searchInput) {
+    searchInput.value = authorName;
+    agentSearchQuery = authorName;
+    const clearBtn = document.getElementById("clearAgentSearchBtn");
+    if (clearBtn) clearBtn.classList.remove("hidden");
+    renderAgentsDirectory();
+  }
+}
+
+function chatWithAgent(agentId) {
+  const agent = allAgentsList.find(a => a.id === agentId);
+  if (!agent) return;
+
+  // Switch to Chat tab
+  const chatTabBtn = document.getElementById("tabChatBtn");
+  if (chatTabBtn) chatTabBtn.click();
+
+  const chatInput = document.getElementById("chatInput");
+  if (chatInput) {
+    chatInput.value = `Ask ${agent.name}: `;
+    chatInput.focus();
+  }
+}
+
+function setCreateModalTab(tab) {
+  const tabs = ["swagger", "manifest", "guide"];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`modalTab${t.charAt(0).toUpperCase() + t.slice(1)}Btn`);
+    const content = document.getElementById(`modalContent${t.charAt(0).toUpperCase() + t.slice(1)}`);
+    if (t === tab) {
+      btn?.classList.add("text-indigo-400", "border-b-2", "border-indigo-500", "font-bold");
+      btn?.classList.remove("text-slate-400");
+      content?.classList.remove("hidden");
+    } else {
+      btn?.classList.remove("text-indigo-400", "border-b-2", "border-indigo-500", "font-bold");
+      btn?.classList.add("text-slate-400");
+      content?.classList.add("hidden");
+    }
+  });
+  if (window.lucide) window.lucide.createIcons();
+}
+
+async function handleModalSwaggerSubmit() {
+  const specContent = document.getElementById("modalSwaggerSpecInput").value.trim();
+  if (!specContent) {
+    alert("Please provide an OpenAPI or Swagger specification.");
+    return;
+  }
+
+  const agentName = document.getElementById("modalSwaggerAgentName").value.trim();
+  const ownerTeam = document.getElementById("modalSwaggerOwnerTeam").value.trim() || "Engineering";
+  const icon = document.getElementById("modalSwaggerIconSelect").value || "wrench";
+  const isPublic = document.getElementById("modalSwaggerIsPublic").checked;
+
+  let roles = ["*"];
+  if (!isPublic) {
+    const selected = [];
+    document.querySelectorAll(".modal-swagger-role:checked").forEach(cb => selected.push(cb.value));
+    roles = selected.length > 0 ? selected : ["*"];
+  }
+
+  const teamsInput = document.getElementById("modalSwaggerAllowedTeams").value.trim();
+  const allowedTeams = teamsInput ? teamsInput.split(",").map(s => s.trim()).filter(Boolean) : ["*"];
+
+  const currentPersonaUser = personasData[currentPersona]?.user;
+
+  const payload = {
+    spec_content: specContent,
+    agent_name: agentName || undefined,
+    owner_team: ownerTeam,
+    author: currentPersonaUser?.name || "Enterprise User",
+    author_id: currentPersonaUser?.sub || "user",
+    icon: icon,
+    is_public: isPublic,
+    allowed_roles: roles,
+    allowed_teams: isPublic ? ["*"] : allowedTeams,
+    auto_register: true
+  };
+
+  const btn = document.getElementById("modalSubmitSwaggerBtn");
+  btn.disabled = true;
+  btn.innerText = "Generating Agent & Tools...";
+
+  try {
+    const res = await fetch("/api/agents/generate-from-swagger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to generate agent");
+
+    alert(`Success! Generated agent '${data.agent.name}' with ${data.tools.length} ADK tools.`);
+    document.getElementById("createAgentModal").classList.add("hidden");
+    await loadAgents();
+    await loadTools();
+    await loadAuditLogs();
+  } catch (err) {
+    alert(`Swagger generation error: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="zap" class="w-4 h-4"></i><span>Generate Agent & Register Tools</span>';
+    if (window.lucide) window.lucide.createIcons();
+  }
+}
+
+function openAgentAccessModal(agentId) {
+  const agent = allAgentsList.find(a => a.id === agentId);
+  if (!agent) return;
+  currentEditingAgent = agent;
+
+  document.getElementById("editAccessModalTitle").innerText = `Access Limits: ${agent.name}`;
+  const isPublicCheck = document.getElementById("editAccessIsPublic");
+  isPublicCheck.checked = agent.is_public !== false;
+
+  const restrictedArea = document.getElementById("editAccessRestrictedArea");
+  if (isPublicCheck.checked) restrictedArea.classList.add("hidden");
+  else restrictedArea.classList.remove("hidden");
+
+  const allowedRoles = agent.allowed_roles || ["*"];
+  document.querySelectorAll(".edit-role-check").forEach(cb => {
+    cb.checked = allowedRoles.includes(cb.value);
+  });
+
+  const teams = (agent.allowed_teams || []).filter(t => t !== "*").join(", ");
+  document.getElementById("editAccessTeamsInput").value = teams;
+
+  document.getElementById("agentAccessModal").classList.remove("hidden");
+}
+
+async function handleSaveAgentAccess() {
+  if (!currentEditingAgent) return;
+
+  const isPublic = document.getElementById("editAccessIsPublic").checked;
+  let roles = ["*"];
+  if (!isPublic) {
+    const selected = [];
+    document.querySelectorAll(".edit-role-check:checked").forEach(cb => selected.push(cb.value));
+    roles = selected.length > 0 ? selected : ["*"];
+  }
+
+  const teamsInput = document.getElementById("editAccessTeamsInput").value.trim();
+  const allowedTeams = teamsInput ? teamsInput.split(",").map(s => s.trim()).filter(Boolean) : ["*"];
+
+  const payload = {
+    is_public: isPublic,
+    allowed_roles: roles,
+    allowed_teams: isPublic ? ["*"] : allowedTeams
+  };
+
+  try {
+    const res = await fetch(`/api/agents/${currentEditingAgent.id}/access`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Failed to update access");
+
+    alert(`Access limits updated for '${currentEditingAgent.name}'.`);
+    document.getElementById("agentAccessModal").classList.add("hidden");
+    await loadAgents();
+  } catch (err) {
+    alert(`Update error: ${err.message}`);
+  }
+}
+
+function getAgentIconSymbol(icon, team) {
+  switch (icon) {
+    case 'wrench': return '🔧';
+    case 'chart': return '📊';
+    case 'shield': return '🛡️';
+    case 'docs': return '📄';
+    case 'cart': return '🛒';
+    case 'user': return '👤';
+    case 'bot': return '🤖';
+    case 'code': return '💻';
+    default:
+      if (team?.toLowerCase().includes('it') || team?.toLowerCase().includes('engineer')) return '🔧';
+      if (team?.toLowerCase().includes('hr') || team?.toLowerCase().includes('people')) return '👤';
+      if (team?.toLowerCase().includes('finance')) return '🛒';
+      return '🤖';
+  }
+}
+
+function getAgentBadgeClass(icon, team) {
+  switch (icon) {
+    case 'chart': return 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60';
+    case 'docs': return 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60';
+    case 'shield': return 'bg-sky-950/80 text-sky-400 border border-sky-800/60';
+    case 'cart': return 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60';
+    case 'user': return 'bg-blue-950/80 text-blue-400 border border-blue-800/60';
+    case 'wrench': return 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60';
+    default: return 'bg-indigo-950/80 text-indigo-400 border border-indigo-800/60';
   }
 }
 

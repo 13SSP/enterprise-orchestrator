@@ -29,6 +29,33 @@ class ImportSwaggerRequest(BaseModel):
     spec_url: Optional[str] = None
     target_agent_id: Optional[str] = None
 
+class GenerateAgentSwaggerRequest(BaseModel):
+    spec_content: Optional[str] = None
+    spec_url: Optional[str] = None
+    agent_id: Optional[str] = None
+    agent_name: Optional[str] = None
+    agent_description: Optional[str] = None
+    system_prompt: Optional[str] = None
+    owner_team: Optional[str] = "Engineering"
+    author: Optional[str] = None
+    author_id: Optional[str] = None
+    icon: Optional[str] = "wrench"
+    is_public: bool = True
+    allowed_roles: List[str] = ["*"]
+    allowed_teams: List[str] = ["*"]
+    tool_overrides: Optional[Dict[str, Dict[str, Any]]] = None
+    auto_register: bool = True
+
+class UpdateAgentAccessRequest(BaseModel):
+    is_public: bool = True
+    allowed_roles: List[str] = ["*"]
+    allowed_teams: List[str] = ["*"]
+
+class UpdateToolAccessRequest(BaseModel):
+    enabled: bool = True
+    require_confirmation: bool = False
+    allowed_roles: List[str] = ["*"]
+
 class DocumentUploadRequest(BaseModel):
     title: str
     scope: str
@@ -70,9 +97,89 @@ def handle_action_confirmation(req: ConfirmActionRequest):
 # ----------------- Agent Onboarding & Registry -----------------
 
 @router.get("/agents")
-def list_agents():
+def list_agents(search: Optional[str] = None):
     agents = registry.list_agents()
+    if search:
+        s = search.lower().strip()
+        agents = [
+            a for a in agents 
+            if s in a.name.lower() or s in a.description.lower() or s in a.owner_team.lower() or (a.author and s in a.author.lower())
+        ]
     return {"agents": [a.model_dump() for a in agents]}
+
+@router.post("/agents/generate-from-swagger")
+def generate_agent_from_swagger(req: GenerateAgentSwaggerRequest):
+    trace_id = str(uuid.uuid4())
+    try:
+        if req.spec_url:
+            spec_data = OpenAPIImporter.fetch_from_url(req.spec_url)
+        elif req.spec_content:
+            spec_data = OpenAPIImporter.parse_spec_content(req.spec_content)
+        else:
+            raise HTTPException(status_code=400, detail="Either spec_content or spec_url must be provided.")
+
+        manifest, tools, meta = OpenAPIImporter.generate_agent_and_tools(
+            spec_data=spec_data,
+            author=req.author,
+            author_id=req.author_id,
+            owner_team=req.owner_team,
+            agent_id_override=req.agent_id,
+            agent_name_override=req.agent_name,
+            agent_description_override=req.agent_description,
+            system_prompt_override=req.system_prompt,
+            icon=req.icon or "wrench",
+            is_public=req.is_public,
+            allowed_roles=req.allowed_roles,
+            allowed_teams=req.allowed_teams,
+            tool_overrides=req.tool_overrides,
+            auto_register=req.auto_register
+        )
+
+        observability.log_event(
+            event_type="AGENT_CREATED_FROM_SWAGGER",
+            severity="NOTICE",
+            message=f"Agent '{manifest.name}' ({manifest.id}) auto-generated from OpenAPI spec with {len(manifest.allowed_tools)} tools",
+            details={
+                "agent": manifest.model_dump(),
+                "tools_count": len(tools),
+                "is_public": manifest.is_public,
+                "allowed_roles": manifest.allowed_roles,
+                "metadata": meta
+            },
+            trace_id=trace_id
+        )
+
+        return {
+            "status": "success",
+            "agent": manifest.model_dump(),
+            "tools": [t.model_dump() for t in tools],
+            "metadata": meta,
+            "trace_id": trace_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to generate agent from Swagger: {str(e)}")
+
+@router.put("/agents/{agent_id}/access")
+def update_agent_access(agent_id: str, req: UpdateAgentAccessRequest):
+    agent = registry.get_agent(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    agent.is_public = req.is_public
+    agent.allowed_roles = req.allowed_roles
+    agent.allowed_teams = req.allowed_teams
+    registry.register_agent(agent)
+    return {"status": "success", "agent": agent.model_dump()}
+
+@router.put("/tools/{tool_name}/access")
+def update_tool_access(tool_name: str, req: UpdateToolAccessRequest):
+    tool = registry.get_tool(tool_name)
+    if not tool:
+        raise HTTPException(status_code=404, detail="Tool not found")
+    tool.enabled = req.enabled
+    tool.require_confirmation = req.require_confirmation
+    tool.allowed_roles = req.allowed_roles
+    registry.register_tool(tool)
+    return {"status": "success", "tool": tool.model_dump()}
 
 @router.post("/agents/onboard")
 def onboard_agent(manifest: AgentManifest):
