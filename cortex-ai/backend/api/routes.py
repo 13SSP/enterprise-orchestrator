@@ -353,14 +353,116 @@ def confirm_action(req: ConfirmActionRequest):
         "action": action.model_dump()
     }
 
+class SwaggerGenerateRequest(BaseModel):
+    agent_name: str = Field(..., description="Display name for the agent")
+    agent_id: Optional[str] = None
+    author: Optional[str] = "Enterprise Developer"
+    author_id: Optional[str] = "bob_ops"
+    owner_team: Optional[str] = "Operations"
+    allowed_roles: Optional[List[str]] = None
+    base_url: Optional[str] = "http://127.0.0.1:8000"
+    swagger_json: Optional[str] = None
+    url: Optional[str] = None
+
+class AgentAccessUpdateRequest(BaseModel):
+    allowed_roles: Optional[List[str]] = None
+    allowed_teams: Optional[List[str]] = None
+    active: Optional[bool] = None
+
+class ToolAccessUpdateRequest(BaseModel):
+    allowed_roles: Optional[List[str]] = None
+    enabled: Optional[bool] = None
+    requires_human_approval: Optional[bool] = None
+
 @router_api.get("/agents", tags=["Registry"])
-def list_agents():
-    return {"agents": [a.model_dump() for a in agent_registry.list_agents()]}
+def list_agents(
+    q: Optional[str] = None,
+    scope: Optional[str] = None,
+    persona: Optional[str] = "bob_ops"
+):
+    user = DEMO_PERSONAS.get(persona, DEMO_PERSONAS.get("bob_ops"))
+    dept_map = {
+        "dept-eng": "Operations",
+        "dept-hr": "HR Operations",
+        "dept-fin": "Corporate Finance",
+        "dept-sec": "Security"
+    }
+    user_team = dept_map.get(getattr(user, "department_id", ""), "") if user else None
+    user_id = user.sub if user else persona
+    agents = agent_registry.search_agents(
+        query=q,
+        scope=scope,
+        persona_id=user_id,
+        persona_team=user_team
+    )
+    return {"agents": [a.model_dump() for a in agents]}
 
 @router_api.post("/agents/onboard", tags=["Registry"])
 def onboard_agent(manifest: AgentManifest):
     reg = agent_registry.register_agent(manifest)
     return {"status": "onboarded", "agent": reg.model_dump()}
+
+@router_api.post("/agents/generate-from-swagger", tags=["Registry"])
+def generate_agent_from_swagger(req: SwaggerGenerateRequest):
+    from tool_factory.generator import tool_factory
+    spec = {}
+    if req.swagger_json:
+        try:
+            spec = json.loads(req.swagger_json)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON in swagger_json: {str(e)}")
+    elif req.url:
+        try:
+            r = httpx.get(req.url, timeout=10.0)
+            spec = r.json()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch OpenAPI spec from URL: {str(e)}")
+    else:
+        raise HTTPException(status_code=400, detail="Must provide swagger_json or url")
+
+    res = tool_factory.generate_agent_and_tools(
+        openapi_dict=spec,
+        agent_name=req.agent_name,
+        agent_id=req.agent_id,
+        author=req.author or "Enterprise Developer",
+        author_id=req.author_id or "bob_ops",
+        owner_team=req.owner_team or "Operations",
+        allowed_roles=req.allowed_roles or ["*"],
+        base_url=req.base_url or "http://127.0.0.1:8000"
+    )
+    return res
+
+@router_api.put("/agents/{agent_id}/access", tags=["Registry"])
+def update_agent_access(agent_id: str, req: AgentAccessUpdateRequest):
+    res = agent_registry.update_access(
+        agent_id=agent_id,
+        allowed_roles=req.allowed_roles,
+        allowed_teams=req.allowed_teams,
+        active=req.active
+    )
+    if not res:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return {"status": "updated", "agent": res.model_dump()}
+
+@router_api.delete("/agents/{agent_id}", tags=["Registry"])
+def delete_agent(agent_id: str):
+    success = agent_registry.delete_agent(agent_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return {"status": "deleted", "agent_id": agent_id}
+
+@router_api.put("/tools/{tool_name}/access", tags=["Tool Registry"])
+def update_tool_access(tool_name: str, req: ToolAccessUpdateRequest):
+    res = tool_registry.update_access(
+        tool_name=tool_name,
+        allowed_roles=req.allowed_roles,
+        enabled=req.enabled,
+        requires_human_approval=req.requires_human_approval
+    )
+    if not res:
+        raise HTTPException(status_code=404, detail="Tool not found")
+    return {"status": "updated", "tool": res.model_dump()}
+
 
 @router_api.get("/tools", tags=["Tool Registry"])
 def list_tools():

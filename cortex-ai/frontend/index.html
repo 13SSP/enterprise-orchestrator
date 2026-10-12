@@ -102,6 +102,8 @@
 
           <!-- Other Views -->
           <div id="dynamicView" class="hidden max-w-5xl mx-auto space-y-4"></div>
+          <!-- Modal Backdrop -->
+          <div id="modalBackdrop" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4"></div>
         </div>
       </main>
     </div>
@@ -158,22 +160,8 @@
             renderPromptLibrary();
             return;
           } else if (tab === 'agents') {
-            const r = await fetch('http://127.0.0.1:8000/api/agents');
-            const d = await r.json();
-            let html = '<h3 class="text-base font-bold text-slate-200">Onboarded Team Agents</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
-            (d.agents || []).forEach(a => {
-              html += `<div class="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                <div class="flex items-center justify-between"><span class="font-bold text-sm text-blue-400">${a.name}</span><span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span></div>
-                <div class="text-xs text-slate-400">${a.description}</div>
-                <div class="text-[11px] font-mono text-slate-500 pt-2 border-t border-slate-800/80">
-                  <div>Team: <span class="text-slate-300">${a.owner_team}</span></div>
-                  <div>Model: <span class="text-indigo-400">${a.preferred_model}</span></div>
-                  <div>Tools: <span class="text-cyan-400">${a.allowed_tools.length} permitted</span></div>
-                </div>
-              </div>`;
-            });
-            html += '</div>';
-            dv.innerHTML = html;
+            await loadAgentsHub();
+            return;
           } else if (tab === 'tools') {
             const r = await fetch('http://127.0.0.1:8000/api/tools');
             const d = await r.json();
@@ -449,6 +437,597 @@
           input.value = text;
           handleSend();
         }
+      }
+
+      // ==========================================
+      // AGENTS HUB & SWAGGER GENERATOR LOGIC
+      // ==========================================
+      window._agentsScope = 'all';
+      window._agentsSearchQuery = '';
+      window._allAgentsList = [];
+
+      async function loadAgentsHub() {
+        const dv = document.getElementById('dynamicView');
+        if (!dv) return;
+        dv.innerHTML = '<div class="text-slate-500 font-mono text-xs p-8 text-center">Loading enterprise agents directory...</div>';
+        try {
+          const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+          const scope = window._agentsScope || 'all';
+          const r = await fetch(`http://127.0.0.1:8000/api/agents?scope=${scope}&persona=${encodeURIComponent(persona)}`);
+          const d = await r.json();
+          window._allAgentsList = d.agents || [];
+          renderAgentsHub();
+        } catch(e) {
+          console.error(e);
+          dv.innerHTML = '<div class="text-red-400 text-xs p-4 bg-red-950/20 border border-red-900 rounded-xl">Error connecting to agents backend gateway.</div>';
+        }
+      }
+
+      function setAgentsScope(scope) {
+        window._agentsScope = scope;
+        renderAgentsHub();
+      }
+
+      function handleAgentSearch(val) {
+        window._agentsSearchQuery = val;
+        renderAgentsHub();
+        const input = document.getElementById('agentSearchInput');
+        if (input) {
+          input.focus();
+          input.selectionStart = input.selectionEnd = input.value.length;
+        }
+      }
+
+      function renderAgentsHub() {
+        const dv = document.getElementById('dynamicView');
+        if (!dv) return;
+        const scope = window._agentsScope || 'all';
+        const query = (window._agentsSearchQuery || '').toLowerCase().trim();
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+
+        let list = (window._allAgentsList || []).filter(a => {
+          if (scope === 'mine') {
+            const matchesMine = (a.author_id === persona) || 
+                                (persona === 'bob_ops' && (a.owner_team.includes('DevOps') || a.owner_team.includes('Operations') || a.owner_team.includes('Productivity') || a.owner_team.includes('IT'))) ||
+                                (persona === 'alice_hr' && a.owner_team.includes('HR')) ||
+                                (persona === 'charlie_fin' && a.owner_team.includes('Finance'));
+            if (!matchesMine) return false;
+          }
+          if (query) {
+            const match = (a.name && a.name.toLowerCase().includes(query)) ||
+                          (a.description && a.description.toLowerCase().includes(query)) ||
+                          (a.author && a.author.toLowerCase().includes(query)) ||
+                          (a.owner_team && a.owner_team.toLowerCase().includes(query)) ||
+                          (a.allowed_tools && a.allowed_tools.some(t => t.toLowerCase().includes(query)));
+            if (!match) return false;
+          }
+          return true;
+        });
+
+        // Scope pill toggle: Your agents vs All
+        const scopeToggleHtml = `
+          <div class="inline-flex rounded-xl bg-slate-900 p-1 border border-slate-800 text-xs font-medium">
+            <button onclick="setAgentsScope('mine')" class="px-3.5 py-1.5 rounded-lg transition ${scope === 'mine' ? 'bg-slate-800 text-white font-semibold shadow-sm' : 'text-slate-400 hover:text-slate-200'}">
+              Your agents
+            </button>
+            <button onclick="setAgentsScope('all')" class="px-3.5 py-1.5 rounded-lg transition ${scope === 'all' ? 'bg-slate-800 text-white font-semibold shadow-sm' : 'text-slate-400 hover:text-slate-200'}">
+              All
+            </button>
+          </div>
+        `;
+
+        let cardsHtml = '';
+        if (list.length === 0) {
+          cardsHtml = `<div class="col-span-full p-12 text-center bg-slate-900/40 rounded-2xl border border-slate-800/80 text-slate-500 text-xs">
+            No agents found matching "${query}". Try clearing your search or switching toggles.
+          </div>`;
+        } else {
+          cardsHtml = list.map(a => {
+            const isDeactivated = (a.active === false);
+            const statusLabel = isDeactivated 
+              ? `<span class="text-xs font-normal text-slate-400 ml-1.5">(deactivated)</span>` 
+              : `<span class="w-2 h-2 rounded-full bg-emerald-500 inline-block ml-1.5 animate-pulse" title="Active"></span>`;
+
+            // Hexagonal badge icon with symbol matching screenshot
+            let iconSymbol = '⬡';
+            if (a.icon === 'calculator' || a.id.includes('math')) iconSymbol = '📐';
+            else if (a.icon === 'user' || a.id.includes('human')) iconSymbol = '👤';
+            else if (a.icon === 'code' || a.id.includes('swe')) iconSymbol = '💻';
+            else if (a.icon === 'trending-up' || a.id.includes('fin')) iconSymbol = '📊';
+            else if (a.id.includes('hr')) iconSymbol = '👥';
+            else if (a.id.includes('ops')) iconSymbol = '⚙️';
+            else if (a.id.includes('prod')) iconSymbol = '📄';
+
+            const rolesText = (a.allowed_roles && a.allowed_roles.includes('*')) 
+              ? 'All Roles' 
+              : (a.allowed_roles || []).join(', ');
+
+            return `
+              <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700/80 transition flex flex-col justify-between space-y-4 shadow-sm group">
+                <div class="space-y-3">
+                  <div class="flex items-start gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-slate-800/90 border border-slate-700/80 flex items-center justify-center text-lg text-indigo-400 shrink-0 font-bold shadow-inner">
+                      ${iconSymbol}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-baseline flex-wrap gap-1">
+                        <h4 class="font-bold text-sm text-slate-100 group-hover:text-blue-400 transition">${a.name}</h4>
+                        ${statusLabel}
+                      </div>
+                      <div class="text-[11px] text-slate-400 font-medium flex items-center gap-1 mt-0.5">
+                        by ${a.author || 'Google'} <span class="text-[10px] text-slate-500">↗</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p class="text-xs text-slate-400 leading-relaxed line-clamp-3">
+                    ${a.description || 'Specialized enterprise agent.'}
+                  </p>
+
+                  <div class="pt-2 border-t border-slate-800/80 space-y-1.5 text-[11px] font-mono">
+                    <div class="flex items-center justify-between text-slate-400">
+                      <span>Team: <strong class="text-slate-300 font-sans">${a.owner_team || 'Core'}</strong></span>
+                      <span class="px-2 py-0.5 rounded bg-cyan-950/40 text-cyan-400 border border-cyan-800/40 text-[10px]">${(a.allowed_tools || []).length} tools</span>
+                    </div>
+                    <div class="flex items-center justify-between text-slate-500 text-[10px]">
+                      <span>Model: <code class="text-indigo-400">${(a.preferred_model || '').split('/').pop()}</code></span>
+                      <span class="text-amber-400/90 truncate max-w-[130px]" title="Access limit: ${rolesText}">🔒 ${rolesText}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                  <button onclick="openAgentAccessModal('${a.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700/80 transition flex items-center gap-1.5">
+                    ⚙️ Limits
+                  </button>
+                  <button onclick="launchAgentInChat('${a.id}', '${encodeURIComponent(a.name)}')" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5 ${isDeactivated ? 'opacity-50 cursor-not-allowed' : ''}">
+                    🚀 Chat
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+
+        dv.innerHTML = `
+          <div class="space-y-6">
+            <!-- Header bar matching screenshot -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 class="text-xl font-bold text-slate-100 tracking-tight">Agents</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Explore baseline benchmarks, team domain agents, or synthesize new agents from Swagger specs.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="openOnboardingModal()" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
+                  📖 How to Onboard
+                </button>
+                <button onclick="openCreateAgentModal()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition flex items-center gap-1.5">
+                  + Create an agent
+                </button>
+              </div>
+            </div>
+
+            <!-- Search and Filter Bar -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80">
+              <div class="relative flex-1 max-w-md">
+                <span class="absolute left-3.5 top-2.5 text-slate-500 text-xs">🔍</span>
+                <input type="text" id="agentSearchInput" value="${window._agentsSearchQuery || ''}" oninput="handleAgentSearch(this.value)" placeholder="Search agent" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-4 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+
+              <!-- Scope Toggle: Your agents | All -->
+              <div class="flex items-center gap-2">
+                ${scopeToggleHtml}
+              </div>
+            </div>
+
+            <!-- Agents Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              ${cardsHtml}
+            </div>
+          </div>
+        `;
+      }
+
+      function closeModal() {
+        const mb = document.getElementById('modalBackdrop');
+        if (mb) {
+          mb.classList.add('hidden');
+          mb.innerHTML = '';
+        }
+      }
+
+      function launchAgentInChat(agentId, encodedName) {
+        const name = decodeURIComponent(encodedName);
+        switchTab('chat');
+        const input = document.getElementById('promptInput');
+        if (input) {
+          input.value = `Ask ${name} to assist with domain tasks`;
+          input.focus();
+        }
+      }
+
+      function openCreateAgentModal() {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">+ Create Agent from Swagger / OpenAPI</h4>
+                <p class="text-xs text-slate-400">Synthesize an intelligent agent and corresponding tools automatically from an OpenAPI 3.0 specification.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">✕</button>
+            </div>
+
+            <form onsubmit="submitSwaggerAgent(event)" class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-300 mb-1">Agent Name *</label>
+                  <input type="text" id="newAgentName" required placeholder="e.g., Inventory Ops Agent" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-300 mb-1">Agent ID (Identifier)</label>
+                  <input type="text" id="newAgentId" placeholder="e.g., inventory_ops_agent" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-300 mb-1">Author Attribution</label>
+                  <input type="text" id="newAgentAuthor" value="Enterprise Developer" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-300 mb-1">Base URL for Tools</label>
+                  <input type="text" id="newAgentBaseUrl" value="http://127.0.0.1:8000" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5">RBAC Access Control (Limit Roles Allowed to Call Agent & Tools)</label>
+                <div class="grid grid-cols-2 gap-2 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input type="checkbox" name="allowedRole" value="DevOps Admin" checked class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span>DevOps Admin</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input type="checkbox" name="allowedRole" value="HR Manager" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span>HR Manager</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input type="checkbox" name="allowedRole" value="Finance Officer" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span>Finance Officer</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input type="checkbox" name="allowedRole" value="Restricted Contractor" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span>Restricted Contractor</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="text-xs font-semibold text-slate-300">OpenAPI 3.0 / Swagger JSON *</label>
+                  <button type="button" onclick="loadSampleSwagger()" class="text-[11px] text-blue-400 hover:text-blue-300 underline font-mono">
+                    Paste Sample Inventory Spec
+                  </button>
+                </div>
+                <textarea id="newAgentSwaggerJson" rows="7" placeholder='Paste raw OpenAPI / Swagger JSON here...' class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"></textarea>
+              </div>
+
+              <div id="createAgentFeedback" class="hidden text-xs p-3 rounded-xl font-mono"></div>
+
+              <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
+                  Cancel
+                </button>
+                <button type="submit" id="createAgentBtn" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/30 transition flex items-center gap-1.5">
+                  ⚡ Generate Agent & Tools
+                </button>
+              </div>
+            </form>
+          </div>
+        `;
+      }
+
+      function loadSampleSwagger() {
+        const sample = {
+          "openapi": "3.0.0",
+          "info": {
+            "title": "Inventory Management API",
+            "description": "Enterprise warehouse supply chain and inventory tracking API.",
+            "version": "1.0.0"
+          },
+          "paths": {
+            "/api/inventory/items": {
+              "get": {
+                "operationId": "list_inventory_items",
+                "summary": "Retrieve real-time warehouse inventory items and stock levels",
+                "responses": {"200": {"description": "Success"}}
+              }
+            },
+            "/api/inventory/reorder": {
+              "post": {
+                "operationId": "create_restock_order",
+                "summary": "Initiate automated replenishment purchase order for low stock",
+                "responses": {"200": {"description": "Order created"}}
+              }
+            }
+          }
+        };
+        const el = document.getElementById('newAgentSwaggerJson');
+        const nameEl = document.getElementById('newAgentName');
+        const idEl = document.getElementById('newAgentId');
+        if (el) el.value = JSON.stringify(sample, null, 2);
+        if (nameEl && !nameEl.value) nameEl.value = "Inventory Management Agent";
+        if (idEl && !idEl.value) idEl.value = "inventory_agent";
+      }
+
+      async function submitSwaggerAgent(e) {
+        if (e) e.preventDefault();
+        const btn = document.getElementById('createAgentBtn');
+        const fb = document.getElementById('createAgentFeedback');
+        const name = document.getElementById('newAgentName').value.trim();
+        const id = document.getElementById('newAgentId').value.trim();
+        const author = document.getElementById('newAgentAuthor').value.trim() || 'Google';
+        const baseUrl = document.getElementById('newAgentBaseUrl').value.trim() || 'http://127.0.0.1:8000';
+        const swaggerJson = document.getElementById('newAgentSwaggerJson').value.trim();
+
+        const roleBoxes = document.querySelectorAll('input[name="allowedRole"]:checked');
+        const allowedRoles = Array.from(roleBoxes).map(cb => cb.value);
+
+        if (!swaggerJson) {
+          fb.className = 'text-xs p-3 rounded-xl font-mono bg-red-950/40 text-red-400 border border-red-900';
+          fb.innerText = 'Please paste a valid Swagger/OpenAPI JSON specification.';
+          fb.classList.remove('hidden');
+          return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Generating Agent & Tools...';
+        fb.classList.add('hidden');
+
+        try {
+          const r = await fetch('http://127.0.0.1:8000/api/agents/generate-from-swagger', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              agent_name: name,
+              agent_id: id || undefined,
+              author: author,
+              base_url: baseUrl,
+              allowed_roles: allowedRoles.length ? allowedRoles : ['*'],
+              swagger_json: swaggerJson
+            })
+          });
+
+          const data = await r.json();
+          if (!r.ok) {
+            throw new Error(data.detail || 'Failed to generate agent');
+          }
+
+          fb.className = 'text-xs p-3 rounded-xl font-mono bg-emerald-950/40 text-emerald-400 border border-emerald-900';
+          fb.innerText = `✓ Agent "${data.agent.name}" generated successfully with ${data.tools_count} tools!`;
+          fb.classList.remove('hidden');
+
+          setTimeout(() => {
+            closeModal();
+            loadAgentsHub();
+          }, 1500);
+        } catch(err) {
+          fb.className = 'text-xs p-3 rounded-xl font-mono bg-red-950/40 text-red-400 border border-red-900';
+          fb.innerText = 'Error: ' + err.message;
+          fb.classList.remove('hidden');
+          btn.disabled = false;
+          btn.innerHTML = '⚡ Generate Agent & Tools';
+        }
+      }
+
+      function openAgentAccessModal(agentId) {
+        const agent = (window._allAgentsList || []).find(a => a.id === agentId);
+        if (!agent) return;
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+
+        const currentRoles = agent.allowed_roles || ['*'];
+        const isAllRoles = currentRoles.includes('*');
+        const isActive = (agent.active !== false);
+
+        mb.classList.remove('hidden');
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">Manage Access Limits: ${agent.name}</h4>
+                <p class="text-xs text-slate-400">Configure RBAC role allowances, activation status, and team boundaries.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">✕</button>
+            </div>
+
+            <form onsubmit="submitAgentAccess('${agent.id}', event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Agent Operational State</label>
+                <div class="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                  <input type="checkbox" id="accessActiveToggle" ${isActive ? 'checked' : ''} class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                  <span class="text-xs text-slate-200 font-medium">Active (Turn off to deactivate agent)</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Authorized Roles (RBAC Limits)</label>
+                <div class="space-y-2 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input type="checkbox" name="agentLimitRole" value="*" ${isAllRoles ? 'checked' : ''} onchange="toggleAllRoles(this)" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span><strong>* (All Roles Allowed)</strong></span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input type="checkbox" name="agentLimitRole" value="DevOps Admin" ${(!isAllRoles && currentRoles.includes('DevOps Admin')) ? 'checked' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span>DevOps Admin</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input type="checkbox" name="agentLimitRole" value="HR Manager" ${(!isAllRoles && currentRoles.includes('HR Manager')) ? 'checked' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span>HR Manager</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input type="checkbox" name="agentLimitRole" value="Finance Officer" ${(!isAllRoles && currentRoles.includes('Finance Officer')) ? 'checked' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span>Finance Officer</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input type="checkbox" name="agentLimitRole" value="Restricted Contractor" ${(!isAllRoles && currentRoles.includes('Restricted Contractor')) ? 'checked' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span>Restricted Contractor</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Authorized Teams (Comma-separated)</label>
+                <input type="text" id="accessTeamsInput" value="${(agent.allowed_teams || ['*']).join(', ')}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+
+              <div id="accessFeedback" class="hidden text-xs p-3 rounded-xl font-mono"></div>
+
+              <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
+                  Cancel
+                </button>
+                <button type="submit" id="saveAccessBtn" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/30 transition">
+                  💾 Save Limits
+                </button>
+              </div>
+            </form>
+          </div>
+        `;
+      }
+
+      function toggleAllRoles(allCheckbox) {
+        if (allCheckbox.checked) {
+          document.querySelectorAll('.role-specific').forEach(cb => cb.checked = false);
+        }
+      }
+
+      async function submitAgentAccess(agentId, e) {
+        if (e) e.preventDefault();
+        const active = document.getElementById('accessActiveToggle').checked;
+        const fb = document.getElementById('accessFeedback');
+        const btn = document.getElementById('saveAccessBtn');
+
+        const roleCheckboxes = document.querySelectorAll('input[name="agentLimitRole"]:checked');
+        let allowedRoles = Array.from(roleCheckboxes).map(cb => cb.value);
+        if (allowedRoles.length === 0) allowedRoles = ['*'];
+
+        const teamsStr = document.getElementById('accessTeamsInput').value.trim();
+        const allowedTeams = teamsStr ? teamsStr.split(',').map(s => s.trim()) : ['*'];
+
+        btn.disabled = true;
+        btn.innerHTML = 'Saving...';
+
+        try {
+          const r = await fetch(`http://127.0.0.1:8000/api/agents/${agentId}/access`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              active: active,
+              allowed_roles: allowedRoles,
+              allowed_teams: allowedTeams
+            })
+          });
+
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.detail || 'Failed to update access limits');
+
+          fb.className = 'text-xs p-3 rounded-xl font-mono bg-emerald-950/40 text-emerald-400 border border-emerald-900';
+          fb.innerText = '✓ Access limits updated successfully!';
+          fb.classList.remove('hidden');
+
+          setTimeout(() => {
+            closeModal();
+            loadAgentsHub();
+          }, 1200);
+        } catch(err) {
+          fb.className = 'text-xs p-3 rounded-xl font-mono bg-red-950/40 text-red-400 border border-red-900';
+          fb.innerText = 'Error: ' + err.message;
+          fb.classList.remove('hidden');
+          btn.disabled = false;
+          btn.innerHTML = '💾 Save Limits';
+        }
+      }
+
+      function openOnboardingModal() {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">📖 How to Onboard a New Agent to cortex.ai</h4>
+                <p class="text-xs text-slate-400">Complete end-to-end instructions for deploying, registering, and securing autonomous enterprise agents.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">✕</button>
+            </div>
+
+            <div class="space-y-4 text-xs text-slate-300">
+              <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div class="flex items-center gap-2 text-blue-400 font-bold text-sm">
+                  <span class="w-6 h-6 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-xs">1</span>
+                  <span>Define or Import Tool Specifications (OpenAPI / Swagger)</span>
+                </div>
+                <p class="text-slate-400 leading-relaxed">
+                  Every domain agent interacts with enterprise systems through generated tools. Provide your REST API OpenAPI 3.0 specification via the <strong>"+ Create an agent"</strong> button, or place your microservice under <code>apps/&lt;service-name&gt;/src/main.py</code>.
+                </p>
+                <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 font-mono text-[11px] text-slate-300">
+                  paths: /api/inventory/items: get: operationId: list_inventory_items
+                </div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div class="flex items-center gap-2 text-indigo-400 font-bold text-sm">
+                  <span class="w-6 h-6 rounded-lg bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-xs">2</span>
+                  <span>Declare the Agent Manifest</span>
+                </div>
+                <p class="text-slate-400 leading-relaxed">
+                  Define the agent metadata, preferred foundation model (Vertex AI Gemini 2.5 / 3.1 Pro), assigned tool list, and knowledge scopes. Auto-generated via Swagger or declared in <code>agents/&lt;agent-id&gt;/agent.manifest.yaml</code>:
+                </p>
+                <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 font-mono text-[11px] text-slate-300">
+                  id: inventory_agent<br/>
+                  name: Inventory Ops Agent<br/>
+                  preferred_model: google/gemini-2.5-flash<br/>
+                  allowed_tools: [list_inventory_items, create_restock_order]
+                </div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div class="flex items-center gap-2 text-cyan-400 font-bold text-sm">
+                  <span class="w-6 h-6 rounded-lg bg-cyan-600/20 border border-cyan-500/40 flex items-center justify-center text-xs">3</span>
+                  <span>Enforce Zero-Trust RBAC & Limits</span>
+                </div>
+                <p class="text-slate-400 leading-relaxed">
+                  Limit which employee roles or teams can invoke the agent. Sensitive write tools (e.g. creating orders, modifying records) automatically trigger human-in-the-loop approvals before execution.
+                </p>
+                <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 font-mono text-[11px] text-slate-300">
+                  allowed_roles: ["DevOps Admin", "Supply Chain Manager"]<br/>
+                  requires_human_approval: true (for mutations)
+                </div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div class="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                  <span class="w-6 h-6 rounded-lg bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-xs">4</span>
+                  <span>Autonomous Intent Routing & Live Verification</span>
+                </div>
+                <p class="text-slate-400 leading-relaxed">
+                  The cortex router automatically analyzes natural language employee queries, detects intent, matches keywords against registered agent manifests, verifies RBAC authorization, and delegates execution seamlessly.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-end pt-3 border-t border-slate-800">
+              <button onclick="closeModal()" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md transition">
+                Got it
+              </button>
+            </div>
+          </div>
+        `;
       }
 
       async function loadModels() {
