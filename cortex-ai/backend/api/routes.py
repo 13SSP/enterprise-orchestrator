@@ -377,3 +377,9 @@ def list_models():
 @router_api.get("/audit", tags=["Observability"])
 def get_audit_trail():
     return {"events": AUDIT_LOGS[-50:]}
+
+@router_api.get("/prompts", tags=["Prompt Library"])
+def list_prompt_library():
+    from prompts.library import get_prompt_library
+    return get_prompt_library()
+
