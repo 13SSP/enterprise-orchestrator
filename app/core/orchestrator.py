@@ -42,10 +42,10 @@ class Orchestrator:
         Uses Gemini if available, or high-accuracy domain semantic parser.
         """
         all_agents = registry.list_agents(active_only=True)
-        # Filter agents accessible to user
+        # Filter agents accessible to user based on policy and RBAC
         accessible_agents = [
             a for a in all_agents 
-            if ("*" in user.allowed_agent_ids or a.id in user.allowed_agent_ids)
+            if policy_engine.can_user_call_agent(user, a.id).allowed
         ]
 
         if not accessible_agents:

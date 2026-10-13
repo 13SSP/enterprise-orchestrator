@@ -10,12 +10,18 @@ class AgentManifest(BaseModel):
     name: str = Field(..., description="Human readable name of the agent")
     description: str = Field(..., description="Semantic description of capabilities used by Gemini Router")
     owner_team: str = Field(..., description="Owner department or team (e.g. IT, HR, Finance, DevOps)")
+    author: Optional[str] = Field(default=None, description="Display name of creator or owner")
+    author_id: Optional[str] = Field(default=None, description="Author persona user ID (e.g. bob_ops)")
+    icon: Optional[str] = Field(default="wrench", description="Icon key: wrench, chart, shield, docs, cart, user, bot, code")
     system_prompt: str = Field(..., description="Instructions and persona for the agent")
     allowed_tools: List[str] = Field(default_factory=list, description="Names of tools this agent is authorized to use")
     knowledge_scopes: List[str] = Field(default_factory=list, description="RAG datastore scopes this agent can query")
     agent_type: str = Field(default="local_adk", description="'local_adk' or 'remote_a2a'")
     remote_endpoint: Optional[str] = Field(default=None, description="URL endpoint if registered as remote A2A agent")
     active: bool = Field(default=True, description="Whether agent is active")
+    is_public: bool = Field(default=True, description="Whether agent is accessible to all enterprise users")
+    allowed_roles: List[str] = Field(default_factory=lambda: ["*"], description="Roles authorized to invoke this agent")
+    allowed_teams: List[str] = Field(default_factory=lambda: ["*"], description="Teams authorized to invoke this agent")
     created_at: Optional[str] = None
 
 class ToolDefinition(BaseModel):
@@ -29,6 +35,8 @@ class ToolDefinition(BaseModel):
     target_url: Optional[str] = Field(default=None, description="Base URL of backend service")
     tags: List[str] = Field(default_factory=list, description="Categories or team tags")
     owner_agent: Optional[str] = Field(default=None, description="Agent this tool belongs to")
+    enabled: bool = Field(default=True, description="Whether tool is active and callable")
+    allowed_roles: List[str] = Field(default_factory=lambda: ["*"], description="Roles permitted to execute this specific tool")
 
 class RegistryManager:
     """
@@ -51,6 +59,8 @@ class RegistryManager:
                     for item in data:
                         agent = AgentManifest(**item)
                         self._agents[agent.id] = agent
+                # Merge any missing default benchmark agents
+                self._merge_default_agents()
             except Exception as e:
                 print(f"[Registry] Error loading agents: {e}, reinitializing defaults")
                 self._init_default_agents()
@@ -78,54 +88,201 @@ class RegistryManager:
         with open(self.tools_file, "w", encoding="utf-8") as f:
             json.dump([tool.model_dump() for tool in self._tools.values()], f, indent=2)
 
-    def _init_default_agents(self):
-        default_agents = [
+    def _merge_default_agents(self):
+        default_list = self._get_default_agents_list()
+        updated = False
+        for def_agent in default_list:
+            if def_agent.id not in self._agents:
+                self._agents[def_agent.id] = def_agent
+                updated = True
+            else:
+                curr = self._agents[def_agent.id]
+                # Populate missing metadata if not present
+                if not curr.author and def_agent.author:
+                    curr.author = def_agent.author
+                    curr.author_id = def_agent.author_id
+                    curr.icon = def_agent.icon
+                    updated = True
+        if updated:
+            self._save_agents()
+
+    def _get_default_agents_list(self) -> List[AgentManifest]:
+        return [
+            AgentManifest(
+                id="usage_pricing_agent",
+                name="Usage Pricing Insights Agent",
+                description="Strategic knowledge assistant that synthesises internal thinking, documentation, and decisions on consumption and usage-based pricing to help build scalable models.",
+                owner_team="Product Strategy",
+                author="Adam Furness",
+                author_id="adam_pricing",
+                icon="chart",
+                system_prompt="You are the Usage Pricing Insights Agent. Synthesise strategic pricing documentation and consumption data.",
+                allowed_tools=["get_budget_overview"],
+                knowledge_scopes=["finance_guidelines"],
+                agent_type="local_adk",
+                active=True,
+                is_public=True,
+                allowed_roles=["*"],
+                allowed_teams=["*"],
+            ),
+            AgentManifest(
+                id="ela_feedback_analyst",
+                name="ELA customer feedback analyst",
+                description="Analyzes Gong calls, customer sentiment, and feedback trends for ELA accounts to inform product retention strategies.",
+                owner_team="Customer Success",
+                author="Sarah Croft",
+                author_id="sarah_cs",
+                icon="docs",
+                system_prompt="You are the ELA Customer Feedback Analyst. Parse Gong transcript summaries and customer feedback.",
+                allowed_tools=[],
+                knowledge_scopes=["benefits_handbook"],
+                agent_type="local_adk",
+                active=True,
+                is_public=True,
+                allowed_roles=["*"],
+                allowed_teams=["*"],
+            ),
+            AgentManifest(
+                id="policy_bot",
+                name="Policy Bot",
+                description="Agent to assist with compliance policy inquiries, security controls, and regulatory audit queries.",
+                owner_team="Governance",
+                author="Francisco Barciella",
+                author_id="francisco_gov",
+                icon="shield",
+                system_prompt="You are the Policy Bot. Assist with compliance checks and corporate governance policies.",
+                allowed_tools=["scan_security_posture"],
+                knowledge_scopes=["security_standards"],
+                agent_type="local_adk",
+                active=False,
+                is_public=True,
+                allowed_roles=["*"],
+                allowed_teams=["*"],
+            ),
+            AgentManifest(
+                id="commerce_intake_agent",
+                name="Commerce Intake Agent",
+                description="Streamlines B2B checkout intake, vendor procurement orders, and merchant billing contract verification.",
+                owner_team="Commercial Ops",
+                author="Jai Ganesh Kamalakannan",
+                author_id="jai_ops",
+                icon="cart",
+                system_prompt="You are the Commerce Intake Agent. Assist with corporate purchase intakes and contract approvals.",
+                allowed_tools=["check_expense_status"],
+                knowledge_scopes=["finance_guidelines"],
+                agent_type="local_adk",
+                active=True,
+                is_public=True,
+                allowed_roles=["*"],
+                allowed_teams=["*"],
+            ),
             AgentManifest(
                 id="it_agent",
                 name="IT & Cloud Ops Agent",
                 description="Handles IT infrastructure queries, Jira issue lookups, system restart requests, cloud server status, and developer workspace operations.",
-                owner_team="IT & Operations",
+                owner_team="Engineering",
+                author="Bob Martinez",
+                author_id="bob_ops",
+                icon="wrench",
                 system_prompt="You are the IT & Operations Agent. Assist users with technical queries, infrastructure checks, and Jira tickets. For destructive or write operations, always explain what will be changed.",
                 allowed_tools=["get_system_health", "lookup_jira_issue", "restart_cloud_service"],
                 knowledge_scopes=["it_runbooks", "cloud_architecture"],
                 agent_type="local_adk",
                 active=True,
+                is_public=True,
+                allowed_roles=["devops_admin", "it_engineer", "employee"],
+                allowed_teams=["Engineering"],
             ),
             AgentManifest(
                 id="hr_agent",
                 name="HR & People Operations Agent",
                 description="Assists employees with PTO balance queries, company benefits, employee directory searches, internal leave policies, and onboarding questions.",
                 owner_team="Human Resources",
+                author="Alice Henderson",
+                author_id="alice_hr",
+                icon="user",
                 system_prompt="You are the HR Assistant. Provide helpful, confidential, and accurate information on benefits, time off, and company policies.",
                 allowed_tools=["check_pto_balance", "lookup_employee", "submit_timeoff_request"],
                 knowledge_scopes=["hr_policies", "benefits_handbook"],
                 agent_type="local_adk",
                 active=True,
+                is_public=True,
+                allowed_roles=["*"],
+                allowed_teams=["*"],
             ),
             AgentManifest(
                 id="finance_agent",
                 name="Finance & Expenses Agent",
                 description="Handles corporate expense report inquiries, reimbursement status, departmental budget checks, and financial compliance questions.",
-                owner_team="Finance & Accounting",
+                owner_team="Finance",
+                author="Charlie Zhao",
+                author_id="charlie_fin",
+                icon="cart",
                 system_prompt="You are the Finance & Expenses Specialist. Assist with budget lookups and expense reports accurately.",
                 allowed_tools=["check_expense_status", "get_budget_overview", "submit_expense_claim"],
                 knowledge_scopes=["finance_guidelines", "procurement_policy"],
                 agent_type="local_adk",
                 active=True,
+                is_public=False,
+                allowed_roles=["finance_officer", "devops_admin"],
+                allowed_teams=["Finance", "Engineering"],
+            ),
+            AgentManifest(
+                id="ticket_manager_review",
+                name="Ticket Manager Review",
+                description="Analyzes Jira tickets and provides key insights on sprint health, SLA tracking, and ticket escalation bottlenecks.",
+                owner_team="Engineering",
+                author="Christiane Delazeri",
+                author_id="christiane_eng",
+                icon="wrench",
+                system_prompt="You are the Ticket Manager Review agent.",
+                allowed_tools=["lookup_jira_issue"],
+                knowledge_scopes=["it_runbooks"],
+                agent_type="local_adk",
+                active=False,
+                is_public=True,
+                allowed_roles=["*"],
+                allowed_teams=["*"],
+            ),
+            AgentManifest(
+                id="file_creator_agent",
+                name="file creator",
+                description="Agent to help create downloadable files, spreadsheets, and document templates for enterprise teams.",
+                owner_team="General",
+                author="Eurley Balentina",
+                author_id="eurley_dev",
+                icon="docs",
+                system_prompt="You are the file creator agent. Generate structured report documents and download templates.",
+                allowed_tools=[],
+                knowledge_scopes=[],
+                agent_type="local_adk",
+                active=True,
+                is_public=True,
+                allowed_roles=["*"],
+                allowed_teams=["*"],
             ),
             AgentManifest(
                 id="security_remote_agent",
                 name="SecOps Remote Agent (A2A)",
                 description="Remote Agent running over Agent-to-Agent (A2A) protocol for enterprise security audits, vulnerability scanning, and IAM compliance reviews.",
                 owner_team="Security Ops",
+                author="Francisco Barciella",
+                author_id="francisco_gov",
+                icon="shield",
                 system_prompt="You are the SecOps A2A Agent. Conduct security posture checks and firewall rule reviews.",
                 allowed_tools=["scan_security_posture"],
                 knowledge_scopes=["security_standards"],
                 agent_type="remote_a2a",
                 remote_endpoint="https://secops.internal.corp/a2a/v1/agent",
                 active=True,
+                is_public=False,
+                allowed_roles=["devops_admin", "it_engineer"],
+                allowed_teams=["Engineering", "Security Ops"],
             ),
         ]
+
+    def _init_default_agents(self):
+        default_agents = self._get_default_agents_list()
         self._agents = {a.id: a for a in default_agents}
         self._save_agents()
 

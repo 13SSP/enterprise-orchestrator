@@ -80,8 +80,11 @@ class VertexGeminiProvider(BaseModelProvider):
                         "model": f"google/{m}"
                     }
             except Exception as e:
+                err_str = str(e)
                 logger.warning(f"Gemini model {m} call failed ({e}); attempting next candidate.")
                 last_err = e
+                if "RESOURCE_EXHAUSTED" in err_str or "429" in err_str or "quota" in err_str.lower():
+                    break
 
         raise RuntimeError(f"All Gemini candidates failed. Last error: {last_err}")
 

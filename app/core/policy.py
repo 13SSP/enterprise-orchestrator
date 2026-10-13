@@ -144,6 +144,28 @@ class PolicyEngine:
             observability.log_policy_evaluation(trace_id, user.model_dump(), agent_id, None, "DENIED", decision.reason, decision.rule_name)
             return decision
 
+        # Check Agent Visibility & Access Control (RBAC & Team Limits)
+        if not agent.is_public:
+            if "*" not in agent.allowed_roles and not any(r in agent.allowed_roles for r in user.roles):
+                decision = PolicyDecision(
+                    allowed=False,
+                    decision_code="DENY_AGENT_ROLE_RESTRICTED",
+                    reason=f"Access Denied: Agent '{agent.name}' is restricted to roles {agent.allowed_roles}. Current user has: {user.roles}.",
+                    rule_name="AgentRoleAccessCheck"
+                )
+                observability.log_policy_evaluation(trace_id, user.model_dump(), agent_id, None, "DENIED", decision.reason, decision.rule_name)
+                return decision
+
+            if "*" not in agent.allowed_teams and user.team not in agent.allowed_teams:
+                decision = PolicyDecision(
+                    allowed=False,
+                    decision_code="DENY_AGENT_TEAM_RESTRICTED",
+                    reason=f"Access Denied: Agent '{agent.name}' is restricted to teams {agent.allowed_teams}. User belongs to '{user.team}'.",
+                    rule_name="AgentTeamAccessCheck"
+                )
+                observability.log_policy_evaluation(trace_id, user.model_dump(), agent_id, None, "DENIED", decision.reason, decision.rule_name)
+                return decision
+
         # Check allowed_agent_ids
         if "*" not in user.allowed_agent_ids and agent_id not in user.allowed_agent_ids:
             decision = PolicyDecision(
@@ -174,7 +196,16 @@ class PolicyEngine:
         visible: List[ToolDefinition] = []
 
         for tool in all_agent_tools:
-            # Check if user has basic role privileges for sensitive/write tools
+            # 1. Skip disabled tools
+            if not getattr(tool, "enabled", True):
+                continue
+
+            # 2. Check per-tool allowed_roles
+            if hasattr(tool, "allowed_roles") and "*" not in tool.allowed_roles:
+                if not any(r in tool.allowed_roles for r in user.roles):
+                    continue
+
+            # 3. Check if user has basic role privileges for sensitive/write tools
             if tool.is_write:
                 # Contractors cannot view/run any write operations
                 if "contractor" in user.roles and not any(r in ["devops_admin", "hr_manager", "finance_officer"] for r in user.roles):
@@ -239,7 +270,30 @@ class PolicyEngine:
             observability.log_policy_evaluation(trace_id, user.model_dump(), agent_id, tool_name, "DENIED", decision.reason, decision.rule_name)
             return decision
 
-        # 2. Role-Based Access Control (RBAC)
+        # 2. Tool Enabled Check
+        if not getattr(tool, "enabled", True):
+            decision = PolicyDecision(
+                allowed=False,
+                decision_code="DENY_TOOL_DISABLED",
+                reason=f"Tool '{tool_name}' is currently disabled in the Tool Registry.",
+                rule_name="ToolStateCheck"
+            )
+            observability.log_policy_evaluation(trace_id, user.model_dump(), agent_id, tool_name, "DENIED", decision.reason, decision.rule_name)
+            return decision
+
+        # 3. Tool Role Limit Check
+        if hasattr(tool, "allowed_roles") and "*" not in tool.allowed_roles:
+            if not any(r in tool.allowed_roles for r in user.roles):
+                decision = PolicyDecision(
+                    allowed=False,
+                    decision_code="DENY_INSUFFICIENT_ROLE",
+                    reason=f"Access Denied: Tool '{tool_name}' requires roles {tool.allowed_roles}. Current user roles: {user.roles}.",
+                    rule_name="ToolRoleLimitCheck"
+                )
+                observability.log_policy_evaluation(trace_id, user.model_dump(), agent_id, tool_name, "DENIED", decision.reason, decision.rule_name)
+                return decision
+
+        # 4. Role-Based Access Control (RBAC)
         if tool.is_write:
             if "contractor" in user.roles:
                 decision = PolicyDecision(
