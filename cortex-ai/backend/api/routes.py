@@ -485,3 +485,324 @@ def list_prompt_library():
     from prompts.library import get_prompt_library
     return get_prompt_library()
 
+
+# ==========================================
+# WORKSPACES & SDD AUTONOMOUS ENGINE ROUTES
+# ==========================================
+
+from workspaces.manager import workspace_manager
+
+
+class CreateWorkspaceRequest(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    workspace_type: str = Field("chat", description="'chat' or 'sdd'")
+    visibility: str = Field("public", description="'public' or 'private'")
+    invited_employee_ids: List[str] = Field(default_factory=list)
+    system_instructions: Optional[str] = None
+    sdd_config: Optional[Dict[str, Any]] = None
+    initial_prompt: Optional[str] = None
+
+
+class WorkspaceInviteRequest(BaseModel):
+    employee_ids: List[str]
+
+
+class SDDRulesUpdateRequest(BaseModel):
+    architecture_principles: List[str]
+    coding_standards: List[str] = Field(default_factory=list)
+
+
+class WorkspaceInstructionsRequest(BaseModel):
+    system_instructions: str
+
+
+class WorkspaceChatRequest(BaseModel):
+    prompt: str
+    persona: str = "bob_ops"
+
+
+class UpdateSpecRequest(BaseModel):
+    raw_markdown: str
+    requirements: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class AIGenerateSpecRequest(BaseModel):
+    prompt: str
+
+
+class UpdatePlanRequest(BaseModel):
+    raw_markdown: str
+    data_models: List[Dict[str, Any]] = Field(default_factory=list)
+    api_endpoints: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class AIGeneratePlanRequest(BaseModel):
+    prompt: str
+
+
+class UpdateTasksRequest(BaseModel):
+    tasks: List[Dict[str, Any]]
+
+
+class AddTaskRequest(BaseModel):
+    task_id: Optional[str] = None
+    title: str
+    description: Optional[str] = ""
+    linked_req_id: Optional[str] = None
+    target_files: List[str] = Field(default_factory=list)
+    test_file: Optional[str] = None
+
+
+@router_api.get("/employees", tags=["Workspaces"])
+def list_company_employees():
+    return {"employees": workspace_manager.list_employees()}
+
+
+@router_api.get("/workspaces", tags=["Workspaces"])
+@router_api.get("/pods", tags=["Pods"])
+def list_workspaces(filter: str = "public", persona: str = "bob_ops", search: str = ""):
+    workspaces = workspace_manager.list_workspaces(filter_type=filter, current_user=persona, search=search)
+    return {"workspaces": workspaces, "filter": filter, "count": len(workspaces)}
+
+
+@router_api.post("/workspaces", tags=["Workspaces"])
+@router_api.post("/pods", tags=["Pods"])
+def create_workspace(req: CreateWorkspaceRequest, persona: str = "bob_ops"):
+    payload = req.model_dump()
+    new_ws = workspace_manager.create_workspace(payload, current_user_id=persona)
+    record_audit(
+        event_type="WORKSPACE_CREATED",
+        severity="INFO",
+        user=persona,
+        details={"workspace_id": new_ws["workspace_id"], "name": new_ws["name"], "type": new_ws["workspace_type"]}
+    )
+    return {"status": "created", "workspace": new_ws}
+
+
+@router_api.get("/workspaces/{workspace_id}", tags=["Workspaces"])
+@router_api.get("/pods/{workspace_id}", tags=["Pods"])
+def get_workspace_details(workspace_id: str):
+    ws = workspace_manager.get_workspace(workspace_id)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return ws
+
+
+@router_api.delete("/workspaces/{workspace_id}", tags=["Workspaces"])
+@router_api.delete("/pods/{workspace_id}", tags=["Pods"])
+def delete_workspace(workspace_id: str, persona: str = "bob_ops"):
+    try:
+        success = workspace_manager.delete_workspace(workspace_id, current_user=persona)
+        if not success:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+        return {"status": "deleted", "workspace_id": workspace_id}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+
+
+@router_api.post("/workspaces/{workspace_id}/invite", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/invite", tags=["Pods"])
+def invite_workspace_contributors(workspace_id: str, req: WorkspaceInviteRequest, persona: str = "bob_ops"):
+    try:
+        updated_ws = workspace_manager.invite_contributors(workspace_id, req.employee_ids, requester_id=persona)
+        return {"status": "updated", "workspace": updated_ws}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+
+
+@router_api.put("/workspaces/{workspace_id}/instructions", tags=["Workspaces"])
+@router_api.put("/pods/{workspace_id}/instructions", tags=["Pods"])
+def update_workspace_instructions(workspace_id: str, req: WorkspaceInstructionsRequest, persona: str = "bob_ops"):
+    try:
+        updated_ws = workspace_manager.update_instructions(workspace_id, req.system_instructions, requester_id=persona)
+        return {"status": "updated", "workspace": updated_ws}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+
+
+@router_api.put("/workspaces/{workspace_id}/sdd/rules", tags=["Workspaces"])
+@router_api.put("/pods/{workspace_id}/sdd/rules", tags=["Pods"])
+def update_sdd_rules(workspace_id: str, req: SDDRulesUpdateRequest, persona: str = "bob_ops"):
+    try:
+        updated_ws = workspace_manager.update_sdd_rules(
+            workspace_id,
+            principles=req.architecture_principles,
+            standards=req.coding_standards,
+            user_id=persona
+        )
+        return {"status": "updated", "workspace": updated_ws}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+
+
+# SPECIFICATION APIS (PERSISTED IN FIRESTORE)
+@router_api.put("/workspaces/{workspace_id}/spec", tags=["Workspaces"])
+@router_api.put("/pods/{workspace_id}/spec", tags=["Pods"])
+def update_spec(workspace_id: str, req: UpdateSpecRequest, persona: str = "bob_ops"):
+    try:
+        updated = workspace_manager.update_spec(workspace_id, req.raw_markdown, req.requirements, user_id=persona)
+        return {"status": "updated", "workspace": updated}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.post("/workspaces/{workspace_id}/spec/ai-generate", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/spec/ai-generate", tags=["Pods"])
+def ai_generate_spec(workspace_id: str, req: AIGenerateSpecRequest, persona: str = "bob_ops"):
+    try:
+        updated = workspace_manager.ai_generate_spec(workspace_id, req.prompt, user_id=persona)
+        return {"status": "generated", "workspace": updated}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ARCHITECTURE PLAN APIS (PERSISTED IN FIRESTORE)
+@router_api.put("/workspaces/{workspace_id}/plan", tags=["Workspaces"])
+@router_api.put("/pods/{workspace_id}/plan", tags=["Pods"])
+def update_plan(workspace_id: str, req: UpdatePlanRequest, persona: str = "bob_ops"):
+    try:
+        updated = workspace_manager.update_plan(workspace_id, req.raw_markdown, req.data_models, req.api_endpoints, user_id=persona)
+        return {"status": "updated", "workspace": updated}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.post("/workspaces/{workspace_id}/plan/ai-generate", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/plan/ai-generate", tags=["Pods"])
+def ai_generate_plan(workspace_id: str, req: AIGeneratePlanRequest, persona: str = "bob_ops"):
+    try:
+        updated = workspace_manager.ai_generate_plan(workspace_id, req.prompt, user_id=persona)
+        return {"status": "generated", "workspace": updated}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# TASKS APIS (PERSISTED IN FIRESTORE)
+@router_api.put("/workspaces/{workspace_id}/tasks", tags=["Workspaces"])
+@router_api.put("/pods/{workspace_id}/tasks", tags=["Pods"])
+def update_tasks(workspace_id: str, req: UpdateTasksRequest, persona: str = "bob_ops"):
+    try:
+        updated = workspace_manager.update_tasks(workspace_id, req.tasks, user_id=persona)
+        return {"status": "updated", "workspace": updated}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.post("/workspaces/{workspace_id}/tasks", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/tasks", tags=["Pods"])
+def add_task(workspace_id: str, req: AddTaskRequest, persona: str = "bob_ops"):
+    try:
+        updated = workspace_manager.add_task(workspace_id, req.model_dump(), user_id=persona)
+        return {"status": "added", "workspace": updated}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.post("/workspaces/{workspace_id}/tasks/ai-breakdown", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/tasks/ai-breakdown", tags=["Pods"])
+def ai_breakdown_tasks(workspace_id: str, persona: str = "bob_ops"):
+    try:
+        updated = workspace_manager.ai_breakdown_tasks(workspace_id, user_id=persona)
+        return {"status": "breakdown_complete", "workspace": updated}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# AUTONOMOUS EXECUTION ENGINES
+@router_api.post("/workspaces/{workspace_id}/sdd/init-repo", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/sdd/init-repo", tags=["Pods"])
+def init_sdd_repo(workspace_id: str, persona: str = "bob_ops"):
+    try:
+        res = workspace_manager.init_or_clone_repo(workspace_id, requester_id=persona)
+        record_audit(
+            event_type="SDD_REPO_INITIALIZED",
+            severity="INFO",
+            user=persona,
+            details={"workspace_id": workspace_id, "local_path": res.get("local_path")}
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.post("/workspaces/{workspace_id}/sdd/implement-task", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/sdd/implement-task", tags=["Pods"])
+def implement_sdd_task(workspace_id: str, task_id: str = "TSK-101", persona: str = "bob_ops"):
+    try:
+        res = workspace_manager.implement_task(workspace_id, task_id=task_id, requester_id=persona)
+        record_audit(
+            event_type="SDD_TASK_IMPLEMENTED",
+            severity="INFO",
+            user=persona,
+            details={"workspace_id": workspace_id, "task_id": task_id, "commit_hash": res.get("commit_hash")}
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.post("/workspaces/{workspace_id}/sdd/run-tests", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/sdd/run-tests", tags=["Pods"])
+def run_sdd_tests(workspace_id: str, persona: str = "bob_ops"):
+    try:
+        return workspace_manager.run_tests(workspace_id, requester_id=persona)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.post("/workspaces/{workspace_id}/chat", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/chat", tags=["Pods"])
+def chat_in_workspace(workspace_id: str, req: WorkspaceChatRequest):
+    try:
+        res = workspace_manager.send_chat_message(workspace_id, prompt=req.prompt, persona=req.persona)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==========================================
+# SYSTEM FILE EXPLORER & FOLDER PICKER ROUTES
+# ==========================================
+from system_utils import open_folder_in_os, pick_folder_dialog
+
+
+class OpenFolderRequest(BaseModel):
+    path: str
+
+
+class PickFolderRequest(BaseModel):
+    initial_dir: Optional[str] = None
+
+
+@router_api.post("/system/open-folder", tags=["System"])
+def open_system_folder(req: OpenFolderRequest):
+    folder_path = req.path.strip()
+    if not folder_path:
+        raise HTTPException(status_code=400, detail="Path cannot be empty")
+    try:
+        opened_path = open_folder_in_os(folder_path)
+        return {"status": "opened", "path": opened_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to open folder: {str(e)}")
+
+
+@router_api.post("/system/pick-folder", tags=["System"])
+def pick_system_folder(req: Optional[PickFolderRequest] = None):
+    initial_dir = req.initial_dir if req else None
+    selected = pick_folder_dialog(initial_dir=initial_dir)
+    return {"status": "ok", "path": selected}
+
+
+
+

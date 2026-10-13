@@ -42,6 +42,7 @@
           </div>
 
           <nav class="space-y-1">
+            <button onclick="switchTab('pods')" id="tab-pods" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">📁 Pods</button>
             <button onclick="switchTab('chat')" id="tab-chat" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition">💬 Chat Assistant</button>
             <button onclick="switchTab('prompts')" id="tab-prompts" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">📚 Prompt Library (18)</button>
             <button onclick="switchTab('agents')" id="tab-agents" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">🤖 Team Agents (5)</button>
@@ -63,8 +64,8 @@
       <main class="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden">
         <header class="h-14 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/40">
           <div class="flex items-center gap-3">
-            <h2 id="currentTabTitle" class="text-sm font-semibold capitalize text-slate-200">Chat Workspace</h2>
-            <span id="roleBadge" class="px-2 py-0.5 text-[10px] rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">Role: DevOps Admin</span>
+            <h2 id="currentTabTitle" class="text-sm font-semibold capitalize text-slate-200">Chat Assistant</h2>
+            <span id="roleBadge" class="hidden"></span>
           </div>
           <div class="flex items-center gap-4 text-xs text-slate-400">
             <span>Model Armor: <strong class="text-emerald-400">Active</strong></span>
@@ -119,14 +120,18 @@
 
       document.getElementById('personaSelect').addEventListener('change', (e) => {
         document.getElementById('roleBadge').innerText = 'Role: ' + (roleMap[e.target.value] || 'Employee');
+        if (currentTab === 'pods' || currentTab === 'workspaces') {
+          loadPodsHub();
+        }
       });
 
       async function switchTab(tab) {
         currentTab = tab;
-        ['chat', 'prompts', 'agents', 'tools', 'models', 'audit'].forEach(t => {
+        const normalizedTab = (tab === 'workspaces') ? 'pods' : tab;
+        ['pods', 'workspaces', 'chat', 'prompts', 'agents', 'tools', 'models', 'audit'].forEach(t => {
           const btn = document.getElementById('tab-' + t);
           if (!btn) return;
-          if (t === tab) {
+          if (t === tab || (normalizedTab === 'pods' && (t === 'pods' || t === 'workspaces'))) {
             btn.className = 'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition';
           } else {
             btn.className = 'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition';
@@ -135,7 +140,7 @@
 
         const chatView = document.getElementById('chatView');
         const dynamicView = document.getElementById('dynamicView');
-        document.getElementById('currentTabTitle').innerText = tab.toUpperCase() + ' Workspace';
+        document.getElementById('currentTabTitle').innerText = (tab === 'workspaces' || tab === 'pods') ? 'Pods Hub' : (tab.toUpperCase() + ' Workspace');
 
         if (tab === 'chat') {
           chatView.classList.remove('hidden');
@@ -151,8 +156,11 @@
         const dv = document.getElementById('dynamicView');
         dv.innerHTML = '<div class="text-slate-500 font-mono text-xs">Loading ' + tab + '...</div>';
         try {
-          if (tab === 'prompts') {
-            const r = await fetch('http://127.0.0.1:8000/api/prompts');
+          if (tab === 'workspaces' || tab === 'pods') {
+            await loadPodsHub(window._currentPodFilter || 'all');
+            return;
+          } else if (tab === 'prompts') {
+            const r = await fetch('/api/prompts');
             const d = await r.json();
             window._allPrompts = d.prompts || [];
             window._allPromptCategories = d.categories || [];
@@ -163,7 +171,7 @@
             await loadAgentsHub();
             return;
           } else if (tab === 'tools') {
-            const r = await fetch('http://127.0.0.1:8000/api/tools');
+            const r = await fetch('/api/tools');
             const d = await r.json();
             let html = '<h3 class="text-base font-bold text-slate-200">Generated ADK Tools</h3><div class="overflow-x-auto rounded-xl border border-slate-800"><table class="w-full text-left text-xs font-mono"><thead class="bg-slate-900 text-slate-400 border-b border-slate-800"><tr><th class="p-3">Tool Name</th><th class="p-3">Method</th><th class="p-3">Service</th><th class="p-3">Path</th><th class="p-3">Approval</th></tr></thead><tbody class="divide-y divide-slate-800/60">';
             (d.tools || []).forEach(t => {
@@ -172,7 +180,7 @@
             html += '</tbody></table></div>';
             dv.innerHTML = html;
           } else if (tab === 'models') {
-            const r = await fetch('http://127.0.0.1:8000/api/models');
+            const r = await fetch('/api/models');
             const d = await r.json();
             let html = '<h3 class="text-base font-bold text-slate-200">Active Multi-Model Providers</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
             (d.models || []).forEach(m => {
@@ -191,7 +199,7 @@
             html += '</div>';
             dv.innerHTML = html;
           } else if (tab === 'audit') {
-            const r = await fetch('http://127.0.0.1:8000/api/audit');
+            const r = await fetch('/api/audit');
             const d = await r.json();
             let html = '<h3 class="text-base font-bold text-slate-200">Google Cloud Logging & Trace Audit Log</h3><div class="space-y-2">';
             (d.events || []).reverse().forEach(ev => {
@@ -223,7 +231,7 @@
         try {
           const persona = document.getElementById('personaSelect').value;
           const model = document.getElementById('modelSelect') ? document.getElementById('modelSelect').value : null;
-          const r = await fetch('http://127.0.0.1:8000/api/chat', {
+          const r = await fetch('/api/chat', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ prompt: text, persona: persona, model: model })
@@ -286,7 +294,7 @@
 
       async function approveAction(confId, action) {
         const persona = document.getElementById('personaSelect').value;
-        const r = await fetch('http://127.0.0.1:8000/api/chat/confirm', {
+        const r = await fetch('/api/chat/confirm', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ confirmation_id: confId, action: action, persona: persona })
@@ -440,9 +448,1726 @@
       }
 
       // ==========================================
-      // AGENTS HUB & SWAGGER GENERATOR LOGIC
+      // PODS & AUTONOMOUS SDD HUB LOGIC
       // ==========================================
-      window._agentsScope = 'all';
+      window._currentPodFilter = 'all';
+      window._currentWorkspaceFilter = 'all';
+      window._allPodsList = [];
+      window._allWorkspacesList = [];
+      window._activePodData = null;
+      window._activeWorkspaceData = null;
+      window._activeWsTab = 'chats';
+      window._activeSDDStage = 'principles';
+
+      async function loadPodsHub(filterType) {
+        if (filterType) {
+          window._currentPodFilter = filterType;
+          window._currentWorkspaceFilter = filterType;
+        }
+        const dv = document.getElementById('dynamicView');
+        if (!dv) return;
+        dv.innerHTML = '<div class="text-slate-500 font-mono text-xs p-8 text-center">Loading pods...</div>';
+
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        
+        try {
+          const r = await fetch(`/api/pods?filter=${window._currentPodFilter}&persona=${persona}`);
+          const data = await r.json();
+          window._allPodsList = data.workspaces || data.pods || [];
+          window._allWorkspacesList = window._allPodsList;
+          renderPodsDirectoryView();
+        } catch(err) {
+          dv.innerHTML = `<div class="p-4 bg-red-950/40 border border-red-900 rounded-xl text-red-400 text-xs">Failed to load pods: ${err.message}</div>`;
+        }
+      }
+      window.loadWorkspacesHub = loadPodsHub;
+      window.loadPodsHub = loadPodsHub;
+
+      function renderPodsDirectoryView() {
+        const dv = document.getElementById('dynamicView');
+        if (!dv) return;
+
+        const activeFilter = window._currentPodFilter || 'all';
+
+        let html = `
+          <div class="space-y-6">
+            <!-- Header -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
+              <div>
+                <h3 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+                  <span>📁</span>
+                  <span>Pods</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-1">
+                  A centralized hub to organize, collaborate on shared context pods, and develop spec-driven applications.
+                </p>
+              </div>
+              <div class="flex items-center gap-3">
+                <button onclick="openNewPodModal()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/30 flex items-center gap-2 transition cursor-pointer">
+                  <span>+</span>
+                  <span>New Pod</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Filter Bar: All, Public Pods, Shared with Me -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-2">
+              <div class="flex items-center space-x-6">
+                <button onclick="loadPodsHub('all')" class="pb-2 text-xs font-semibold transition cursor-pointer ${activeFilter === 'all' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-200'}">
+                  📁 All
+                </button>
+                <button onclick="loadPodsHub('public')" class="pb-2 text-xs font-semibold transition cursor-pointer ${activeFilter === 'public' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-200'}">
+                  🌐 Public Pods
+                </button>
+                <button onclick="loadPodsHub('shared')" class="pb-2 text-xs font-semibold transition cursor-pointer ${activeFilter === 'shared' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-200'}">
+                  🔒 Shared with Me
+                </button>
+              </div>
+
+              <!-- Search -->
+              <div class="relative">
+                <input type="text" onkeyup="filterPodsCards(this.value)" placeholder="Search pods..." class="bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 w-56" />
+                <span class="absolute left-2.5 top-2 text-slate-500 text-xs">🔍</span>
+              </div>
+            </div>
+
+            <!-- Cards Grid -->
+            <div id="wsCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        `;
+
+        if (window._allPodsList.length === 0) {
+          html += `
+            <div class="col-span-full p-12 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/30">
+              <span class="text-3xl block mb-2">📁</span>
+              <div class="text-sm font-semibold text-slate-300">No pods found</div>
+              <p class="text-xs text-slate-500 mt-1">Create a new Public General Chat or Private SDD pod to get started.</p>
+              <button onclick="openNewPodModal()" class="mt-4 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold">
+                + Create Pod
+              </button>
+            </div>
+          `;
+        } else {
+          window._allPodsList.forEach(ws => {
+            const isSDD = ws.workspace_type === 'sdd';
+            const isOwner = ws.user_role === 'owner';
+            const typeBadge = isSDD 
+              ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">📐 SDD (Private) Pod</span>'
+              : (ws.visibility === 'public'
+                  ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">🌐 General Chat (Public) Pod</span>'
+                  : '<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">🔒 General Chat (Private) Pod</span>');
+
+            const roleBadge = isOwner 
+              ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600/20 text-blue-300 border border-blue-500/30">Owner</span>'
+              : '<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-300 border border-slate-700">Contributor</span>';
+
+            const localSpaceInfo = isSDD && ws.sdd_config
+              ? `<div class="text-[11px] text-slate-400 font-mono truncate mt-2 flex items-center justify-between">
+                   <span class="truncate cursor-pointer hover:text-blue-300 transition" onclick="event.stopPropagation(); openPodFolder('${ws.workspace_id}')" title="Click to open folder in Windows File Explorer">Local: <code class="text-slate-300">${ws.sdd_config.local_space_path || 'workspace-projects/' + ws.workspace_id}</code></span>
+                   <button type="button" onclick="event.stopPropagation(); openPodFolder('${ws.workspace_id}')" class="px-1.5 py-0.5 hover:bg-slate-800 rounded text-slate-400 hover:text-blue-400 text-[11px] shrink-0 transition" title="Open in Windows File Explorer">
+                     📂 ↗
+                   </button>
+                 </div>`
+              : `<div class="text-[11px] text-slate-400 mt-2">${ws.documents ? ws.documents.length : 0} Scoped Documents</div>`;
+
+            html += `
+              <div onclick="openPodDetail('${ws.workspace_id}')" class="ws-card group bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-blue-500/50 rounded-2xl p-5 shadow-sm hover:shadow-lg transition cursor-pointer flex flex-col justify-between h-52 relative" data-title="${(ws.name || '').toLowerCase()}">
+                <div>
+                  <div class="flex items-center justify-between mb-3">
+                    ${typeBadge}
+                    ${roleBadge}
+                  </div>
+                  <h4 class="font-bold text-slate-100 text-base group-hover:text-blue-400 transition">${ws.name}</h4>
+                  <p class="text-xs text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">${ws.description || 'Shared context pod.'}</p>
+                </div>
+                <div>
+                  ${localSpaceInfo}
+                  <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
+                    <span class="flex items-center gap-1.5 text-slate-300 font-medium">
+                      <span>👤</span>
+                      <span>${ws.owner_name || 'Owner'}</span>
+                      <span class="text-[10px] text-slate-500">(${ws.members ? ws.members.length : 1} contribs)</span>
+                    </span>
+                    <span class="font-mono text-[11px]">${ws.created_at ? ws.created_at.slice(0, 10) : 'Recent'}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+        }
+
+        html += `
+            </div>
+          </div>
+        `;
+
+        dv.innerHTML = html;
+      }
+      window.renderWorkspacesDirectoryView = renderPodsDirectoryView;
+      window.renderPodsDirectoryView = renderPodsDirectoryView;
+
+      function filterPodsCards(query) {
+        const q = (query || '').toLowerCase().trim();
+        const cards = document.querySelectorAll('.ws-card');
+        cards.forEach(c => {
+          const t = c.getAttribute('data-title') || '';
+          if (t.includes(q)) c.classList.remove('hidden');
+          else c.classList.add('hidden');
+        });
+      }
+      window.filterWorkspacesCards = filterPodsCards;
+      window.filterPodsCards = filterPodsCards;
+
+      async function openPodDetail(wsId, defaultTab) {
+        const dv = document.getElementById('dynamicView');
+        if (!dv) return;
+        dv.innerHTML = '<div class="text-slate-500 font-mono text-xs p-8 text-center">Loading pod details...</div>';
+
+        try {
+          const r = await fetch(`/api/pods/${wsId}`);
+          if (!r.ok) throw new Error('Pod not found');
+          const ws = await r.json();
+          window._activePodData = ws;
+          window._activeWorkspaceData = ws;
+          
+          const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+          const isOwner = (ws.owner_id === persona);
+          const isSDD = (ws.workspace_type === 'sdd');
+
+          // Strict separation: General Chat pods only have 'chats'
+          window._activeWsTab = isSDD ? (defaultTab || 'sdd') : 'chats';
+
+          renderPodDetailView(ws, isOwner, isSDD);
+        } catch(err) {
+          dv.innerHTML = `<div class="p-4 bg-red-950/40 border border-red-900 rounded-xl text-red-400 text-xs">Error: ${err.message}</div>`;
+        }
+      }
+      window.openWorkspaceDetail = openPodDetail;
+      window.openPodDetail = openPodDetail;
+
+      function renderPodDetailView(ws, isOwner, isSDD) {
+        const dv = document.getElementById('dynamicView');
+        if (!dv) return;
+
+        const roleBadge = isOwner
+          ? '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600/20 text-blue-300 border border-blue-500/30">Owner</span>'
+          : '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">Contributor</span>';
+
+        const typeBadge = isSDD
+          ? '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">📐 SDD (Private) Pod</span>'
+          : (ws.visibility === 'public'
+              ? '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">🌐 General Chat (Public) Pod</span>'
+              : '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">🔒 General Chat (Private) Pod</span>');
+
+        const localPathBadge = isSDD && ws.sdd_config
+          ? `<div class="flex items-center gap-3 text-xs text-slate-400 font-mono mt-1 flex-wrap">
+               <button type="button" onclick="openPodFolder('${ws.workspace_id}')" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/60 px-2.5 py-1 rounded-lg text-left transition cursor-pointer group flex items-center gap-1.5 shadow-sm" title="Click to open this folder in Windows File Explorer">
+                 <span>📁</span>
+                 <span>Local:</span>
+                 <strong class="text-blue-400 group-hover:text-blue-300 underline decoration-blue-500/40">${ws.sdd_config.local_space_path || 'Not configured'}</strong>
+                 <span class="text-slate-500 group-hover:text-slate-300 text-[10px]">↗</span>
+               </button>
+               <span class="bg-emerald-950/40 border border-emerald-900 text-emerald-400 px-2.5 py-1 rounded-lg">🌿 git: ${ws.sdd_config.commit_hash || 'main'}</span>
+             </div>`
+          : '';
+
+        const chatMessages = ws.chat_messages || [];
+        const spec = ws.spec || { title: ws.name + ' Specification', requirements: [], raw_markdown: '' };
+        const plan = ws.plan || { title: ws.name + ' Architecture Plan', data_models: [], api_endpoints: [], decisions: [], raw_markdown: '' };
+        const tasks = ws.tasks || [];
+
+        let html = `
+          <div class="space-y-5">
+            <!-- Pod Banner Header -->
+            <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-sm space-y-4">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex items-start gap-3">
+                  <button onclick="loadPodsHub('${window._currentPodFilter}')" class="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition cursor-pointer text-sm" title="Back to Pods">
+                    ←
+                  </button>
+                  <div>
+                    <div class="flex items-center gap-2.5 flex-wrap">
+                      <h3 class="text-lg font-bold text-slate-100">${ws.name}</h3>
+                      ${typeBadge}
+                      ${roleBadge}
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">${ws.description || 'Pod container.'}</p>
+                    ${localPathBadge}
+                  </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="flex items-center gap-2 flex-wrap">
+                  <button onclick="openInviteContributorsModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition cursor-pointer">
+                    <span>👥</span>
+                    <span>Contributors (${ws.members ? ws.members.length : 1})</span>
+                  </button>
+
+                  ${isOwner && isSDD ? `
+                    <button onclick="openOwnerRulesModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 text-xs font-semibold border border-indigo-800 flex items-center gap-1.5 transition cursor-pointer">
+                      <span>⚙️</span>
+                      <span>Rules (Owner)</span>
+                    </button>
+                  ` : ''}
+
+                  <button onclick="openInstructionsModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition cursor-pointer">
+                    <span>💬</span>
+                    <span>Instructions</span>
+                  </button>
+
+                  ${isOwner ? `
+                    <button onclick="deletePod('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 text-xs font-medium border border-red-900 flex items-center gap-1.5 transition cursor-pointer">
+                      <span>🗑️</span>
+                      <span>Delete</span>
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+
+              <!-- SDD TABS BAR (ONLY VISIBLE FOR SDD PODS) -->
+              ${isSDD ? `
+                <div class="flex items-center space-x-8 border-b border-slate-800 pt-2 -mb-2">
+                  <button onclick="switchPodSubTab('sdd')" id="subtab-sdd" class="pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer ${window._activeWsTab === 'sdd' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-slate-400 hover:text-slate-200'}">
+                    <span>📐</span>
+                    <span>Spec-Driven Development (SDD)</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold">Autonomous Engine</span>
+                  </button>
+                  <button onclick="switchPodSubTab('chats')" id="subtab-chats" class="pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer ${window._activeWsTab === 'chats' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-200'}">
+                    <span>💬</span>
+                    <span>Pod Chat</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Spec Grounding</span>
+                  </button>
+                </div>
+              ` : `
+                <!-- For General Chat: clean border separation without SDD tab -->
+                <div class="border-b border-slate-800/60 pt-1 -mb-2"></div>
+              `}
+            </div>
+
+            <!-- CHAT VIEW (PERSISTED IN FIRESTORE) -->
+            <div id="wsChatsTabContent" class="${(!isSDD || window._activeWsTab === 'chats') ? '' : 'hidden'} grid grid-cols-1 md:grid-cols-3 gap-5">
+              <!-- Left Sidebar: Context & Metadata -->
+              <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 h-[580px] flex flex-col justify-between">
+                <div class="space-y-4 overflow-y-auto">
+                  <div class="p-3 rounded-xl bg-blue-950/40 border border-blue-900 text-xs text-blue-300 space-y-1">
+                    <strong class="flex items-center gap-1.5">${isSDD ? '🔒 Scoped Grounding in Firestore' : '💬 Team Pod Hub'}</strong>
+                    <p class="text-[11px] text-blue-400 leading-relaxed">
+                      ${isSDD
+                        ? `Every turn is grounded strictly in <strong>${ws.name}</strong> approved specification and architecture tenets.`
+                        : `Shared context container for <strong>${ws.name}</strong>. Team answers are grounded in pod instructions and history.`}
+                    </p>
+                  </div>
+
+                  ${isSDD ? `
+                    <div>
+                      <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Grounding Source</div>
+                      <div class="space-y-1.5 text-xs">
+                        <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                          <span class="text-slate-300 font-medium truncate">📄 ${spec.title || 'System Specification'}</span>
+                          <span class="text-[10px] text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-900">Approved</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                          <span class="text-slate-300 font-medium truncate">📐 ${plan.title || 'Architecture Plan'}</span>
+                          <span class="text-[10px] text-indigo-400 bg-indigo-950/50 px-1.5 py-0.5 rounded border border-indigo-900">Active</span>
+                        </div>
+                      </div>
+                    </div>
+                  ` : `
+                    <div>
+                      <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Pod Mission & Instructions</div>
+                      <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed max-h-36 overflow-y-auto">
+                        ${ws.system_instructions || 'Open team communication and collaborative problem solving.'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Pod Documents (${(ws.documents || []).length})</div>
+                      <div class="space-y-1.5 text-xs">
+                        ${(ws.documents && ws.documents.length > 0) ? ws.documents.map(d => `
+                          <div class="p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 flex items-center justify-between">
+                            <span class="truncate">📄 ${d.name || d.title || 'Doc'}</span>
+                            <span class="text-[10px] text-slate-500 font-mono">${d.size || '1.2kb'}</span>
+                          </div>
+                        `).join('') : '<div class="text-slate-500 text-xs">No documents uploaded yet.</div>'}
+                      </div>
+                    </div>
+                  `}
+                </div>
+
+                <!-- Grounding stats -->
+                <div class="pt-3 border-t border-slate-800 text-[11px] text-slate-500 font-mono">
+                  <span>Persistence: Firestore DB</span>
+                </div>
+              </div>
+
+              <!-- Right: Real-time Firestore Chat Feed -->
+              <div class="md:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between h-[580px]">
+                <!-- Message history -->
+                <div id="wsMessagesContainer" class="flex-1 overflow-y-auto space-y-4 pr-2 mb-3">
+                  ${chatMessages.length === 0 ? `
+                    <div class="p-8 text-center text-slate-500 text-xs space-y-1">
+                      <span class="text-2xl block mb-2">💬</span>
+                      <p>Start a conversation in <strong>${ws.name}</strong>.</p>
+                      <p class="text-[11px] text-slate-600">Answers are grounded in shared context and instructions.</p>
+                    </div>
+                  ` : chatMessages.map(m => `
+                    ${m.role === 'user' ? `
+                      <div class="flex gap-3 justify-end">
+                        <div class="bg-blue-600 p-3.5 rounded-2xl max-w-xl text-xs text-white shadow-sm leading-relaxed">${m.content}</div>
+                      </div>
+                    ` : `
+                      <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
+                        <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs max-w-xl space-y-2.5 leading-relaxed text-slate-200">
+                          <p class="whitespace-pre-line">${m.content}</p>
+                          ${(m.citations && m.citations.length > 0) ? `
+                            <div class="pt-2 border-t border-slate-800/80 flex items-center gap-2 text-[11px] font-mono text-slate-400 flex-wrap">
+                              <span>Grounding:</span>
+                              ${m.citations.map(c => `<span class="px-2 py-0.5 rounded bg-blue-950/40 text-blue-400 border border-blue-900">📄 ${c}</span>`).join('')}
+                            </div>
+                          ` : ''}
+                        </div>
+                      </div>
+                    `}
+                  `).join('')}
+                </div>
+
+                <!-- Input form -->
+                <form onsubmit="sendPodChatMessage('${ws.workspace_id}', event)" class="relative flex items-center">
+                  <input type="text" id="wsChatInput" placeholder="${isSDD ? `Ask anything against ${ws.name} specification...` : `Chat with team in ${ws.name}...`}" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-4 pr-24 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-inner" />
+                  <button type="submit" class="absolute right-2 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer">
+                    Send
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <!-- SDD TAB CONTENT (STRICTLY ONLY RENDERED IF isSDD) -->
+            ${isSDD ? `
+              <div id="wsSDDTabContent" class="${window._activeWsTab === 'sdd' ? '' : 'hidden'} space-y-5">
+                <!-- SDD 6-Stage Stepper -->
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div class="flex items-center space-x-2 text-xs overflow-x-auto py-1">
+                    <button onclick="setSDDStageUI('principles')" id="stepBtn-principles" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-semibold cursor-pointer">
+                      <span class="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">1</span>
+                      <span>Principles</span>
+                    </button>
+                    <span class="text-slate-600">→</span>
+
+                    <button onclick="setSDDStageUI('specify')" id="stepBtn-specify" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
+                      <span class="w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">2</span>
+                      <span>Specify (${(spec.requirements || []).length} reqs)</span>
+                    </button>
+                    <span class="text-slate-600">→</span>
+
+                    <button onclick="setSDDStageUI('plan')" id="stepBtn-plan" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
+                      <span class="w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">3</span>
+                      <span>Plan (${(plan.data_models || []).length} models)</span>
+                    </button>
+                    <span class="text-slate-600">→</span>
+
+                    <button onclick="setSDDStageUI('tasks')" id="stepBtn-tasks" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
+                      <span class="w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">4</span>
+                      <span>Tasks (${tasks.length})</span>
+                    </button>
+                    <span class="text-slate-600">→</span>
+
+                    <button onclick="setSDDStageUI('implement')" id="stepBtn-implement" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
+                      <span class="w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">5</span>
+                      <span>Implement</span>
+                    </button>
+                    <span class="text-slate-600">→</span>
+
+                    <button onclick="setSDDStageUI('verify')" id="stepBtn-verify" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
+                      <span class="w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">6</span>
+                      <span>Verify</span>
+                    </button>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <button onclick="setSDDStageUI('implement')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 flex items-center gap-1.5 transition cursor-pointer">
+                      <span>🚀</span>
+                      <span>Autonomous Engine</span>
+                    </button>
+                    <button onclick="showTraceabilityModal()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 cursor-pointer">
+                      <span>📊</span>
+                      <span>Traceability Matrix</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- SDD STAGE PANELS -->
+                <div class="space-y-4">
+                  <!-- STAGE 1: PRINCIPLES -->
+                  <div id="stagePanel-principles" class="space-y-4">
+                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between">
+                      <div>
+                        <h4 class="text-sm font-bold text-slate-100">Stage 1: Architecture Principles & Coding Standards</h4>
+                        <p class="text-xs text-slate-400">Owner-enforced tenets stored in Firestore.</p>
+                      </div>
+                      ${isOwner ? `<button onclick="openOwnerRulesModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer">Edit Rules (Owner)</button>` : ''}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                        <div class="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
+                          <span>📐</span>
+                          <span>Architecture Principles</span>
+                        </div>
+                        <ul class="text-xs text-slate-300 space-y-1.5 list-disc pl-4">
+                          ${(ws.sdd_config && ws.sdd_config.architecture_principles && ws.sdd_config.architecture_principles.length > 0) ? ws.sdd_config.architecture_principles.map(p => `<li>${p}</li>`).join('') : `
+                            <li>Clean Architecture with explicit domain boundaries</li>
+                            <li>Pydantic v2 validation on all data mutations</li>
+                            <li>Stateless service design</li>
+                          `}
+                        </ul>
+                      </div>
+
+                      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                        <div class="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                          <span>⚙️</span>
+                          <span>Coding Standards</span>
+                        </div>
+                        <ul class="text-xs text-slate-300 space-y-1.5 list-disc pl-4">
+                          ${(ws.sdd_config && ws.sdd_config.coding_standards && ws.sdd_config.coding_standards.length > 0) ? ws.sdd_config.coding_standards.map(c => `<li>${c}</li>`).join('') : `
+                            <li>100% Type Annotations with PEP 8</li>
+                            <li>Pytest Coverage > 85%</li>
+                          `}
+                        </ul>
+                      </div>
+
+                      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                        <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                          <span>🛡️</span>
+                          <span>Tech Stack & Status</span>
+                        </div>
+                        <div class="text-xs text-slate-300 space-y-1">
+                          <div><strong>Stack:</strong> ${(ws.sdd_config && ws.sdd_config.tech_stack) || 'Python 3.11 / FastAPI / Pytest'}</div>
+                          <div><strong>Spec Version:</strong> ${(ws.sdd_config && ws.sdd_config.active_spec_version) || 'v1.0'}</div>
+                          <div><strong>Approval:</strong> <span class="text-emerald-400 font-bold uppercase">${(ws.sdd_config && ws.sdd_config.approval_status) || 'Approved'}</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- STAGE 2: SPECIFY -->
+                  <div id="stagePanel-specify" class="hidden space-y-4">
+                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h4 class="text-sm font-bold text-slate-100">${spec.title || 'Application Specification'}</h4>
+                        <p class="text-xs text-slate-400">Authoritative requirements and acceptance criteria saved in Firestore.</p>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button onclick="openEditSpecModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 cursor-pointer">
+                          ✏️ Edit Spec
+                        </button>
+                        <button onclick="openAIGenerateSpecModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer">
+                          ✨ AI Generate / Refine
+                        </button>
+                      </div>
+                    </div>
+
+                    ${spec.raw_markdown ? `
+                      <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 max-h-56 overflow-y-auto whitespace-pre-line leading-relaxed">
+                        ${spec.raw_markdown}
+                      </div>
+                    ` : ''}
+
+                    <div class="space-y-3">
+                      <div class="text-xs font-bold text-slate-300 uppercase tracking-wider">Requirements Breakdown (${(spec.requirements || []).length})</div>
+                      ${(spec.requirements && spec.requirements.length > 0) ? spec.requirements.map(req => `
+                        <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2 text-xs">
+                          <div class="flex items-center justify-between">
+                            <span class="font-bold text-indigo-300">${req.id}: ${req.title}</span>
+                            <span class="px-2 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-900 text-[10px] font-mono">Approved</span>
+                          </div>
+                          <p class="text-slate-400">${req.description || ''}</p>
+                          ${req.acceptance_criteria ? `
+                            <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl font-mono text-[11px] text-slate-300 space-y-1">
+                              <div><strong>Acceptance Criteria:</strong></div>
+                              <div>${req.acceptance_criteria}</div>
+                            </div>
+                          ` : ''}
+                        </div>
+                      `).join('') : `
+                        <div class="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center text-xs text-slate-400">
+                          No requirements defined yet. Click <strong>"AI Generate / Refine"</strong> to synthesize full specifications.
+                        </div>
+                      `}
+                    </div>
+                  </div>
+
+                  <!-- STAGE 3: PLAN -->
+                  <div id="stagePanel-plan" class="hidden space-y-4">
+                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h4 class="text-sm font-bold text-slate-100">${plan.title || 'Technical Architecture & Plan'}</h4>
+                        <p class="text-xs text-slate-400">Entity data models, API route contracts, and architecture decisions.</p>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button onclick="openEditPlanModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 cursor-pointer">
+                          ✏️ Edit Plan
+                        </button>
+                        <button onclick="openAIGeneratePlanModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer">
+                          ✨ AI Generate Plan
+                        </button>
+                      </div>
+                    </div>
+
+                    ${plan.raw_markdown ? `
+                      <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 max-h-56 overflow-y-auto whitespace-pre-line leading-relaxed">
+                        ${plan.raw_markdown}
+                      </div>
+                    ` : ''}
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                        <div class="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
+                          <span>📦</span>
+                          <span>Data Models (${(plan.data_models || []).length})</span>
+                        </div>
+                        <div class="space-y-2 text-xs">
+                          ${(plan.data_models && plan.data_models.length > 0) ? plan.data_models.map(m => `
+                            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                              <strong class="text-slate-200">${m.name}</strong>
+                              <div class="text-[11px] font-mono text-slate-400">${(m.fields || []).join(', ')}</div>
+                            </div>
+                          `).join('') : '<div class="text-slate-500 text-xs">No data models defined.</div>'}
+                        </div>
+                      </div>
+
+                      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                        <div class="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                          <span>⚡</span>
+                          <span>API Endpoints (${(plan.api_endpoints || []).length})</span>
+                        </div>
+                        <div class="space-y-2 text-xs">
+                          ${(plan.api_endpoints && plan.api_endpoints.length > 0) ? plan.api_endpoints.map(ep => `
+                            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                              <div class="flex items-center gap-2">
+                                <span class="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${ep.method === 'POST' ? 'bg-blue-950 text-blue-400' : 'bg-emerald-950 text-emerald-400'}">${ep.method || 'GET'}</span>
+                                <code class="text-slate-200 text-xs">${ep.path}</code>
+                              </div>
+                              <span class="text-[11px] text-slate-400">${ep.summary || ''}</span>
+                            </div>
+                          `).join('') : '<div class="text-slate-500 text-xs">No endpoints defined.</div>'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- STAGE 4: TASKS -->
+                  <div id="stagePanel-tasks" class="hidden space-y-4">
+                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h4 class="text-sm font-bold text-slate-100">Stage 4: Implementation Task Breakdown</h4>
+                        <p class="text-xs text-slate-400">Executable unit tasks linked to specification sections.</p>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button onclick="openAddTaskModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 cursor-pointer">
+                          + Add Task
+                        </button>
+                        <button onclick="triggerAIBreakdownTasks('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer">
+                          ✨ AI Auto-Breakdown
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3">
+                      ${tasks.length > 0 ? tasks.map(t => `
+                        <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+                          <div class="space-y-1.5 flex-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                              <span class="px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 font-mono font-bold text-[10px] border border-indigo-900">${t.task_id}</span>
+                              <strong class="text-slate-100 text-sm">${t.title}</strong>
+                              ${t.linked_req_id ? `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[10px]">${t.linked_req_id}</span>` : ''}
+                              ${t.status === 'completed'
+                                ? `<span class="px-2 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-900 text-[10px] font-bold">Completed & Committed (${t.last_commit_hash || 'main'})</span>`
+                                : (t.status === 'failed'
+                                    ? `<span class="px-2 py-0.5 rounded bg-red-950/40 text-red-400 border border-red-900 text-[10px] font-bold">Failed</span>`
+                                    : `<span class="px-2 py-0.5 rounded bg-amber-950/40 text-amber-400 border border-amber-900 text-[10px] font-bold">Pending</span>`)}
+                            </div>
+                            <p class="text-slate-400">${t.description || ''}</p>
+                            <div class="flex items-center gap-3 font-mono text-[11px] text-slate-500 flex-wrap">
+                              <span>Code: <code class="text-slate-300">${(t.target_files || []).join(', ') || 'src/module.py'}</code></span>
+                              <span>Test: <code class="text-slate-300">${t.test_file || 'tests/test_module.py'}</code></span>
+                            </div>
+                          </div>
+
+                          <div class="flex items-center gap-2">
+                            <button onclick="startSingleTaskImplementation('${ws.workspace_id}', '${t.task_id}')" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer">
+                              <span>⚡</span>
+                              <span>Implement Task</span>
+                            </button>
+                          </div>
+                        </div>
+                      `).join('') : `
+                        <div class="p-8 bg-slate-900 border border-slate-800 rounded-2xl text-center text-xs text-slate-400 space-y-2">
+                          <p>No tasks configured yet.</p>
+                          <button onclick="triggerAIBreakdownTasks('${ws.workspace_id}')" class="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold cursor-pointer">✨ Auto-Generate Tasks from Spec</button>
+                        </div>
+                      `}
+                    </div>
+                  </div>
+
+                  <!-- STAGE 5: IMPLEMENT (AUTONOMOUS ANTIGRAVITY ENGINE) -->
+                  <div id="stagePanel-implement" class="hidden space-y-4">
+                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h4 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+                          <span>🚀</span>
+                          <span>Stage 5: Autonomous Antigravity Implementation Engine</span>
+                        </h4>
+                        <p class="text-xs text-slate-400">Directly scaffolds repository, writes code, runs pytest, and commits to git in local workspace directory.</p>
+                      </div>
+
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <select id="sddTaskSelector" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none">
+                          ${tasks.map(t => `<option value="${t.task_id}">${t.task_id}: ${t.title} [${t.status}]</option>`).join('')}
+                        </select>
+
+                        <button onclick="startAutonomousSDDImplementation('${ws.workspace_id}')" id="btnRunSDD" class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 flex items-center gap-2 cursor-pointer transition">
+                          <span id="sddSpinner" class="hidden animate-spin">🌀</span>
+                          <span id="sddBtnText">Run Implementation & Tests</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Live Terminal Console -->
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2 font-mono text-xs">
+                      <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                        <span class="text-indigo-400 font-bold flex items-center gap-2">
+                          <span>💻</span>
+                          <span>Autonomous Execution Terminal (Antigravity Engine)</span>
+                        </span>
+                        <span class="text-slate-500 text-[11px]">Subprocess Runner</span>
+                      </div>
+                      <div id="sddTerminalOutput" class="h-56 overflow-y-auto space-y-1 text-slate-400 text-[11px] pr-2">
+                        <div>$ Antigravity SDD agent initialized. Select a task above and click 'Run Implementation & Tests'.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- STAGE 6: VERIFY (PYTEST RUNNER) -->
+                  <div id="stagePanel-verify" class="hidden space-y-4">
+                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h4 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+                          <span>🧪</span>
+                          <span>Stage 6: Specification Verification & Pytest Suite</span>
+                        </h4>
+                        <p class="text-xs text-slate-400">Executes pytest against the user local space workspace repository.</p>
+                      </div>
+
+                      <button onclick="runPytestSuite('${ws.workspace_id}')" id="btnRunPytest" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer transition">
+                        <span>▶</span>
+                        <span>Run Full Pytest Suite</span>
+                      </button>
+                    </div>
+
+                    <div id="pytestResultBox" class="hidden p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 font-mono text-xs">
+                      <div class="text-slate-300 font-bold">Pytest Execution Output:</div>
+                      <pre id="pytestOutputText" class="text-slate-400 text-[11px] max-h-60 overflow-y-auto whitespace-pre-wrap leading-relaxed"></pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+
+        dv.innerHTML = html;
+      }
+      window.renderWorkspaceDetailView = renderPodDetailView;
+      window.renderPodDetailView = renderPodDetailView;
+
+      function switchPodSubTab(tab) {
+        window._activeWsTab = tab;
+        const cChats = document.getElementById('wsChatsTabContent');
+        const cSDD = document.getElementById('wsSDDTabContent');
+        const bChats = document.getElementById('subtab-chats');
+        const bSDD = document.getElementById('subtab-sdd');
+
+        if (tab === 'chats') {
+          if (cChats) cChats.classList.remove('hidden');
+          if (cSDD) cSDD.classList.add('hidden');
+          if (bChats) bChats.className = 'pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-blue-400 border-b-2 border-blue-500';
+          if (bSDD) bSDD.className = 'pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200';
+        } else {
+          if (cChats) cChats.classList.add('hidden');
+          if (cSDD) cSDD.classList.remove('hidden');
+          if (bChats) bChats.className = 'pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200';
+          if (bSDD) bSDD.className = 'pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-indigo-400 border-b-2 border-indigo-500';
+        }
+      }
+      window.switchWorkspaceSubTab = switchPodSubTab;
+      window.switchPodSubTab = switchPodSubTab;
+
+      function setSDDStageUI(stage) {
+        window._activeSDDStage = stage;
+        const stages = ['principles', 'specify', 'plan', 'tasks', 'implement', 'verify'];
+        stages.forEach(s => {
+          const panel = document.getElementById('stagePanel-' + s);
+          const btn = document.getElementById('stepBtn-' + s);
+          if (panel) {
+            if (s === stage) panel.classList.remove('hidden');
+            else panel.classList.add('hidden');
+          }
+          if (btn) {
+            if (s === stage) {
+              btn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-semibold cursor-pointer';
+            } else {
+              btn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer';
+            }
+          }
+        });
+      }
+      window.setSDDStageUI = setSDDStageUI;
+
+      function startSingleTaskImplementation(wsId, taskId) {
+        setSDDStageUI('implement');
+        const sel = document.getElementById('sddTaskSelector');
+        if (sel) sel.value = taskId;
+        startAutonomousSDDImplementation(wsId);
+      }
+      window.startSingleTaskImplementation = startSingleTaskImplementation;
+
+      async function startAutonomousSDDImplementation(wsId) {
+        const term = document.getElementById('sddTerminalOutput');
+        const spinner = document.getElementById('sddSpinner');
+        const btnText = document.getElementById('sddBtnText');
+        const sel = document.getElementById('sddTaskSelector');
+        const taskId = sel ? sel.value : 'TSK-101';
+
+        if (spinner) spinner.classList.remove('hidden');
+        if (btnText) btnText.innerText = 'Executing Task ' + taskId + '...';
+
+        if (term) {
+          term.innerHTML += `<div class="text-indigo-400 font-bold mt-2">&gt;&gt; [START] Autonomous Agent Implementation for ${taskId}...</div>`;
+          term.scrollTop = term.scrollHeight;
+        }
+
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+
+        try {
+          // 1. Init repo
+          if (term) {
+            term.innerHTML += `<div class="text-slate-400">[INIT] Verifying local git repository...</div>`;
+            term.scrollTop = term.scrollHeight;
+          }
+          const initRes = await fetch(`/api/pods/${wsId}/sdd/init-repo?persona=${persona}`, { method: 'POST' });
+          const initData = await initRes.json();
+          if (term) {
+            term.innerHTML += `<div class="text-emerald-400">[GIT] Ready at: ${initData.local_path}</div>`;
+            term.scrollTop = term.scrollHeight;
+          }
+
+          // 2. Implement task
+          if (term) {
+            term.innerHTML += `<div class="text-indigo-300">[EXEC] Agent generating code & test suite for ${taskId}...</div>`;
+            term.scrollTop = term.scrollHeight;
+          }
+          const taskRes = await fetch(`/api/pods/${wsId}/sdd/implement-task?task_id=${taskId}&persona=${persona}`, { method: 'POST' });
+          const taskData = await taskRes.json();
+
+          if (taskData.steps && term) {
+            taskData.steps.forEach(st => {
+              const col = st.level === 'success' ? 'text-emerald-400' : (st.level === 'complete' ? 'text-emerald-400 font-bold' : (st.level === 'error' ? 'text-red-400 font-bold' : 'text-slate-300'));
+              term.innerHTML += `<div class="${col}">${st.msg}</div>`;
+            });
+            term.scrollTop = term.scrollHeight;
+          }
+
+          // Re-fetch updated pod
+          openPodDetail(wsId, 'sdd');
+        } catch(e) {
+          if (term) term.innerHTML += `<div class="text-red-400">[ERROR] Execution failed: ${e.message}</div>`;
+        } finally {
+          if (spinner) spinner.classList.add('hidden');
+          if (btnText) btnText.innerText = 'Run Implementation & Tests';
+        }
+      }
+      window.startAutonomousSDDImplementation = startAutonomousSDDImplementation;
+
+      async function runPytestSuite(wsId) {
+        const box = document.getElementById('pytestResultBox');
+        const out = document.getElementById('pytestOutputText');
+        const btn = document.getElementById('btnRunPytest');
+        if (box) box.classList.remove('hidden');
+        if (out) out.innerText = 'Running pytest in local space pod repository...';
+        if (btn) btn.disabled = true;
+
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+
+        try {
+          const r = await fetch(`/api/pods/${wsId}/sdd/run-tests?persona=${persona}`, { method: 'POST' });
+          const d = await r.json();
+          if (out) {
+            out.innerText = `Pytest Exit Code: ${d.returncode} (${d.passed ? 'PASSED ✅' : 'FAILED ❌'})
+
+${d.output || 'No output recorded.'}`;
+          }
+        } catch(e) {
+          if (out) out.innerText = 'Pytest execution failed: ' + e.message;
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      }
+      window.runPytestSuite = runPytestSuite;
+      window.runFullTestSuite = runPytestSuite;
+
+      function injectPodPrompt(text) {
+        const input = document.getElementById('wsChatInput');
+        if (input) {
+          input.value = text;
+          input.focus();
+        }
+      }
+      window.injectWorkspacePrompt = injectPodPrompt;
+      window.injectPodPrompt = injectPodPrompt;
+
+      async function sendPodChatMessage(wsId, event) {
+        if (event) event.preventDefault();
+        const input = document.getElementById('wsChatInput');
+        if (!input) return;
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+
+        const mc = document.getElementById('wsMessagesContainer');
+        if (mc) {
+          mc.innerHTML += `
+            <div class="flex gap-3 justify-end">
+              <div class="bg-blue-600 p-3.5 rounded-2xl max-w-xl text-xs text-white shadow-sm leading-relaxed">${text}</div>
+            </div>
+          `;
+          mc.scrollTop = mc.scrollHeight;
+        }
+
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+
+        try {
+          const r = await fetch(`/api/pods/${wsId}/chat`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ prompt: text, persona: persona })
+          });
+          const d = await r.json();
+
+          if (mc) {
+            mc.innerHTML += `
+              <div class="flex gap-3">
+                <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
+                <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs max-w-xl space-y-2.5 leading-relaxed text-slate-200">
+                  <p class="whitespace-pre-line">${d.reply || d.text}</p>
+                  ${(d.citations && d.citations.length > 0) ? `
+                    <div class="pt-2 border-t border-slate-800/80 flex items-center gap-2 text-[11px] font-mono text-slate-400 flex-wrap">
+                      <span>Grounding:</span>
+                      ${d.citations.map(c => `<span class="px-2 py-0.5 rounded bg-blue-950/40 text-blue-400 border border-blue-900">📄 ${c}</span>`).join('')}
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+            mc.scrollTop = mc.scrollHeight;
+          }
+        } catch(err) {
+          if (mc) {
+            mc.innerHTML += `
+              <div class="flex gap-3">
+                <div class="w-8 h-8 rounded-xl bg-red-600 flex items-center justify-center font-bold text-sm shrink-0">⚠️</div>
+                <div class="p-3 rounded-2xl bg-slate-950 border border-red-900 text-xs text-red-400">Error querying pod: ${err.message}</div>
+              </div>
+            `;
+          }
+        }
+      }
+      window.sendWorkspaceChatMessage = sendPodChatMessage;
+      window.sendPodChatMessage = sendPodChatMessage;
+
+      // ==========================================
+      // MODALS: NEW POD, SPEC, PLAN, TASKS, RULES
+      // ==========================================
+
+      async function openNewPodModal() {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        let employees = [];
+        try {
+          const r = await fetch('/api/employees');
+          const data = await r.json();
+          employees = data.employees || [];
+        } catch(e) {}
+
+        window._selectedModalType = 'sdd';
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">Create Application Pod</h4>
+                <p class="text-xs text-slate-400">Persisted in Firestore with live Spec-Driven Development engine.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <!-- Pod Type Selector -->
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">Select Pod Type</label>
+              <div class="grid grid-cols-2 gap-4">
+                <div onclick="selectModalType('chat')" id="cardTypeChat" class="p-4 rounded-xl border-2 border-slate-800 hover:border-blue-500 cursor-pointer space-y-2 transition bg-slate-950">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xl">💬</span>
+                    <strong class="text-sm text-slate-100">General Chat</strong>
+                  </div>
+                  <p class="text-xs text-slate-400">Shared context container for team documents, prompts, and scoped chat.</p>
+                </div>
+
+                <div onclick="selectModalType('sdd')" id="cardTypeSDD" class="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-950/20 cursor-pointer space-y-2 transition shadow-sm">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="text-xl">📐</span>
+                      <strong class="text-sm text-indigo-300">SDD (Spec-Driven Dev)</strong>
+                    </div>
+                    <span class="text-[10px] bg-indigo-500/20 text-indigo-400 font-bold px-2 py-0.5 rounded-full font-mono border border-indigo-500/30">Private Only</span>
+                  </div>
+                  <p class="text-xs text-slate-400">Application builder. Inits local repo, generates code, runs pytest, and commits to git.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Basic Info -->
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Application / Pod Name</label>
+                <input type="text" id="inputNewWsName" placeholder="e.g. Order & Inventory Management System" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Description</label>
+                <textarea id="inputNewWsDesc" rows="2" placeholder="Describe the application scope..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Initial Requirements / Goal Prompt (Optional)</label>
+                <textarea id="inputNewWsInitialPrompt" rows="3" placeholder="e.g. Create a FastAPI service for managing customer orders, items, stock levels, and order checkout with validation rules..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+              </div>
+            </div>
+
+            <!-- SDD Fields -->
+            <div id="modalSDDFields" class="p-4 bg-indigo-950/30 border border-indigo-900 rounded-xl space-y-3 text-xs">
+              <div class="font-bold text-indigo-300 flex items-center gap-1.5">
+                <span>⚙️</span>
+                <span>SDD Local Repository Configuration</span>
+              </div>
+
+              <div>
+                <label class="block font-semibold text-slate-300 mb-1">Local Space Working Directory</label>
+                <div class="flex items-center gap-2">
+                  <div class="relative flex-1">
+                    <input type="text" id="inputNewWsLocalPath" placeholder="d:/AI Orchestrator/workspace-projects/my-app" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  </div>
+                  <button type="button" onclick="browseFolderForSDD()" id="btnBrowseSDD" class="px-3.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md shrink-0">
+                    <span id="browseIcon">📂</span>
+                    <span id="browseText">Browse Folder</span>
+                  </button>
+                </div>
+                <span class="text-[11px] text-slate-400 mt-1 block">Click Browse Folder to choose from your device file explorer, or type a custom path.</span>
+              </div>
+            </div>
+
+            <!-- Employee Directory Invitation -->
+            <div id="modalInviteSection" class="space-y-2">
+              <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Invite Contributors from Employee Directory
+              </label>
+              <div class="max-h-36 overflow-y-auto border border-slate-800 rounded-xl divide-y divide-slate-800/60 bg-slate-950 p-1 text-xs">
+                ${employees.map(emp => `
+                  <label class="flex items-center justify-between p-2 hover:bg-slate-900 rounded-lg cursor-pointer">
+                    <span class="flex items-center gap-2.5">
+                      <input type="checkbox" name="invitedEmployee" value="${emp.employee_id}" class="rounded" />
+                      <span class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px]">${(emp.name || 'EM').slice(0, 2).toUpperCase()}</span>
+                      <div>
+                        <strong class="text-slate-200">${emp.name}</strong>
+                        <span class="text-slate-400 text-[11px]"> • ${emp.title}</span>
+                      </div>
+                    </span>
+                    <span class="text-[10px] text-indigo-400 bg-indigo-950/40 px-2 py-0.5 rounded font-mono border border-indigo-900">Contributor</span>
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Submit -->
+            <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+              <span class="text-xs text-slate-400">Owner role held by You</span>
+              <div class="flex items-center gap-2">
+                <button onclick="closeModal()" class="px-4 py-2 text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">Cancel</button>
+                <button onclick="submitCreatePod()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md transition cursor-pointer">
+                  Create Application Pod
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      window.openNewWorkspaceModal = openNewPodModal;
+      window.openNewPodModal = openNewPodModal;
+
+      function selectModalType(type) {
+        window._selectedModalType = type;
+        const cChat = document.getElementById('cardTypeChat');
+        const cSDD = document.getElementById('cardTypeSDD');
+        const sddFields = document.getElementById('modalSDDFields');
+
+        if (type === 'chat') {
+          if (cChat) cChat.className = 'p-4 rounded-xl border-2 border-blue-600 bg-blue-950/20 cursor-pointer space-y-2 transition shadow-sm';
+          if (cSDD) cSDD.className = 'p-4 rounded-xl border-2 border-slate-800 hover:border-indigo-500 cursor-pointer space-y-2 transition bg-slate-950';
+          if (sddFields) sddFields.classList.add('hidden');
+        } else {
+          if (cChat) cChat.className = 'p-4 rounded-xl border-2 border-slate-800 hover:border-blue-500 cursor-pointer space-y-2 transition bg-slate-950';
+          if (cSDD) cSDD.className = 'p-4 rounded-xl border-2 border-indigo-600 bg-indigo-950/20 cursor-pointer space-y-2 transition shadow-sm';
+          if (sddFields) sddFields.classList.remove('hidden');
+        }
+      }
+      window.selectModalType = selectModalType;
+
+      async function submitCreatePod() {
+        const name = document.getElementById('inputNewWsName').value.trim();
+        const desc = document.getElementById('inputNewWsDesc').value.trim();
+        const prompt = document.getElementById('inputNewWsInitialPrompt') ? document.getElementById('inputNewWsInitialPrompt').value.trim() : '';
+        const type = window._selectedModalType || 'sdd';
+
+        if (!name) {
+          alert('Please enter a pod or application name');
+          return;
+        }
+
+        const invitedCheckboxes = document.querySelectorAll('input[name="invitedEmployee"]:checked');
+        const invited = Array.from(invitedCheckboxes).map(c => c.value);
+
+        const localPath = document.getElementById('inputNewWsLocalPath') ? document.getElementById('inputNewWsLocalPath').value.trim() : '';
+
+        const payload = {
+          name: name,
+          description: desc,
+          workspace_type: type,
+          visibility: type === 'sdd' ? 'private' : 'public',
+          invited_employee_ids: invited,
+          initial_prompt: prompt,
+          sdd_config: type === 'sdd' ? {
+            local_space_path: localPath || ('d:/AI Orchestrator/workspace-projects/' + name.toLowerCase().replace(/\s+/g, '-')),
+            git_action: 'init'
+          } : null
+        };
+
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+
+        try {
+          const r = await fetch(`/api/pods?persona=${persona}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+          });
+          const d = await r.json();
+          closeModal();
+          openPodDetail(d.workspace.workspace_id);
+        } catch(e) {
+          alert('Failed to create pod: ' + e.message);
+        }
+      }
+      window.submitCreateWorkspace = submitCreatePod;
+      window.submitCreatePod = submitCreatePod;
+
+      async function deletePod(wsId) {
+        if (!confirm('Are you sure you want to delete this pod? This will remove all spec, plan, tasks, and chat history from Firestore.')) return;
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        try {
+          const r = await fetch(`/api/pods/${wsId}?persona=${persona}`, { method: 'DELETE' });
+          if (!r.ok) throw new Error('Deletion failed');
+          loadPodsHub(window._currentPodFilter);
+        } catch(e) {
+          alert('Error deleting pod: ' + e.message);
+        }
+      }
+      window.deleteWorkspace = deletePod;
+      window.deletePod = deletePod;
+
+      // EDIT & AI SPEC MODALS
+      function openEditSpecModal(wsId) {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        const ws = window._activePodData || window._activeWorkspaceData || {};
+        const spec = ws.spec || {};
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">Edit Specification</h4>
+                <p class="text-xs text-slate-400">Saved directly into Firestore database.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Specification Markdown</label>
+              <textarea id="editSpecMarkdown" rows="10" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">${spec.raw_markdown || ''}</textarea>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+              <button onclick="submitEditSpec('${wsId}')" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+                Save Spec to Firestore
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      window.openEditSpecModal = openEditSpecModal;
+
+      async function submitEditSpec(wsId) {
+        const text = document.getElementById('editSpecMarkdown').value;
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        try {
+          await fetch(`/api/pods/${wsId}/spec?persona=${persona}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ raw_markdown: text, requirements: [] })
+          });
+          closeModal();
+          openPodDetail(wsId, 'sdd');
+        } catch(e) {
+          alert('Failed to save spec: ' + e.message);
+        }
+      }
+      window.submitEditSpec = submitEditSpec;
+
+      function openAIGenerateSpecModal(wsId) {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">✨ AI Generate / Refine Specification</h4>
+                <p class="text-xs text-slate-400">Uses Gemini to draft structured requirements and criteria.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Requirements Focus or Expansion Prompt</label>
+              <textarea id="aiSpecPrompt" rows="4" placeholder="e.g. Expand specifications to include user authentication, permission roles, and edge-case boundary validations..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+              <button onclick="submitAIGenerateSpec('${wsId}')" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer">
+                Generate & Save
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      window.openAIGenerateSpecModal = openAIGenerateSpecModal;
+
+      async function submitAIGenerateSpec(wsId) {
+        const prompt = document.getElementById('aiSpecPrompt').value.trim();
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        closeModal();
+        alert('Generating specification with AI... The pod will refresh when complete.');
+        try {
+          await fetch(`/api/pods/${wsId}/spec/ai-generate?persona=${persona}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ prompt: prompt || 'Draft complete requirements specification' })
+          });
+          openPodDetail(wsId, 'sdd');
+        } catch(e) {
+          alert('AI Generation error: ' + e.message);
+        }
+      }
+      window.submitAIGenerateSpec = submitAIGenerateSpec;
+
+      // EDIT & AI PLAN MODALS
+      function openEditPlanModal(wsId) {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        const ws = window._activePodData || window._activeWorkspaceData || {};
+        const plan = ws.plan || {};
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">Edit Architecture Plan</h4>
+                <p class="text-xs text-slate-400">Technical design doc and API route contracts.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Architecture Plan Markdown</label>
+              <textarea id="editPlanMarkdown" rows="10" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">${plan.raw_markdown || ''}</textarea>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+              <button onclick="submitEditPlan('${wsId}')" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+                Save Plan to Firestore
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      window.openEditPlanModal = openEditPlanModal;
+
+      async function submitEditPlan(wsId) {
+        const text = document.getElementById('editPlanMarkdown').value;
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        try {
+          await fetch(`/api/pods/${wsId}/plan?persona=${persona}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ raw_markdown: text, data_models: [], api_endpoints: [] })
+          });
+          closeModal();
+          openPodDetail(wsId, 'sdd');
+        } catch(e) {
+          alert('Failed to save plan: ' + e.message);
+        }
+      }
+      window.submitEditPlan = submitEditPlan;
+
+      function openAIGeneratePlanModal(wsId) {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">✨ AI Generate Architecture Plan</h4>
+                <p class="text-xs text-slate-400">Synthesizes data models and REST contracts from approved spec.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Architecture Guidance (Optional)</label>
+              <textarea id="aiPlanPrompt" rows="3" placeholder="e.g. Focus on low-latency query patterns and explicit database models..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+              <button onclick="submitAIGeneratePlan('${wsId}')" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer">
+                Synthesize Plan
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      window.openAIGeneratePlanModal = openAIGeneratePlanModal;
+
+      async function submitAIGeneratePlan(wsId) {
+        const prompt = document.getElementById('aiPlanPrompt').value.trim();
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        closeModal();
+        alert('Generating architecture plan with AI... Please wait.');
+        try {
+          await fetch(`/api/pods/${wsId}/plan/ai-generate?persona=${persona}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ prompt: prompt || 'Design full technical architecture' })
+          });
+          openPodDetail(wsId, 'sdd');
+        } catch(e) {
+          alert('AI Plan Generation error: ' + e.message);
+        }
+      }
+      window.submitAIGeneratePlan = submitAIGeneratePlan;
+
+      // ADD & BREAKDOWN TASKS MODALS
+      function openAddTaskModal(wsId) {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">Add Implementation Task</h4>
+                <p class="text-xs text-slate-400">Saved to Firestore task list.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Task Title</label>
+                <input type="text" id="inputNewTaskTitle" placeholder="e.g. Implement Order State Validator" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Description</label>
+                <textarea id="inputNewTaskDesc" rows="2" placeholder="Details of logic and deliverables..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Target Code File</label>
+                <input type="text" id="inputNewTaskFile" value="src/validator.py" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+              <button onclick="submitAddTask('${wsId}')" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+                Add Task
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      window.openAddTaskModal = openAddTaskModal;
+
+      async function submitAddTask(wsId) {
+        const title = document.getElementById('inputNewTaskTitle').value.trim();
+        const desc = document.getElementById('inputNewTaskDesc').value.trim();
+        const file = document.getElementById('inputNewTaskFile').value.trim();
+        if (!title) { alert('Please enter a task title'); return; }
+
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        try {
+          await fetch(`/api/pods/${wsId}/tasks?persona=${persona}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ title: title, description: desc, target_files: [file || 'src/module.py'] })
+          });
+          closeModal();
+          openPodDetail(wsId, 'sdd');
+        } catch(e) {
+          alert('Failed to add task: ' + e.message);
+        }
+      }
+      window.submitAddTask = submitAddTask;
+
+      async function triggerAIBreakdownTasks(wsId) {
+        if (!confirm('Let AI analyze your spec and plan to decompose into tasks?')) return;
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        try {
+          await fetch(`/api/pods/${wsId}/tasks/ai-breakdown?persona=${persona}`, { method: 'POST' });
+          openPodDetail(wsId, 'sdd');
+        } catch(e) {
+          alert('Task breakdown error: ' + e.message);
+        }
+      }
+      window.triggerAIBreakdownTasks = triggerAIBreakdownTasks;
+
+      // RULES, INSTRUCTIONS & CONTRIBUTORS
+      async function openInviteContributorsModal(wsId) {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        let employees = [];
+        try {
+          const r = await fetch('/api/employees');
+          const data = await r.json();
+          employees = data.employees || [];
+        } catch(e) {}
+
+        const currentMembers = (window._activePodData && window._activePodData.members) ? window._activePodData.members.map(m => m.user_id) : [];
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">Invite Contributors</h4>
+                <p class="text-xs text-slate-400">Select employees to collaborate on this pod.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <div class="max-h-48 overflow-y-auto border border-slate-800 rounded-xl divide-y divide-slate-800/60 bg-slate-950 p-1 text-xs">
+              ${employees.map(emp => `
+                <label class="flex items-center justify-between p-2 hover:bg-slate-900 rounded-lg cursor-pointer">
+                  <span class="flex items-center gap-2.5">
+                    <input type="checkbox" name="inviteMemberCheck" value="${emp.employee_id}" ${currentMembers.includes(emp.employee_id) ? 'checked' : ''} class="rounded" />
+                    <span class="font-medium text-slate-200">${emp.name}</span>
+                    <span class="text-slate-500 text-[11px]">(${emp.title})</span>
+                  </span>
+                  <span class="text-[10px] text-indigo-400 bg-indigo-950/40 px-2 py-0.5 rounded font-mono border border-indigo-900">Contributor</span>
+                </label>
+              `).join('')}
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+              <span class="text-xs text-slate-400">All invitees gain Contributor role</span>
+              <button onclick="submitInviteContributors('${wsId}')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+                Save Contributors
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      window.openInviteContributorsModal = openInviteContributorsModal;
+
+      async function submitInviteContributors(wsId) {
+        const checkboxes = document.querySelectorAll('input[name="inviteMemberCheck"]:checked');
+        const ids = Array.from(checkboxes).map(c => c.value);
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+
+        try {
+          await fetch(`/api/pods/${wsId}/invite?persona=${persona}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ employee_ids: ids })
+          });
+          closeModal();
+          openPodDetail(wsId);
+        } catch(e) {
+          alert('Failed to update contributors: ' + e.message);
+        }
+      }
+      window.submitInviteContributors = submitInviteContributors;
+
+      function openOwnerRulesModal(wsId) {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        const ws = window._activePodData || window._activeWorkspaceData || {};
+        const principles = (ws.sdd_config && ws.sdd_config.architecture_principles) ? ws.sdd_config.architecture_principles.join(String.fromCharCode(10)) : '';
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">Configure SDD Rules & Tenets</h4>
+                <p class="text-xs text-slate-400">Only the Pod Owner can modify these rules.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Architecture Principles & Tenets (One per line)</label>
+                <textarea id="inputRulesPrinciples" rows="5" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">${principles}</textarea>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+              <span class="text-xs text-slate-400">Enforced on all Contributors</span>
+              <button onclick="submitOwnerRules('${wsId}')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer">
+                Save & Enforce Rules
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      window.openOwnerRulesModal = openOwnerRulesModal;
+
+      async function submitOwnerRules(wsId) {
+        const text = document.getElementById('inputRulesPrinciples').value.trim();
+        const list = text.split(String.fromCharCode(10)).map(p => p.trim()).filter(Boolean);
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+
+        try {
+          await fetch(`/api/pods/${wsId}/sdd/rules?persona=${persona}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ architecture_principles: list, coding_standards: [] })
+          });
+          closeModal();
+          openPodDetail(wsId);
+        } catch(e) {
+          alert('Failed to save rules: ' + e.message);
+        }
+      }
+      window.submitOwnerRules = submitOwnerRules;
+
+      function openInstructionsModal(wsId) {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        const ws = window._activePodData || window._activeWorkspaceData || {};
+        const instr = ws.system_instructions || '';
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">Pod Instructions (System Prompt)</h4>
+                <p class="text-xs text-slate-400">Persistent instructions prepended to every AI turn in this pod.</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <div>
+              <textarea id="inputInstructionsText" rows="5" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">${instr}</textarea>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+              <button onclick="submitPodInstructions('${wsId}')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+                Save Instructions
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      window.openInstructionsModal = openInstructionsModal;
+
+      async function submitPodInstructions(wsId) {
+        const text = document.getElementById('inputInstructionsText').value.trim();
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+
+        try {
+          await fetch(`/api/pods/${wsId}/instructions?persona=${persona}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ system_instructions: text })
+          });
+          closeModal();
+          openPodDetail(wsId);
+        } catch(e) {
+          alert('Failed to save instructions: ' + e.message);
+        }
+      }
+      window.submitWorkspaceInstructions = submitPodInstructions;
+      window.submitPodInstructions = submitPodInstructions;
+
+      function showTraceabilityModal() {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        const ws = window._activePodData || window._activeWorkspaceData || {};
+        const spec = ws.spec || {};
+        const tasks = ws.tasks || [];
+        const reqs = spec.requirements || [];
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100">End-to-End SDD Traceability Matrix</h4>
+                <p class="text-xs text-slate-400">Links: Requirement (Specify) → Architecture (Plan) → Task → Verification (Test)</p>
+              </div>
+              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-800">
+              <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-slate-950 text-slate-400 border-b border-slate-800">
+                  <tr>
+                    <th class="p-3">Requirement (Specify)</th>
+                    <th class="p-3">Implementation Task</th>
+                    <th class="p-3">Verification (Test)</th>
+                    <th class="p-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60">
+                  ${reqs.length > 0 ? reqs.map(r => {
+                    const linkedTask = tasks.find(t => t.linked_req_id === r.id) || tasks[0] || {};
+                    return `
+                      <tr class="hover:bg-slate-800/40">
+                        <td class="p-3 font-semibold text-indigo-400">${r.id}: ${r.title}</td>
+                        <td class="p-3 text-slate-300">${linkedTask.task_id ? (linkedTask.task_id + ': ' + linkedTask.title) : 'Pending Breakdown'}</td>
+                        <td class="p-3 text-slate-300">${linkedTask.test_file || 'tests/test_module.py'}</td>
+                        <td class="p-3">
+                          ${linkedTask.status === 'completed'
+                            ? `<span class="px-2 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-900 text-[10px] font-bold">Passed & Committed (${linkedTask.last_commit_hash || 'head'})</span>`
+                            : `<span class="px-2 py-0.5 rounded bg-amber-950/40 text-amber-400 border border-amber-900 text-[10px] font-bold">Pending</span>`}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('') : `
+                    <tr><td colspan="4" class="p-4 text-center text-slate-500">No requirements defined.</td></tr>
+                  `}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="pt-2 flex justify-end">
+              <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-semibold cursor-pointer">Close</button>
+            </div>
+          </div>
+        `;
+      }
+      window.showTraceabilityModal = showTraceabilityModal;
+
+      async function openLocalFolderInExplorer(path) {
+        if (!path) {
+          alert('No local directory path configured for this pod.');
+          return;
+        }
+        try {
+          const r = await fetch('/api/system/open-folder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ path: path })
+          });
+          const d = await r.json();
+          if (d.status !== 'opened') {
+            alert('Could not open folder: ' + (d.detail || 'Unknown error'));
+          }
+        } catch(e) {
+          alert('Failed to launch File Explorer: ' + e.message);
+        }
+      }
+      window.openLocalFolderInExplorer = openLocalFolderInExplorer;
+
+      async function openPodFolder(wsId) {
+        let ws = (window._activePodData && window._activePodData.workspace_id === wsId) ? window._activePodData : null;
+        if (!ws && window._allPodsList) {
+          ws = window._allPodsList.find(p => p.workspace_id === wsId);
+        }
+        if (!ws && window._allWorkspacesList) {
+          ws = window._allWorkspacesList.find(p => p.workspace_id === wsId);
+        }
+        const path = (ws && ws.sdd_config && ws.sdd_config.local_space_path) ? ws.sdd_config.local_space_path : '';
+        if (!path) {
+          alert('No local directory path configured for this pod.');
+          return;
+        }
+        await openLocalFolderInExplorer(path);
+      }
+      window.openPodFolder = openPodFolder;
+
+      async function browseFolderForSDD() {
+        const input = document.getElementById('inputNewWsLocalPath');
+        const btn = document.getElementById('btnBrowseSDD');
+        const icon = document.getElementById('browseIcon');
+        const txt = document.getElementById('browseText');
+        const currentPath = input ? input.value.trim() : '';
+
+        if (btn) btn.disabled = true;
+        if (icon) icon.innerText = '⏳';
+        if (txt) txt.innerText = 'Selecting...';
+
+        try {
+          const r = await fetch('/api/system/pick-folder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ initial_dir: currentPath })
+          });
+          const d = await r.json();
+          if (d.path && input) {
+            input.value = d.path;
+            input.focus();
+          }
+        } catch(e) {
+          alert('Folder picker error: ' + e.message);
+        } finally {
+          if (btn) btn.disabled = false;
+          if (icon) icon.innerText = '📂';
+          if (txt) txt.innerText = 'Browse Folder';
+        }
+      }
+      window.browseFolderForSDD = browseFolderForSDD;
+
       window._agentsSearchQuery = '';
       window._allAgentsList = [];
 
@@ -453,7 +2178,7 @@
         try {
           const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
           const scope = window._agentsScope || 'all';
-          const r = await fetch(`http://127.0.0.1:8000/api/agents?scope=${scope}&persona=${encodeURIComponent(persona)}`);
+          const r = await fetch(`/api/agents?scope=${scope}&persona=${encodeURIComponent(persona)}`);
           const d = await r.json();
           window._allAgentsList = d.agents || [];
           renderAgentsHub();
@@ -788,7 +2513,7 @@
         fb.classList.add('hidden');
 
         try {
-          const r = await fetch('http://127.0.0.1:8000/api/agents/generate-from-swagger', {
+          const r = await fetch('/api/agents/generate-from-swagger', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -922,7 +2647,7 @@
         btn.innerHTML = 'Saving...';
 
         try {
-          const r = await fetch(`http://127.0.0.1:8000/api/agents/${agentId}/access`, {
+          const r = await fetch(`/api/agents/${agentId}/access`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -1032,7 +2757,7 @@
 
       async function loadModels() {
         try {
-          const res = await fetch('http://127.0.0.1:8000/api/models');
+          const res = await fetch('/api/models');
           const data = await res.json();
           const select = document.getElementById('modelSelect');
           if (data.models && select) {

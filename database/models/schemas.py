@@ -6,6 +6,8 @@ Pydantic model definitions for enterprise Firestore collections.
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime
+import uuid
+
 
 
 class Department(BaseModel):
@@ -117,3 +119,86 @@ class ExpenseClaim(BaseModel):
     approver_id: Optional[str] = Field(None, description="Manager or finance approver ID")
     submitted_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     payout_date: Optional[str] = Field(None, description="Target or actual reimbursement disbursement date")
+
+
+class WorkspaceMember(BaseModel):
+    user_id: str
+    user_name: str
+    role: str = Field("contributor", description="'owner' or 'contributor'")
+    joined_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+
+class SDDTask(BaseModel):
+    task_id: str = Field(..., description="Unique task key, e.g. TSK-101")
+    title: str = Field(..., description="Task title")
+    description: str = Field("", description="Task scope and deliverables")
+    linked_req_id: Optional[str] = Field(None, description="Linked specification requirement key, e.g. REQ-01")
+    target_files: List[str] = Field(default_factory=list, description="Target implementation files, e.g. ['src/models.py']")
+    test_file: Optional[str] = Field(None, description="Test suite path, e.g. 'tests/test_models.py'")
+    status: str = Field("pending", description="'pending', 'in_progress', 'completed', 'failed'")
+    last_commit_hash: Optional[str] = None
+    last_test_output: Optional[str] = None
+    completed_at: Optional[str] = None
+
+
+class SDDSpec(BaseModel):
+    title: str = Field("Application Requirements Specification", description="Spec title")
+    version: str = Field("v1.0", description="Spec revision")
+    status: str = Field("approved", description="'draft' or 'approved'")
+    raw_markdown: str = Field("", description="Authoritative specification markdown content")
+    requirements: List[Dict[str, Any]] = Field(default_factory=list, description="Extracted requirement items [id, title, acceptance_criteria]")
+
+
+class SDDPlan(BaseModel):
+    title: str = Field("Technical Architecture & Plan", description="Plan title")
+    version: str = Field("v1.0", description="Plan revision")
+    raw_markdown: str = Field("", description="Architecture design, data models, and API contracts markdown")
+    data_models: List[Dict[str, Any]] = Field(default_factory=list, description="Entity schemas and relational models")
+    api_endpoints: List[Dict[str, Any]] = Field(default_factory=list, description="OpenAPI / REST route contracts")
+    decisions: List[str] = Field(default_factory=list, description="Architecture Decision Records (ADRs)")
+
+
+class ChatMessage(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+    sender_id: str
+    sender_name: str
+    role: str = Field("user", description="'user' or 'assistant'")
+    content: str
+    citations: List[str] = Field(default_factory=list)
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+
+class SDDConfig(BaseModel):
+    local_space_path: str = Field(..., description="Local working directory path for repo cloning and autonomous execution")
+    git_action: str = Field("init", description="'init' or 'clone'")
+    git_remote_url: Optional[str] = None
+    tech_stack: str = Field("Python 3.11 / FastAPI / Pytest")
+    architecture_principles: List[str] = Field(default_factory=list)
+    coding_standards: List[str] = Field(default_factory=list)
+    active_spec_version: str = Field("v1.0")
+    approval_status: str = Field("approved")
+
+
+class Workspace(BaseModel):
+    workspace_id: str = Field(..., description="Unique workspace ID, e.g. ws-my-app")
+    name: str = Field(..., description="Workspace title")
+    description: str = Field("", description="Purpose or scope of workspace")
+    workspace_type: str = Field("chat", description="'chat' or 'sdd'")
+    visibility: str = Field("private", description="'public' or 'private'")
+    owner_id: str = Field(..., description="Employee ID of owner who created it")
+    owner_name: str = Field(..., description="Full name of owner")
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    system_instructions: str = Field("", description="Persistent workspace system prompt")
+    members: List[WorkspaceMember] = Field(default_factory=list)
+    sdd_config: Optional[SDDConfig] = None
+    spec: Optional[SDDSpec] = None
+    plan: Optional[SDDPlan] = None
+    tasks: List[SDDTask] = Field(default_factory=list)
+    documents: List[Dict[str, Any]] = Field(default_factory=list)
+    prompts: List[Dict[str, Any]] = Field(default_factory=list)
+    chat_messages: List[ChatMessage] = Field(default_factory=list)
+    chat_sessions: List[str] = Field(default_factory=list)
+    execution_logs: List[Dict[str, Any]] = Field(default_factory=list)
+
+
