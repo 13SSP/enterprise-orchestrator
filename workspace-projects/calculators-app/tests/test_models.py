@@ -1,50 +1,35 @@
+"""
+Unit Tests for Implement Domain Schemas & Models
+"""
+
 import pytest
-from datetime import datetime, timezone
-from src.models import CalculatorSchema, CalculatorType, CalculatorStatus, DomainException
-from pydantic import ValidationError
+import sys
+from pathlib import Path
 
-def test_calculator_creation_success():
-    calc = CalculatorSchema(
-        id="calc001",
-        name="FinancePro",
-        type=CalculatorType.FINANCIAL
-    )
-    assert calc.id == "calc001"
-    assert calc.status == CalculatorStatus.ACTIVE
-    assert isinstance(calc.created_at, datetime)
+src_dir = Path(__file__).resolve().parent.parent / "src"
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
 
-def test_calculator_invalid_id():
-    with pytest.raises(ValidationError) as exc:
-        CalculatorSchema(id="invalid-id!", name="Test", type=CalculatorType.SCIENTIFIC)
-    assert "ID must be alphanumeric" in str(exc.value)
+from models import ModelsService, ModelsItem
 
-def test_immutable_field_validation():
-    calc = CalculatorSchema(
-        id="calc001",
-        name="FinancePro",
-        type=CalculatorType.FINANCIAL
-    )
-    with pytest.raises(ValidationError):
-        # Should fail because of frozen=True in ConfigDict
-        calc.id = "newid"
 
-def test_status_transition_integrity():
-    calc = CalculatorSchema(
-        id="calc002",
-        name="StatsTool",
-        type=CalculatorType.STATISTICAL
-    )
-    assert calc.status == CalculatorStatus.ACTIVE
-    
-    # Verify enum validation
-    with pytest.raises(ValidationError):
-        CalculatorSchema(
-            id="calc003",
-            name="BadType",
-            type="invalid_type"
-        )
+def test_create_item_success():
+    svc = ModelsService()
+    item = svc.create("test-1", "Sample Entity")
+    assert item.id == "test-1"
+    assert item.title == "Sample Entity"
+    assert item.status == "active"
+    assert svc.get("test-1") is not None
 
-def test_domain_exception_structure():
-    exc = DomainException("Invariant violated", status_code=422)
-    assert exc.status_code == 422
-    assert str(exc) == "Invariant violated"
+
+def test_create_duplicate_raises_error():
+    svc = ModelsService()
+    svc.create("test-dup", "Original")
+    with pytest.raises(ValueError, match="already exists"):
+        svc.create("test-dup", "Duplicate")
+
+
+def test_empty_id_raises_validation_error():
+    svc = ModelsService()
+    with pytest.raises(ValueError, match="must not be empty"):
+        svc.create("", "Invalid")

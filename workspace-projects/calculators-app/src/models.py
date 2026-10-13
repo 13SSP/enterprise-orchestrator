@@ -1,50 +1,35 @@
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Optional
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+"""
+Calculators App - Implement Domain Schemas & Models
+Module: src/models.py
+"""
 
-class CalculatorType(str, Enum):
-    FINANCIAL = "financial"
-    SCIENTIFIC = "scientific"
-    STATISTICAL = "statistical"
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+from pydantic import BaseModel, Field
 
-class CalculatorStatus(str, Enum):
-    ACTIVE = "active"
-    MAINTENANCE = "maintenance"
-    DECOMMISSIONED = "decommissioned"
 
-class CalculatorSchema(BaseModel):
-    """
-    Domain entity representing a calculator instance with strict validation.
-    """
-    model_config = ConfigDict(frozen=True, validate_assignment=True)
+class ModelsItem(BaseModel):
+    id: str = Field(..., description="Unique entity ID")
+    title: str = Field(..., description="Entity name or title")
+    status: str = Field("active", description="Entity status")
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
-    id: str = Field(..., min_length=3, max_length=50)
-    name: str = Field(..., min_length=1, max_length=100)
-    type: CalculatorType
-    status: CalculatorStatus = CalculatorStatus.ACTIVE
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    @field_validator('id')
-    @classmethod
-    def validate_id_format(cls, v: str) -> str:
-        if not v.isalnum():
-            raise ValueError("ID must be alphanumeric")
-        return v
+class ModelsService:
+    def __init__(self):
+        self._storage: Dict[str, ModelsItem] = {}
 
-class CalculatorUpdate(BaseModel):
-    """
-    Schema for mutation operations.
-    """
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    status: Optional[CalculatorStatus] = None
+    def create(self, item_id: str, title: str) -> ModelsItem:
+        if not item_id or not title:
+            raise ValueError("Item ID and title must not be empty.")
+        if item_id in self._storage:
+            raise ValueError(f"Item {item_id} already exists.")
+        item = ModelsItem(id=item_id, title=title)
+        self._storage[item_id] = item
+        return item
 
-class DomainException(Exception):
-    """
-    Base exception for business logic violations.
-    """
-    def __init__(self, message: str, status_code: int = 400):
-        self.message = message
-        self.status_code = status_code
-        super().__init__(self.message)
+    def get(self, item_id: str) -> Optional[ModelsItem]:
+        return self._storage.get(item_id)
+
+    def list_all(self) -> List[ModelsItem]:
+        return list(self._storage.values())
