@@ -28,7 +28,8 @@ fi
 
 REGION="${GCP_REGION:-us-central1}"
 SERVICE_NAME="cortex-hub"
-IMAGE_TAG="gcr.io/${PROJECT_ID}/${SERVICE_NAME}:latest"
+REPO_NAME="cortex-repo"
+IMAGE_TAG="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}:latest"
 
 echo -e "🚀 Deploying to Project: ${GREEN}${PROJECT_ID}${NC} in Region: ${GREEN}${REGION}${NC}"
 
@@ -84,14 +85,23 @@ if [ -n "$ACCOUNT" ]; then
         --role="roles/storage.admin" --quiet 2>/dev/null || true
 fi
 
+echo -e "Ensuring Artifact Registry repository exists..."
+gcloud artifacts repositories create "$REPO_NAME" \
+    --repository-format=docker \
+    --location="$REGION" \
+    --description="Docker repository for cortex.ai" \
+    --quiet 2>/dev/null || true
+
+gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet 2>/dev/null || true
+
 BUILD_SUCCESS=false
 if gcloud builds submit --tag "$IMAGE_TAG" . ; then
     BUILD_SUCCESS=true
 else
-    echo -e "${YELLOW}Notice: gcloud builds submit had a permission issue with the default staging bucket.${NC}"
-    echo -e "${YELLOW}Falling back to Cloud Shell built-in Docker engine...${NC}"
+    echo -e "${YELLOW}Notice: gcloud builds submit had a staging bucket permission issue.${NC}"
+    echo -e "${YELLOW}Building and pushing directly via Cloud Shell Docker & Artifact Registry...${NC}"
     if command -v docker &>/dev/null; then
-        gcloud auth configure-docker --quiet || true
+        gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet 2>/dev/null || true
         docker build -t "$IMAGE_TAG" .
         docker push "$IMAGE_TAG"
         BUILD_SUCCESS=true
@@ -105,7 +115,7 @@ if [ "$BUILD_SUCCESS" = false ]; then
     exit 1
 fi
 
-echo -e "${GREEN}✓ Container built and pushed to Container Registry.${NC}"
+echo -e "${GREEN}✓ Container built and pushed to Artifact Registry.${NC}"
 
 # 6. Deploy to Cloud Run with Cost-Protection Guardrails (Scale-to-Zero)
 echo -e "\n${BLUE}🌐 [5/5] Deploying cortex.ai to Google Cloud Run...${NC}"
