@@ -34,7 +34,8 @@ if (-not $ProjectId) {
 }
 
 $ServiceName = "cortex-hub"
-$ImageTag = "gcr.io/$ProjectId/${ServiceName}:latest"
+$RepoName = "cortex-repo"
+$ImageTag = "${Region}-docker.pkg.dev/${ProjectId}/${RepoName}/${ServiceName}:latest"
 
 Write-Host "🚀 Deploying to Project: $ProjectId in Region: $Region" -ForegroundColor Green
 
@@ -44,6 +45,7 @@ gcloud services enable `
     run.googleapis.com `
     cloudbuild.googleapis.com `
     artifactregistry.googleapis.com `
+    storage.googleapis.com `
     aiplatform.googleapis.com `
     discoveryengine.googleapis.com `
     documentai.googleapis.com `
@@ -64,7 +66,13 @@ try {
 Write-Host "✓ Firestore database ready." -ForegroundColor Green
 
 # 3. Build Container via Cloud Build (Serverless remote build - no local Docker needed!)
-Write-Host "`n📦 [3/4] Building container image using Google Cloud Build..." -ForegroundColor Blue
+Write-Host "`n📦 [3/4] Building container image using Google Cloud Build & Artifact Registry..." -ForegroundColor Blue
+gcloud artifacts repositories create $RepoName `
+    --repository-format=docker `
+    --location=$Region `
+    --description="Docker repository for cortex.ai" `
+    --quiet 2>$null
+
 gcloud builds submit --tag $ImageTag .
 Write-Host "✓ Container image built and pushed." -ForegroundColor Green
 

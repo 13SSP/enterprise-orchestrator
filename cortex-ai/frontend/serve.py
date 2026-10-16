@@ -302,7 +302,7 @@ def build_dist_html():
           <!-- Other Views -->
           <div id="dynamicView" class="hidden max-w-5xl mx-auto space-y-4"></div>
           <!-- Modal Backdrop -->
-          <div id="modalBackdrop" onclick="closeModal()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4"></div>
+          <div id="modalBackdrop" onclick="if (event.target === this) closeModal(event)" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4"></div>
         </div>
       </main>
     </div>
@@ -1024,24 +1024,24 @@ def build_dist_html():
         if (!dv) return;
 
         const roleBadge = isOwner
-          ? '<span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600/20 text-blue-300 border border-blue-500/30">Owner</span>'
-          : '<span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">Contributor</span>';
+          ? '<span class="pod-role-badge pod-role-owner px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600/20 text-blue-300 border border-blue-500/30">Owner</span>'
+          : '<span class="pod-role-badge pod-role-contrib px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">Contributor</span>';
 
         const typeBadge = isSDD
-          ? '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">📐 SDD (Private) Pod</span>'
+          ? '<span class="pod-type-badge pod-type-sdd px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">📐 SDD (Private) Pod</span>'
           : (ws.visibility === 'public'
-              ? '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">🌐 General Chat (Public) Pod</span>'
-              : '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">🔒 General Chat (Private) Pod</span>');
+              ? '<span class="pod-type-badge pod-type-public px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">🌐 General Chat (Public) Pod</span>'
+              : '<span class="pod-type-badge pod-type-private px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">🔒 General Chat (Private) Pod</span>');
 
         const localPathBadge = isSDD && ws.sdd_config
           ? `<div class="flex items-center gap-3 text-xs text-slate-400 font-mono mt-1 flex-wrap">
-               <button type="button" onclick="openPodFolder('${ws.workspace_id}')" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/60 px-2.5 py-1 rounded-lg text-left transition cursor-pointer group flex items-center gap-1.5 shadow-sm" title="Click to open this folder in Windows File Explorer">
+               <button type="button" onclick="openPodFolder('${ws.workspace_id}')" class="pod-local-btn bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/60 px-2.5 py-1 rounded-lg text-left transition cursor-pointer group flex items-center gap-1.5 shadow-sm" title="Click to open this folder in Windows File Explorer">
                  <span>📁</span>
                  <span>Local:</span>
                  <strong class="text-blue-400 group-hover:text-blue-300 underline decoration-blue-500/40">${ws.sdd_config.local_space_path || 'Not configured'}</strong>
                  <span class="text-slate-500 group-hover:text-slate-300 text-[10px]">↗</span>
                </button>
-               <span class="bg-emerald-950/40 border border-emerald-900 text-emerald-400 px-2.5 py-1 rounded-lg">🌿 git: ${ws.sdd_config.commit_hash || 'main'}</span>
+               <span class="pod-git-badge bg-emerald-950/40 border border-emerald-900 text-emerald-400 px-2.5 py-1 rounded-lg font-mono">🌿 git: ${ws.sdd_config.commit_hash || 'main'}</span>
              </div>`
           : '';
 
@@ -1053,44 +1053,44 @@ def build_dist_html():
         let html = `
           <div class="space-y-5">
             <!-- Pod Banner Header -->
-            <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-sm space-y-4">
+            <div id="podBannerHeader" class="pod-banner-card bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-sm space-y-4">
               <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex items-start gap-3">
-                  <button onclick="loadPodsHub('${window._currentPodFilter}')" class="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition cursor-pointer text-sm" title="Back to Pods">
+                  <button onclick="loadPodsHub('${window._currentPodFilter}')" class="pod-back-btn p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition cursor-pointer text-sm" title="Back to Pods">
                     ←
                   </button>
                   <div>
                     <div class="flex items-center gap-2.5 flex-wrap">
-                      <h3 class="text-lg font-bold text-slate-100">${ws.name}</h3>
+                      <h3 class="pod-title text-lg font-bold text-slate-100">${ws.name}</h3>
                       ${typeBadge}
                       ${roleBadge}
                     </div>
-                    <p class="text-xs text-slate-400 mt-1">${ws.description || 'Pod container.'}</p>
+                    <p class="pod-desc text-xs text-slate-400 mt-1">${ws.description || 'Pod container.'}</p>
                     ${localPathBadge}
                   </div>
                 </div>
 
                 <!-- Action buttons -->
                 <div class="flex items-center gap-2 flex-wrap">
-                  <button onclick="openInviteContributorsModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition cursor-pointer">
+                  <button onclick="openInviteContributorsModal('${ws.workspace_id}')" class="pod-action-btn px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition cursor-pointer">
                     <span>👥</span>
                     <span>Contributors (${ws.members ? ws.members.length : 1})</span>
                   </button>
 
                   ${isOwner && isSDD ? `
-                    <button onclick="openOwnerRulesModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 text-xs font-semibold border border-indigo-800 flex items-center gap-1.5 transition cursor-pointer">
+                    <button onclick="openOwnerRulesModal('${ws.workspace_id}')" class="pod-rules-btn px-3 py-1.5 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 text-xs font-semibold border border-indigo-800 flex items-center gap-1.5 transition cursor-pointer">
                       <span>⚙️</span>
                       <span>Rules (Owner)</span>
                     </button>
                   ` : ''}
 
-                  <button onclick="openInstructionsModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition cursor-pointer">
+                  <button onclick="openInstructionsModal('${ws.workspace_id}')" class="pod-action-btn px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1.5 transition cursor-pointer">
                     <span>💬</span>
                     <span>Instructions</span>
                   </button>
 
                   ${isOwner ? `
-                    <button onclick="deletePod('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 text-xs font-medium border border-red-900 flex items-center gap-1.5 transition cursor-pointer">
+                    <button onclick="deletePod('${ws.workspace_id}')" class="pod-delete-btn px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 text-xs font-medium border border-red-900 flex items-center gap-1.5 transition cursor-pointer">
                       <span>🗑️</span>
                       <span>Delete</span>
                     </button>
@@ -1100,16 +1100,16 @@ def build_dist_html():
 
               <!-- SDD TABS BAR (ONLY VISIBLE FOR SDD PODS) -->
               ${isSDD ? `
-                <div class="flex items-center space-x-8 border-b border-slate-800 pt-2 -mb-2">
-                  <button onclick="switchPodSubTab('sdd')" id="subtab-sdd" class="pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer ${window._activeWsTab === 'sdd' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-slate-400 hover:text-slate-200'}">
+                <div class="pod-tabs-bar flex items-center space-x-8 border-b border-slate-800 pt-2 -mb-2">
+                  <button onclick="switchPodSubTab('sdd')" id="subtab-sdd" class="pod-subtab pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer ${window._activeWsTab === 'sdd' ? 'subtab-active-sdd text-indigo-400 border-b-2 border-indigo-500' : 'subtab-inactive text-slate-400 hover:text-slate-200'}">
                     <span>📐</span>
                     <span>Spec-Driven Development (SDD)</span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold">Autonomous Engine</span>
+                    <span class="subtab-badge-sdd text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold">Autonomous Engine</span>
                   </button>
-                  <button onclick="switchPodSubTab('chats')" id="subtab-chats" class="pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer ${window._activeWsTab === 'chats' ? 'text-blue-400 border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-200'}">
+                  <button onclick="switchPodSubTab('chats')" id="subtab-chats" class="pod-subtab pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer ${window._activeWsTab === 'chats' ? 'subtab-active-chats text-blue-400 border-b-2 border-blue-500' : 'subtab-inactive text-slate-400 hover:text-slate-200'}">
                     <span>💬</span>
                     <span>Pod Chat</span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Spec Grounding</span>
+                    <span class="subtab-badge-chats text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Spec Grounding</span>
                   </button>
                 </div>
               ` : `
@@ -1220,40 +1220,40 @@ def build_dist_html():
             ${isSDD ? `
               <div id="wsSDDTabContent" class="${window._activeWsTab === 'sdd' ? '' : 'hidden'} space-y-5">
                 <!-- SDD 6-Stage Stepper -->
-                <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="sdd-stepper-container bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div class="flex items-center space-x-2 text-xs overflow-x-auto py-1">
-                    <button onclick="setSDDStageUI('principles')" id="stepBtn-principles" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-semibold cursor-pointer">
-                      <span class="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">1</span>
+                    <button onclick="setSDDStageUI('principles')" id="stepBtn-principles" class="sdd-step-btn sdd-step-active flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-semibold cursor-pointer">
+                      <span class="sdd-step-num w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">1</span>
                       <span>Principles</span>
                     </button>
-                    <span class="text-slate-600">→</span>
+                    <span class="sdd-step-arrow text-slate-600">→</span>
 
-                    <button onclick="setSDDStageUI('specify')" id="stepBtn-specify" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
-                      <span class="w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">2</span>
+                    <button onclick="setSDDStageUI('specify')" id="stepBtn-specify" class="sdd-step-btn sdd-step-inactive flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
+                      <span class="sdd-step-num w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">2</span>
                       <span>Specify (${(spec.requirements || []).length} reqs)</span>
                     </button>
-                    <span class="text-slate-600">→</span>
+                    <span class="sdd-step-arrow text-slate-600">→</span>
 
-                    <button onclick="setSDDStageUI('plan')" id="stepBtn-plan" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
-                      <span class="w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">3</span>
+                    <button onclick="setSDDStageUI('plan')" id="stepBtn-plan" class="sdd-step-btn sdd-step-inactive flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
+                      <span class="sdd-step-num w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">3</span>
                       <span>Plan (${(plan.data_models || []).length} models)</span>
                     </button>
-                    <span class="text-slate-600">→</span>
+                    <span class="sdd-step-arrow text-slate-600">→</span>
 
-                    <button onclick="setSDDStageUI('tasks')" id="stepBtn-tasks" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
-                      <span class="w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">4</span>
+                    <button onclick="setSDDStageUI('tasks')" id="stepBtn-tasks" class="sdd-step-btn sdd-step-inactive flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
+                      <span class="sdd-step-num w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">4</span>
                       <span>Tasks (${tasks.length})</span>
                     </button>
-                    <span class="text-slate-600">→</span>
+                    <span class="sdd-step-arrow text-slate-600">→</span>
 
-                    <button onclick="setSDDStageUI('implement')" id="stepBtn-implement" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
-                      <span class="w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">5</span>
+                    <button onclick="setSDDStageUI('implement')" id="stepBtn-implement" class="sdd-step-btn sdd-step-inactive flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
+                      <span class="sdd-step-num w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">5</span>
                       <span>Implement</span>
                     </button>
-                    <span class="text-slate-600">→</span>
+                    <span class="sdd-step-arrow text-slate-600">→</span>
 
-                    <button onclick="setSDDStageUI('verify')" id="stepBtn-verify" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
-                      <span class="w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">6</span>
+                    <button onclick="setSDDStageUI('verify')" id="stepBtn-verify" class="sdd-step-btn sdd-step-inactive flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
+                      <span class="sdd-step-num w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">6</span>
                       <span>Verify</span>
                     </button>
                   </div>
@@ -1263,7 +1263,7 @@ def build_dist_html():
                       <span>🚀</span>
                       <span>Autonomous Engine</span>
                     </button>
-                    <button onclick="showTraceabilityModal()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 cursor-pointer">
+                    <button onclick="showTraceabilityModal()" class="pod-traceability-btn px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 cursor-pointer">
                       <span>📊</span>
                       <span>Traceability Matrix</span>
                     </button>
@@ -1508,9 +1508,9 @@ def build_dist_html():
                     </div>
 
                     <!-- Live Terminal Console -->
-                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2 font-mono text-xs">
-                      <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                        <span class="text-indigo-400 font-bold flex items-center gap-2">
+                    <div id="sddTerminalContainer" class="terminal-card bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2 font-mono text-xs">
+                      <div class="terminal-header flex items-center justify-between pb-2 border-b border-slate-800/80">
+                        <span class="terminal-title text-indigo-400 font-bold flex items-center gap-2">
                           <span>💻</span>
                           <span>Autonomous Execution Terminal (Antigravity Engine)</span>
                         </span>
@@ -1565,13 +1565,21 @@ def build_dist_html():
         if (tab === 'chats') {
           if (cChats) cChats.classList.remove('hidden');
           if (cSDD) cSDD.classList.add('hidden');
-          if (bChats) bChats.className = 'pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-blue-400 border-b-2 border-blue-500';
-          if (bSDD) bSDD.className = 'pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200';
+          if (bChats) {
+            bChats.className = 'pod-subtab subtab-active-chats pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-blue-400 border-b-2 border-blue-500';
+          }
+          if (bSDD) {
+            bSDD.className = 'pod-subtab subtab-inactive pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200';
+          }
         } else {
           if (cChats) cChats.classList.add('hidden');
           if (cSDD) cSDD.classList.remove('hidden');
-          if (bChats) bChats.className = 'pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200';
-          if (bSDD) bSDD.className = 'pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-indigo-400 border-b-2 border-indigo-500';
+          if (bChats) {
+            bChats.className = 'pod-subtab subtab-inactive pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200';
+          }
+          if (bSDD) {
+            bSDD.className = 'pod-subtab subtab-active-sdd pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-indigo-400 border-b-2 border-indigo-500';
+          }
         }
       }
       window.switchWorkspaceSubTab = switchPodSubTab;
@@ -1588,10 +1596,13 @@ def build_dist_html():
             else panel.classList.add('hidden');
           }
           if (btn) {
+            const numSpan = btn.querySelector('.sdd-step-num');
             if (s === stage) {
-              btn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-semibold cursor-pointer';
+              btn.className = 'sdd-step-btn sdd-step-active flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-semibold cursor-pointer';
+              if (numSpan) numSpan.className = 'sdd-step-num w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]';
             } else {
-              btn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer';
+              btn.className = 'sdd-step-btn sdd-step-inactive flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer';
+              if (numSpan) numSpan.className = 'sdd-step-num w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]';
             }
           }
         });
@@ -1778,13 +1789,13 @@ ${d.output || 'No output recorded.'}`;
         window._selectedModalType = 'sdd';
 
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">Create Application Pod</h4>
                 <p class="text-xs text-slate-400">Persisted in Firestore with live Spec-Driven Development engine.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
             </div>
 
             <!-- Pod Type Selector -->
@@ -1876,8 +1887,8 @@ ${d.output || 'No output recorded.'}`;
             <div class="flex items-center justify-between pt-3 border-t border-slate-800">
               <span class="text-xs text-slate-400">Owner role held by You</span>
               <div class="flex items-center gap-2">
-                <button onclick="closeModal()" class="px-4 py-2 text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">Cancel</button>
-                <button onclick="submitCreatePod()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md transition cursor-pointer">
+                <button type="button" onclick="closeModal()" class="px-4 py-2 text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">Cancel</button>
+                <button type="button" onclick="submitCreatePod()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md transition cursor-pointer">
                   Create Application Pod
                 </button>
               </div>
@@ -1943,6 +1954,10 @@ ${d.output || 'No output recorded.'}`;
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
           });
+          if (!r.ok) {
+            const errData = await r.json().catch(() => ({}));
+            throw new Error(errData.detail || errData.error || `HTTP ${r.status}`);
+          }
           const d = await r.json();
           closeModal();
           openPodDetail(d.workspace.workspace_id);
@@ -1977,13 +1992,13 @@ ${d.output || 'No output recorded.'}`;
         const spec = ws.spec || {};
 
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">Edit Specification</h4>
                 <p class="text-xs text-slate-400">Saved directly into Firestore database.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
             </div>
 
             <div>
@@ -1992,7 +2007,7 @@ ${d.output || 'No output recorded.'}`;
             </div>
 
             <div class="flex justify-end pt-2 border-t border-slate-800">
-              <button onclick="submitEditSpec('${wsId}')" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+              <button type="button" onclick="submitEditSpec('${wsId}')" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
                 Save Spec to Firestore
               </button>
             </div>
@@ -2005,11 +2020,15 @@ ${d.output || 'No output recorded.'}`;
         const text = document.getElementById('editSpecMarkdown').value;
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
         try {
-          await fetch(`/api/pods/${wsId}/spec?persona=${persona}`, {
+          const r = await fetch(`/api/pods/${wsId}/spec?persona=${persona}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ raw_markdown: text, requirements: [] })
           });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
           closeModal();
           openPodDetail(wsId, 'sdd');
         } catch(e) {
@@ -2024,13 +2043,13 @@ ${d.output || 'No output recorded.'}`;
         mb.classList.remove('hidden');
 
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">✨ AI Generate / Refine Specification</h4>
                 <p class="text-xs text-slate-400">Uses Gemini to draft structured requirements and criteria.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
             </div>
 
             <div>
@@ -2039,7 +2058,7 @@ ${d.output || 'No output recorded.'}`;
             </div>
 
             <div class="flex justify-end pt-2 border-t border-slate-800">
-              <button onclick="submitAIGenerateSpec('${wsId}')" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer">
+              <button type="button" onclick="submitAIGenerateSpec('${wsId}')" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer">
                 Generate & Save
               </button>
             </div>
@@ -2054,11 +2073,15 @@ ${d.output || 'No output recorded.'}`;
         closeModal();
         alert('Generating specification with AI... The pod will refresh when complete.');
         try {
-          await fetch(`/api/pods/${wsId}/spec/ai-generate?persona=${persona}`, {
+          const r = await fetch(`/api/pods/${wsId}/spec/ai-generate?persona=${persona}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ prompt: prompt || 'Draft complete requirements specification' })
           });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
           openPodDetail(wsId, 'sdd');
         } catch(e) {
           alert('AI Generation error: ' + e.message);
@@ -2076,13 +2099,13 @@ ${d.output || 'No output recorded.'}`;
         const plan = ws.plan || {};
 
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">Edit Architecture Plan</h4>
                 <p class="text-xs text-slate-400">Technical design doc and API route contracts.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
             </div>
 
             <div>
@@ -2091,7 +2114,7 @@ ${d.output || 'No output recorded.'}`;
             </div>
 
             <div class="flex justify-end pt-2 border-t border-slate-800">
-              <button onclick="submitEditPlan('${wsId}')" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+              <button type="button" onclick="submitEditPlan('${wsId}')" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
                 Save Plan to Firestore
               </button>
             </div>
@@ -2104,11 +2127,15 @@ ${d.output || 'No output recorded.'}`;
         const text = document.getElementById('editPlanMarkdown').value;
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
         try {
-          await fetch(`/api/pods/${wsId}/plan?persona=${persona}`, {
+          const r = await fetch(`/api/pods/${wsId}/plan?persona=${persona}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ raw_markdown: text, data_models: [], api_endpoints: [] })
           });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
           closeModal();
           openPodDetail(wsId, 'sdd');
         } catch(e) {
@@ -2123,13 +2150,13 @@ ${d.output || 'No output recorded.'}`;
         mb.classList.remove('hidden');
 
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">✨ AI Generate Architecture Plan</h4>
                 <p class="text-xs text-slate-400">Synthesizes data models and REST contracts from approved spec.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
             </div>
 
             <div>
@@ -2138,7 +2165,7 @@ ${d.output || 'No output recorded.'}`;
             </div>
 
             <div class="flex justify-end pt-2 border-t border-slate-800">
-              <button onclick="submitAIGeneratePlan('${wsId}')" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer">
+              <button type="button" onclick="submitAIGeneratePlan('${wsId}')" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer">
                 Synthesize Plan
               </button>
             </div>
@@ -2153,11 +2180,15 @@ ${d.output || 'No output recorded.'}`;
         closeModal();
         alert('Generating architecture plan with AI... Please wait.');
         try {
-          await fetch(`/api/pods/${wsId}/plan/ai-generate?persona=${persona}`, {
+          const r = await fetch(`/api/pods/${wsId}/plan/ai-generate?persona=${persona}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ prompt: prompt || 'Design full technical architecture' })
           });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
           openPodDetail(wsId, 'sdd');
         } catch(e) {
           alert('AI Plan Generation error: ' + e.message);
@@ -2172,13 +2203,13 @@ ${d.output || 'No output recorded.'}`;
         mb.classList.remove('hidden');
 
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">Add Implementation Task</h4>
                 <p class="text-xs text-slate-400">Saved to Firestore task list.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
             </div>
 
             <div class="space-y-3">
@@ -2197,7 +2228,7 @@ ${d.output || 'No output recorded.'}`;
             </div>
 
             <div class="flex justify-end pt-2 border-t border-slate-800">
-              <button onclick="submitAddTask('${wsId}')" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+              <button type="button" onclick="submitAddTask('${wsId}')" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
                 Add Task
               </button>
             </div>
@@ -2214,11 +2245,15 @@ ${d.output || 'No output recorded.'}`;
 
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
         try {
-          await fetch(`/api/pods/${wsId}/tasks?persona=${persona}`, {
+          const r = await fetch(`/api/pods/${wsId}/tasks?persona=${persona}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ title: title, description: desc, target_files: [file || 'src/module.py'] })
           });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
           closeModal();
           openPodDetail(wsId, 'sdd');
         } catch(e) {
@@ -2231,7 +2266,11 @@ ${d.output || 'No output recorded.'}`;
         if (!confirm('Let AI analyze your spec and plan to decompose into tasks?')) return;
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
         try {
-          await fetch(`/api/pods/${wsId}/tasks/ai-breakdown?persona=${persona}`, { method: 'POST' });
+          const r = await fetch(`/api/pods/${wsId}/tasks/ai-breakdown?persona=${persona}`, { method: 'POST' });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
           openPodDetail(wsId, 'sdd');
         } catch(e) {
           alert('Task breakdown error: ' + e.message);
@@ -2255,13 +2294,13 @@ ${d.output || 'No output recorded.'}`;
         const currentMembers = (window._activePodData && window._activePodData.members) ? window._activePodData.members.map(m => m.user_id) : [];
 
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">Invite Contributors</h4>
                 <p class="text-xs text-slate-400">Select employees to collaborate on this pod.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
             </div>
 
             <div class="max-h-48 overflow-y-auto border border-slate-800 rounded-xl divide-y divide-slate-800/60 bg-slate-950 p-1 text-xs">
@@ -2279,7 +2318,7 @@ ${d.output || 'No output recorded.'}`;
 
             <div class="flex items-center justify-between pt-2 border-t border-slate-800">
               <span class="text-xs text-slate-400">All invitees gain Contributor role</span>
-              <button onclick="submitInviteContributors('${wsId}')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+              <button type="button" onclick="submitInviteContributors('${wsId}')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
                 Save Contributors
               </button>
             </div>
@@ -2294,11 +2333,15 @@ ${d.output || 'No output recorded.'}`;
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
 
         try {
-          await fetch(`/api/pods/${wsId}/invite?persona=${persona}`, {
+          const r = await fetch(`/api/pods/${wsId}/invite?persona=${persona}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ employee_ids: ids })
           });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
           closeModal();
           openPodDetail(wsId);
         } catch(e) {
@@ -2316,13 +2359,13 @@ ${d.output || 'No output recorded.'}`;
         const principles = (ws.sdd_config && ws.sdd_config.architecture_principles) ? ws.sdd_config.architecture_principles.join(String.fromCharCode(10)) : '';
 
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">Configure SDD Rules & Tenets</h4>
                 <p class="text-xs text-slate-400">Only the Pod Owner can modify these rules.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
             </div>
 
             <div class="space-y-3">
@@ -2334,7 +2377,7 @@ ${d.output || 'No output recorded.'}`;
 
             <div class="flex items-center justify-between pt-2 border-t border-slate-800">
               <span class="text-xs text-slate-400">Enforced on all Contributors</span>
-              <button onclick="submitOwnerRules('${wsId}')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer">
+              <button type="button" onclick="submitOwnerRules('${wsId}')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer">
                 Save & Enforce Rules
               </button>
             </div>
@@ -2349,11 +2392,15 @@ ${d.output || 'No output recorded.'}`;
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
 
         try {
-          await fetch(`/api/pods/${wsId}/sdd/rules?persona=${persona}`, {
+          const r = await fetch(`/api/pods/${wsId}/sdd/rules?persona=${persona}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ architecture_principles: list, coding_standards: [] })
           });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
           closeModal();
           openPodDetail(wsId);
         } catch(e) {
@@ -2371,13 +2418,13 @@ ${d.output || 'No output recorded.'}`;
         const instr = ws.system_instructions || '';
 
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">Pod Instructions (System Prompt)</h4>
                 <p class="text-xs text-slate-400">Persistent instructions prepended to every AI turn in this pod.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
             </div>
 
             <div>
@@ -2385,7 +2432,7 @@ ${d.output || 'No output recorded.'}`;
             </div>
 
             <div class="flex justify-end pt-2 border-t border-slate-800">
-              <button onclick="submitPodInstructions('${wsId}')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+              <button type="button" onclick="submitPodInstructions('${wsId}')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
                 Save Instructions
               </button>
             </div>
@@ -2399,11 +2446,15 @@ ${d.output || 'No output recorded.'}`;
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
 
         try {
-          await fetch(`/api/pods/${wsId}/instructions?persona=${persona}`, {
+          const r = await fetch(`/api/pods/${wsId}/instructions?persona=${persona}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ system_instructions: text })
           });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
           closeModal();
           openPodDetail(wsId);
         } catch(e) {
@@ -2424,17 +2475,17 @@ ${d.output || 'No output recorded.'}`;
         const reqs = spec.requirements || [];
 
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">End-to-End SDD Traceability Matrix</h4>
                 <p class="text-xs text-slate-400">Links: Requirement (Specify) → Architecture (Plan) → Task → Verification (Test)</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
             </div>
 
             <div class="overflow-x-auto rounded-xl border border-slate-800">
-              <table class="w-full text-left text-xs font-mono">
+              <table class="w-left text-xs font-mono w-full">
                 <thead class="bg-slate-950 text-slate-400 border-b border-slate-800">
                   <tr>
                     <th class="p-3">Requirement (Specify)</th>
@@ -2466,7 +2517,7 @@ ${d.output || 'No output recorded.'}`;
             </div>
 
             <div class="pt-2 flex justify-end">
-              <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-semibold cursor-pointer">Close</button>
+              <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-semibold cursor-pointer">Close</button>
             </div>
           </div>
         `;
@@ -2710,13 +2761,25 @@ ${d.output || 'No output recorded.'}`;
         `;
       }
 
-      function closeModal() {
+      function closeModal(e) {
+        if (e && e.target && e.currentTarget && e.target !== e.currentTarget) {
+          return;
+        }
         const mb = document.getElementById('modalBackdrop');
         if (mb) {
           mb.classList.add('hidden');
           mb.innerHTML = '';
         }
       }
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const mb = document.getElementById('modalBackdrop');
+          if (mb && !mb.classList.contains('hidden')) {
+            closeModal();
+          }
+        }
+      });
 
       function openAgentToolsModal(agentId, e) {
         if (e) {
@@ -2824,13 +2887,13 @@ ${d.output || 'No output recorded.'}`;
         if (!mb) return;
         mb.classList.remove('hidden');
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">+ Create Agent from Swagger / OpenAPI</h4>
                 <p class="text-xs text-slate-400">Synthesize an intelligent agent and corresponding tools automatically from an OpenAPI 3.0 specification.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">✕</button>
             </div>
 
             <form onsubmit="submitSwaggerAgent(event)" class="space-y-4">
@@ -3008,13 +3071,13 @@ ${d.output || 'No output recorded.'}`;
 
         mb.classList.remove('hidden');
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">Manage Access Limits: ${agent.name}</h4>
                 <p class="text-xs text-slate-400">Configure RBAC role allowances, activation status, and team boundaries.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">✕</button>
             </div>
 
             <form onsubmit="submitAgentAccess('${agent.id}', event)" class="space-y-4">
@@ -3130,13 +3193,13 @@ ${d.output || 'No output recorded.'}`;
         if (!mb) return;
         mb.classList.remove('hidden');
         mb.innerHTML = `
-          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div>
                 <h4 class="text-base font-bold text-slate-100">📖 How to Onboard a New Agent to cortex.ai</h4>
                 <p class="text-xs text-slate-400">Complete end-to-end instructions for deploying, registering, and securing autonomous enterprise agents.</p>
               </div>
-              <button onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">✕</button>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">✕</button>
             </div>
 
             <div class="space-y-4 text-xs text-slate-300">
@@ -3195,7 +3258,7 @@ ${d.output || 'No output recorded.'}`;
             </div>
 
             <div class="flex items-center justify-end pt-3 border-t border-slate-800">
-              <button onclick="closeModal()" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md transition">
+              <button type="button" onclick="closeModal()" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md transition">
                 Got it
               </button>
             </div>
