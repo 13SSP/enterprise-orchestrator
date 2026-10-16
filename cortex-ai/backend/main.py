@@ -58,6 +58,14 @@ generated_dir = root_dir / "integrations" / "m365-connector" / "generated_files"
 generated_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/downloads", StaticFiles(directory=str(generated_dir)), name="downloads")
 
+# Serve Frontend Web Shell for Cloud Run evaluators
+from fastapi.responses import FileResponse
+frontend_file = root_dir / "cortex-ai" / "frontend" / "index.html"
+if frontend_file.exists():
+    @app.get("/", tags=["Frontend"], response_class=FileResponse)
+    def serve_frontend_ui():
+        return FileResponse(frontend_file)
+
 def load_app_spec(app_path: Path, module_name: str):
     spec = importlib.util.spec_from_file_location(module_name, app_path)
     mod = importlib.util.module_from_spec(spec)
@@ -99,5 +107,6 @@ def health():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
