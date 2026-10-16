@@ -32,45 +32,242 @@ def build_dist_html():
             </div>
           </div>
 
-          <div class="mb-6 p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">Firebase User Identity</label>
-            <select id="personaSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs p-2 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="bob_ops">Bob Martinez (DevOps Admin)</option>
-              <option value="alice_hr">Alice Henderson (HR Manager)</option>
-              <option value="charlie_fin">Charlie Zhao (Finance Officer)</option>
-              <option value="dave_contractor">Dave Miller (Restricted Contractor)</option>
-            </select>
-          </div>
+          <select id="personaSelect" class="hidden">
+            <option value="bob_ops" selected>Bob Martinez (DevOps Admin)</option>
+            <option value="alice_hr">Alice Henderson (HR Manager)</option>
+            <option value="charlie_fin">Charlie Zhao (Finance Officer)</option>
+            <option value="dave_contractor">Dave Miller (Restricted Contractor)</option>
+          </select>
 
           <nav class="space-y-1">
-            <button onclick="switchTab('pods')" id="tab-pods" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">📁 Pods</button>
-            <button onclick="switchTab('chat')" id="tab-chat" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition">💬 Chat Assistant</button>
-            <button onclick="switchTab('prompts')" id="tab-prompts" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">📚 Prompt Library (18)</button>
-            <button onclick="switchTab('agents')" id="tab-agents" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">🤖 Team Agents (5)</button>
-            <button onclick="switchTab('tools')" id="tab-tools" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">🛠️ Tool Catalog (25)</button>
-            <button onclick="switchTab('models')" id="tab-models" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">🧠 Model Gateway</button>
-            <button onclick="switchTab('audit')" id="tab-audit" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition">📜 Cloud Audit Trail</button>
+            <button onclick="switchTab('chat')" id="tab-chat" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white shadow-sm transition">💬 Chat Assistant</button>
+            <button onclick="switchTab('pods')" id="tab-pods" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition">🚀 Pods</button>
+            <button onclick="switchTab('prompts')" id="tab-prompts" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition">📚 Prompt Library (18)</button>
+            <button onclick="switchTab('agents')" id="tab-agents" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition">🤖 Team Agents (5)</button>
           </nav>
         </div>
 
-        <div class="pt-4 border-t border-slate-800 text-[11px] text-slate-500 font-mono space-y-1">
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Firestore: Native (:8080)</span>
+        <div class="pt-3 border-t border-slate-200 dark:border-slate-800 relative">
+          <!-- Dropup menu for user switching directly from sidebar if clicked -->
+          <div id="sidebarUserMenu" class="hidden absolute bottom-full left-0 mb-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-2 z-40 space-y-1">
+            <div class="px-2 py-1 text-[10px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 flex items-center justify-between">
+              <span>Switch Identity</span>
+              <span class="text-[9px] text-blue-600 dark:text-blue-400 font-semibold">Firebase Auth</span>
+            </div>
+            <div onclick="selectPersona('bob_ops'); toggleSidebarUserMenu();" class="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition user-item">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] flex items-center justify-center border border-indigo-200 dark:border-indigo-500/30">BM</div>
+                <div>
+                  <div class="text-xs font-semibold text-slate-800 dark:text-slate-200 user-name">Bob Martinez</div>
+                  <div class="text-[10px] text-slate-500 dark:text-slate-400 user-role">DevOps Admin</div>
+                </div>
+              </div>
+              <span id="sidebar-check-bob_ops" class="text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+            </div>
+            <div onclick="selectPersona('alice_hr'); toggleSidebarUserMenu();" class="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition user-item">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-pink-100 dark:bg-pink-600/20 text-pink-600 dark:text-pink-400 font-bold text-[10px] flex items-center justify-center border border-pink-200 dark:border-pink-500/30">AH</div>
+                <div>
+                  <div class="text-xs font-semibold text-slate-800 dark:text-slate-200 user-name">Alice Henderson</div>
+                  <div class="text-[10px] text-slate-500 dark:text-slate-400 user-role">HR Manager</div>
+                </div>
+              </div>
+              <span id="sidebar-check-alice_hr" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+            </div>
+            <div onclick="selectPersona('charlie_fin'); toggleSidebarUserMenu();" class="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition user-item">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] flex items-center justify-center border border-emerald-200 dark:border-emerald-500/30">CZ</div>
+                <div>
+                  <div class="text-xs font-semibold text-slate-800 dark:text-slate-200 user-name">Charlie Zhao</div>
+                  <div class="text-[10px] text-slate-500 dark:text-slate-400 user-role">Finance Officer</div>
+                </div>
+              </div>
+              <span id="sidebar-check-charlie_fin" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+            </div>
+            <div onclick="selectPersona('dave_contractor'); toggleSidebarUserMenu();" class="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition user-item">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-600/20 text-amber-600 dark:text-amber-400 font-bold text-[10px] flex items-center justify-center border border-amber-200 dark:border-amber-500/30">DM</div>
+                <div>
+                  <div class="text-xs font-semibold text-slate-800 dark:text-slate-200 user-name">Dave Miller</div>
+                  <div class="text-[10px] text-slate-500 dark:text-slate-400 user-role">Restricted Contractor</div>
+                </div>
+              </div>
+              <span id="sidebar-check-dave_contractor" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+            </div>
           </div>
-          <div>Cortex Gateway: :8000</div>
+
+          <!-- Bottom user card trigger -->
+          <div id="sidebarUserCard" class="p-2.5 rounded-xl bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/70 transition shadow-sm group" onclick="toggleSidebarUserMenu(event)">
+            <div class="flex items-center gap-2.5 overflow-hidden">
+              <div id="sidebarAvatarInitials" class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-blue-600 border border-blue-400/30 flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-sm">
+                BM
+              </div>
+              <div class="truncate">
+                <div id="sidebarUserName" class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">Bob Martinez</div>
+                <div id="sidebarUserRole" class="text-[10px] text-slate-500 dark:text-slate-400 truncate font-mono">DevOps Admin</div>
+              </div>
+            </div>
+            <span class="text-[10px] text-blue-600 dark:text-blue-400 shrink-0 font-medium ml-1">Switch ▾</span>
+          </div>
         </div>
       </aside>
 
       <main class="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden">
-        <header class="h-14 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/40">
+        <header class="h-14 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/40 relative z-30">
           <div class="flex items-center gap-3">
             <h2 id="currentTabTitle" class="text-sm font-semibold capitalize text-slate-200">Chat Assistant</h2>
             <span id="roleBadge" class="hidden"></span>
           </div>
-          <div class="flex items-center gap-4 text-xs text-slate-400">
-            <span>Model Armor: <strong class="text-emerald-400">Active</strong></span>
-            <span>Zero-Trust RBAC: <strong class="text-emerald-400">Enforced</strong></span>
+          
+          <div class="flex items-center gap-4">
+            <div class="hidden md:flex items-center gap-3 text-xs text-slate-400">
+              <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-blue-400"></span>ShieldGemma: <strong class="text-blue-400">Active</strong></span>
+            </div>
+
+            <!-- USER PROFILE AVATAR TRIGGER IN TOP RIGHT CORNER (Matching Image 3) -->
+            <div class="relative">
+              <button id="profileMenuBtn" onclick="toggleProfileMenu(event)" class="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-blue-500/50 transition focus:outline-none cursor-pointer group">
+                <div class="relative">
+                  <div id="topAvatarInitials" class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-blue-600 border border-blue-400/30 flex items-center justify-center font-bold text-xs text-white shadow-sm group-hover:border-blue-400 transition">
+                    BM
+                  </div>
+                  <span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-white dark:border-slate-900"></span>
+                </div>
+              </button>
+
+              <!-- PROFILE POPOVER MENU (Positioned top-right exactly like Image 3) -->
+              <div id="profilePopover" class="hidden absolute right-0 mt-2 w-80 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 overflow-hidden profile-popover transition-all duration-200">
+                <!-- User Profile Header Card -->
+                <div class="p-5 border-b border-slate-200 dark:border-slate-800 profile-header-card bg-slate-50 dark:bg-slate-800/30 text-center relative">
+                  <div class="inline-flex relative mb-2.5">
+                    <div id="popoverAvatarInitials" class="w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-500 text-white font-bold text-lg flex items-center justify-center shadow-md border-2 border-slate-200 dark:border-slate-700">
+                      BM
+                    </div>
+                  </div>
+                  <h3 id="popoverUserName" class="font-bold text-sm text-slate-800 dark:text-slate-100">Bob Martinez</h3>
+                  <p id="popoverUserEmail" class="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">bob.ops@company.internal</p>
+                  <div class="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-600 dark:text-blue-300 border border-blue-500/25">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    <span id="popoverUserRole">DevOps Admin</span>
+                  </div>
+                </div>
+
+                <div class="p-2.5 space-y-2">
+                  <!-- SHIFTED USER SWITCHER -->
+                  <div>
+                    <div class="px-2 py-1 text-[10px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                      <span>Firebase Identity</span>
+                      <span class="text-[9px] text-blue-600 dark:text-blue-400 font-semibold">Active Session</span>
+                    </div>
+                    <div class="space-y-1 mt-1 max-h-40 overflow-y-auto pr-1">
+                      <div onclick="selectPersona('bob_ops')" id="user-opt-bob_ops" class="flex items-center justify-between p-2 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/80 transition profile-menu-item bg-slate-100/80 dark:bg-slate-800/40">
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-600/30 text-indigo-600 dark:text-indigo-300 font-bold text-xs flex items-center justify-center border border-indigo-200 dark:border-indigo-500/30">BM</div>
+                          <div>
+                            <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">Bob Martinez</div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400">DevOps Admin</div>
+                          </div>
+                        </div>
+                        <span id="check-bob_ops" class="text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+                      </div>
+
+                      <div onclick="selectPersona('alice_hr')" id="user-opt-alice_hr" class="flex items-center justify-between p-2 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/80 transition profile-menu-item">
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-7 h-7 rounded-full bg-pink-100 dark:bg-pink-600/30 text-pink-600 dark:text-pink-300 font-bold text-xs flex items-center justify-center border border-pink-200 dark:border-pink-500/30">AH</div>
+                          <div>
+                            <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">Alice Henderson</div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400">HR Manager</div>
+                          </div>
+                        </div>
+                        <span id="check-alice_hr" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+                      </div>
+
+                      <div onclick="selectPersona('charlie_fin')" id="user-opt-charlie_fin" class="flex items-center justify-between p-2 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/80 transition profile-menu-item">
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-600/30 text-emerald-600 dark:text-emerald-300 font-bold text-xs flex items-center justify-center border border-emerald-200 dark:border-emerald-500/30">CZ</div>
+                          <div>
+                            <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">Charlie Zhao</div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400">Finance Officer</div>
+                          </div>
+                        </div>
+                        <span id="check-charlie_fin" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+                      </div>
+
+                      <div onclick="selectPersona('dave_contractor')" id="user-opt-dave_contractor" class="flex items-center justify-between p-2 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/80 transition profile-menu-item">
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-600/30 text-amber-600 dark:text-amber-300 font-bold text-xs flex items-center justify-center border border-amber-200 dark:border-amber-500/30">DM</div>
+                          <div>
+                            <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">Dave Miller</div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400">Restricted Contractor</div>
+                          </div>
+                        </div>
+                        <span id="check-dave_contractor" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="border-t border-slate-200 dark:border-slate-800"></div>
+
+                  <!-- THEME SWITCHER (Light and Dark Mode Only - matching Image 3) -->
+                  <div class="flex items-center justify-between p-2 rounded-xl profile-menu-item">
+                    <div class="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-200 font-medium">
+                      <span class="text-sm">🌗</span>
+                      <span>Appearance</span>
+                    </div>
+                    <!-- 2-toggle pill for Light and Dark mode only -->
+                    <div class="flex items-center p-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 theme-toggle-container">
+                      <button id="themeLightBtn" onclick="setTheme('light')" type="button" title="Light Mode" class="flex items-center justify-center w-7 h-7 rounded-full bg-white text-blue-600 shadow-sm transition cursor-pointer theme-toggle-active">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                      </button>
+                      <button id="themeDarkBtn" onclick="setTheme('dark')" type="button" title="Dark Mode" class="flex items-center justify-center w-7 h-7 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-100 transition cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="border-t border-slate-200 dark:border-slate-800"></div>
+
+                  <!-- NAVIGATION: Tool Catalog, Model Details, Cloud Audit Logs -->
+                  <div>
+                    <div class="px-2 py-1 text-[10px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400">Navigation & Tools</div>
+                    <div class="space-y-0.5 mt-0.5">
+                      <button onclick="switchTab('tools'); toggleProfileMenu();" type="button" class="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition group profile-menu-item cursor-pointer">
+                        <div class="flex items-center gap-2.5">
+                          <span class="text-sm">🛠️</span>
+                          <div>
+                            <div class="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">Tool Catalog</div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400">25 Registered API Tools</div>
+                          </div>
+                        </div>
+                        <span class="text-[10px] bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-mono px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">25</span>
+                      </button>
+
+                      <button onclick="switchTab('models'); toggleProfileMenu();" type="button" class="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition group profile-menu-item cursor-pointer">
+                        <div class="flex items-center gap-2.5">
+                          <span class="text-sm">🧠</span>
+                          <div>
+                            <div class="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition">Model Details</div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400">Gemini 2.5/3, ShieldGemma</div>
+                          </div>
+                        </div>
+                        <span class="text-[10px] bg-slate-100 dark:bg-slate-800 text-purple-600 dark:text-purple-400 font-mono px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">Active</span>
+                      </button>
+
+                      <button onclick="switchTab('audit'); toggleProfileMenu();" type="button" class="w-full flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition group profile-menu-item cursor-pointer">
+                        <div class="flex items-center gap-2.5">
+                          <span class="text-sm">📜</span>
+                          <div>
+                            <div class="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">Logs & Audit Trail</div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400">SOC2 Audit & Security Blocks</div>
+                          </div>
+                        </div>
+                        <span class="text-[10px] bg-slate-100 dark:bg-slate-800 text-amber-600 dark:text-amber-400 font-mono px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">SOC2</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </header>
 
@@ -105,7 +302,7 @@ def build_dist_html():
           <!-- Other Views -->
           <div id="dynamicView" class="hidden max-w-5xl mx-auto space-y-4"></div>
           <!-- Modal Backdrop -->
-          <div id="modalBackdrop" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4"></div>
+          <div id="modalBackdrop" onclick="closeModal()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4"></div>
         </div>
       </main>
     </div>
@@ -119,12 +316,193 @@ def build_dist_html():
         dave_contractor: 'Restricted Contractor'
       };
 
+      const userProfiles = {
+        bob_ops: {
+          name: 'Bob Martinez',
+          role: 'DevOps Admin',
+          email: 'bob.ops@company.internal',
+          initials: 'BM',
+          department: 'Platform Engineering'
+        },
+        alice_hr: {
+          name: 'Alice Henderson',
+          role: 'HR Manager',
+          email: 'alice.hr@company.internal',
+          initials: 'AH',
+          department: 'People Operations'
+        },
+        charlie_fin: {
+          name: 'Charlie Zhao',
+          role: 'Finance Officer',
+          email: 'charlie.fin@company.internal',
+          initials: 'CZ',
+          department: 'Finance & Payroll'
+        },
+        dave_contractor: {
+          name: 'Dave Miller',
+          role: 'Restricted Contractor',
+          email: 'dave.external@partner.com',
+          initials: 'DM',
+          department: 'External Operations'
+        }
+      };
+
+      function toggleProfileMenu(e) {
+        if (e) e.stopPropagation();
+        const popover = document.getElementById('profilePopover');
+        if (popover) {
+          popover.classList.toggle('hidden');
+        }
+      }
+
+      function toggleSidebarUserMenu(e) {
+        if (e) e.stopPropagation();
+        const menu = document.getElementById('sidebarUserMenu');
+        if (menu) {
+          menu.classList.toggle('hidden');
+        }
+      }
+
+      function selectPersona(personaKey) {
+        const select = document.getElementById('personaSelect');
+        if (select) {
+          select.value = personaKey;
+          select.dispatchEvent(new Event('change'));
+        }
+        updateUserProfileDisplay(personaKey);
+        const popover = document.getElementById('profilePopover');
+        if (popover) popover.classList.add('hidden');
+        const sidebarMenu = document.getElementById('sidebarUserMenu');
+        if (sidebarMenu) sidebarMenu.classList.add('hidden');
+      }
+
+      function updateUserProfileDisplay(personaKey) {
+        const p = userProfiles[personaKey] || userProfiles['bob_ops'];
+        if (document.getElementById('topAvatarInitials')) {
+          document.getElementById('topAvatarInitials').innerText = p.initials;
+        }
+        if (document.getElementById('sidebarAvatarInitials')) {
+          document.getElementById('sidebarAvatarInitials').innerText = p.initials;
+        }
+        if (document.getElementById('sidebarUserName')) {
+          document.getElementById('sidebarUserName').innerText = p.name;
+        }
+        if (document.getElementById('sidebarUserRole')) {
+          document.getElementById('sidebarUserRole').innerText = p.role;
+        }
+        if (document.getElementById('popoverAvatarInitials')) {
+          document.getElementById('popoverAvatarInitials').innerText = p.initials;
+        }
+        if (document.getElementById('popoverUserName')) {
+          document.getElementById('popoverUserName').innerText = p.name;
+        }
+        if (document.getElementById('popoverUserEmail')) {
+          document.getElementById('popoverUserEmail').innerText = p.email;
+        }
+        if (document.getElementById('popoverUserRole')) {
+          document.getElementById('popoverUserRole').innerText = p.role;
+        }
+
+        // Update active checkmarks in both popover and sidebar menu
+        Object.keys(userProfiles).forEach(k => {
+          const check = document.getElementById('check-' + k);
+          const opt = document.getElementById('user-opt-' + k);
+          if (check) {
+            if (k === personaKey) {
+              check.classList.remove('hidden');
+              if (opt) {
+                opt.classList.add('bg-slate-100', 'dark:bg-slate-800/40');
+              }
+            } else {
+              check.classList.add('hidden');
+              if (opt) {
+                opt.classList.remove('bg-slate-100', 'dark:bg-slate-800/40');
+              }
+            }
+          }
+          const sidebarCheck = document.getElementById('sidebar-check-' + k);
+          if (sidebarCheck) {
+            if (k === personaKey) {
+              sidebarCheck.classList.remove('hidden');
+            } else {
+              sidebarCheck.classList.add('hidden');
+            }
+          }
+        });
+      }
+
+      let currentTheme = localStorage.getItem('cortex_theme') || 'light';
+
+      function setTheme(theme) {
+        currentTheme = theme;
+        localStorage.setItem('cortex_theme', theme);
+        const app = document.getElementById('app');
+        const lightBtn = document.getElementById('themeLightBtn');
+        const darkBtn = document.getElementById('themeDarkBtn');
+
+        if (theme === 'light') {
+          document.body.classList.add('theme-light');
+          document.documentElement.classList.add('theme-light');
+          document.body.classList.remove('dark', 'theme-dark');
+          document.documentElement.classList.remove('dark', 'theme-dark');
+          if (app) {
+            app.classList.add('theme-light');
+            app.classList.remove('dark', 'theme-dark');
+          }
+          if (lightBtn) {
+            lightBtn.className = 'flex items-center justify-center w-7 h-7 rounded-full bg-white text-blue-600 shadow-sm transition cursor-pointer theme-toggle-active';
+          }
+          if (darkBtn) {
+            darkBtn.className = 'flex items-center justify-center w-7 h-7 rounded-full text-slate-400 hover:text-slate-600 transition cursor-pointer';
+          }
+        } else {
+          document.body.classList.remove('theme-light');
+          document.documentElement.classList.remove('theme-light');
+          document.body.classList.add('dark', 'theme-dark');
+          document.documentElement.classList.add('dark', 'theme-dark');
+          if (app) {
+            app.classList.remove('theme-light');
+            app.classList.add('dark', 'theme-dark');
+          }
+          if (darkBtn) {
+            darkBtn.className = 'flex items-center justify-center w-7 h-7 rounded-full bg-slate-700 text-blue-400 shadow-sm transition cursor-pointer theme-toggle-active';
+          }
+          if (lightBtn) {
+            lightBtn.className = 'flex items-center justify-center w-7 h-7 rounded-full text-slate-400 hover:text-slate-200 transition cursor-pointer';
+          }
+        }
+      }
+
+      window.addEventListener('click', (e) => {
+        const popover = document.getElementById('profilePopover');
+        const btn = document.getElementById('profileMenuBtn');
+        if (popover && !popover.classList.contains('hidden')) {
+          if (!popover.contains(e.target) && !btn.contains(e.target)) {
+            popover.classList.add('hidden');
+          }
+        }
+        const sidebarMenu = document.getElementById('sidebarUserMenu');
+        const sidebarCard = document.getElementById('sidebarUserCard');
+        if (sidebarMenu && !sidebarMenu.classList.contains('hidden')) {
+          if (!sidebarMenu.contains(e.target) && !sidebarCard.contains(e.target)) {
+            sidebarMenu.classList.add('hidden');
+          }
+        }
+      });
+
+      // Synchronize changes to personaSelect
       document.getElementById('personaSelect').addEventListener('change', (e) => {
-        document.getElementById('roleBadge').innerText = 'Role: ' + (roleMap[e.target.value] || 'Employee');
+        const val = e.target.value;
+        document.getElementById('roleBadge').innerText = 'Role: ' + (roleMap[val] || 'Employee');
+        updateUserProfileDisplay(val);
         if (currentTab === 'pods' || currentTab === 'workspaces') {
           loadPodsHub();
         }
       });
+
+      // Initialize theme and profile on load
+      setTheme(currentTheme);
+      updateUserProfileDisplay(document.getElementById('personaSelect').value || 'bob_ops');
 
       async function switchTab(tab) {
         currentTab = tab;
@@ -133,9 +511,9 @@ def build_dist_html():
           const btn = document.getElementById('tab-' + t);
           if (!btn) return;
           if (t === tab || (normalizedTab === 'pods' && (t === 'pods' || t === 'workspaces'))) {
-            btn.className = 'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition';
+            btn.className = 'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white shadow-sm transition';
           } else {
-            btn.className = 'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 transition';
+            btn.className = 'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition';
           }
         });
 
@@ -355,10 +733,6 @@ def build_dist_html():
                 </div>
                 <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/90 text-xs font-mono text-slate-200 select-all leading-relaxed">
                   "${p.prompt}"
-                </div>
-                <div class="p-2.5 rounded-lg bg-amber-950/20 border border-amber-900/30 text-[11px] text-amber-300/90 space-y-1">
-                  <div class="font-semibold flex items-center gap-1.5">💡 Hackathon Demo Note:</div>
-                  <div class="text-amber-400/80 leading-normal">${p.hackathon_highlight}</div>
                 </div>
                 <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono pt-1">
                   <span>👤 Recommended: <strong class="text-slate-300">${p.persona_name}</strong></span>
@@ -2171,6 +2545,7 @@ ${d.output || 'No output recorded.'}`;
 
       window._agentsSearchQuery = '';
       window._allAgentsList = [];
+      window._allToolsList = [];
 
       async function loadAgentsHub() {
         const dv = document.getElementById('dynamicView');
@@ -2178,20 +2553,20 @@ ${d.output || 'No output recorded.'}`;
         dv.innerHTML = '<div class="text-slate-500 font-mono text-xs p-8 text-center">Loading enterprise agents directory...</div>';
         try {
           const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
-          const scope = window._agentsScope || 'all';
-          const r = await fetch(`/api/agents?scope=${scope}&persona=${encodeURIComponent(persona)}`);
-          const d = await r.json();
-          window._allAgentsList = d.agents || [];
+          const [rAgents, rTools] = await Promise.all([
+            fetch(`/api/agents?scope=all&persona=${encodeURIComponent(persona)}`),
+            fetch('/api/tools').catch(() => ({ json: () => ({ tools: [] }) }))
+          ]);
+          const dAgents = await rAgents.json();
+          let dTools = { tools: [] };
+          try { dTools = await rTools.json(); } catch(e){}
+          window._allAgentsList = dAgents.agents || [];
+          window._allToolsList = dTools.tools || [];
           renderAgentsHub();
         } catch(e) {
           console.error(e);
           dv.innerHTML = '<div class="text-red-400 text-xs p-4 bg-red-950/20 border border-red-900 rounded-xl">Error connecting to agents backend gateway.</div>';
         }
-      }
-
-      function setAgentsScope(scope) {
-        window._agentsScope = scope;
-        renderAgentsHub();
       }
 
       function handleAgentSearch(val) {
@@ -2207,18 +2582,9 @@ ${d.output || 'No output recorded.'}`;
       function renderAgentsHub() {
         const dv = document.getElementById('dynamicView');
         if (!dv) return;
-        const scope = window._agentsScope || 'all';
         const query = (window._agentsSearchQuery || '').toLowerCase().trim();
-        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
 
         let list = (window._allAgentsList || []).filter(a => {
-          if (scope === 'mine') {
-            const matchesMine = (a.author_id === persona) || 
-                                (persona === 'bob_ops' && (a.owner_team.includes('DevOps') || a.owner_team.includes('Operations') || a.owner_team.includes('Productivity') || a.owner_team.includes('IT'))) ||
-                                (persona === 'alice_hr' && a.owner_team.includes('HR')) ||
-                                (persona === 'charlie_fin' && a.owner_team.includes('Finance'));
-            if (!matchesMine) return false;
-          }
           if (query) {
             const match = (a.name && a.name.toLowerCase().includes(query)) ||
                           (a.description && a.description.toLowerCase().includes(query)) ||
@@ -2230,22 +2596,10 @@ ${d.output || 'No output recorded.'}`;
           return true;
         });
 
-        // Scope pill toggle: Your agents vs All
-        const scopeToggleHtml = `
-          <div class="inline-flex rounded-xl bg-slate-900 p-1 border border-slate-800 text-xs font-medium">
-            <button onclick="setAgentsScope('mine')" class="px-3.5 py-1.5 rounded-lg transition ${scope === 'mine' ? 'bg-slate-800 text-white font-semibold shadow-sm' : 'text-slate-400 hover:text-slate-200'}">
-              Your agents
-            </button>
-            <button onclick="setAgentsScope('all')" class="px-3.5 py-1.5 rounded-lg transition ${scope === 'all' ? 'bg-slate-800 text-white font-semibold shadow-sm' : 'text-slate-400 hover:text-slate-200'}">
-              All
-            </button>
-          </div>
-        `;
-
         let cardsHtml = '';
         if (list.length === 0) {
           cardsHtml = `<div class="col-span-full p-12 text-center bg-slate-900/40 rounded-2xl border border-slate-800/80 text-slate-500 text-xs">
-            No agents found matching "${query}". Try clearing your search or switching toggles.
+            No agents found matching "${query}". Try clearing your search query.
           </div>`;
         } else {
           cardsHtml = list.map(a => {
@@ -2290,23 +2644,30 @@ ${d.output || 'No output recorded.'}`;
                     ${a.description || 'Specialized enterprise agent.'}
                   </p>
 
-                  <div class="pt-2 border-t border-slate-800/80 space-y-1.5 text-[11px] font-mono">
-                    <div class="flex items-center justify-between text-slate-400">
-                      <span>Team: <strong class="text-slate-300 font-sans">${a.owner_team || 'Core'}</strong></span>
-                      <span class="px-2 py-0.5 rounded bg-cyan-950/40 text-cyan-400 border border-cyan-800/40 text-[10px]">${(a.allowed_tools || []).length} tools</span>
+                  <div class="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-1.5 text-[11px] font-mono">
+                    <div class="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                      <span>Team: <strong class="text-slate-800 dark:text-slate-300 font-sans">${a.owner_team || 'Core'}</strong></span>
+                      <button type="button" 
+                              onclick="openAgentToolsModal('${a.id}', event)" 
+                              title="Permitted Tools (${(a.allowed_tools || []).length}):&#10;• ${(a.allowed_tools || []).join('&#10;• ')}"
+                              class="agent-tools-badge inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-semibold font-mono bg-cyan-50 text-cyan-700 border border-cyan-200 hover:bg-cyan-100 hover:border-cyan-300 dark:bg-cyan-950/40 dark:text-cyan-400 dark:border-cyan-800/50 dark:hover:bg-cyan-900/50 transition cursor-pointer shadow-xs active:scale-95 group/tools">
+                        <span>🛠️</span>
+                        <span>${(a.allowed_tools || []).length} tools</span>
+                        <span class="text-[9px] opacity-60 group-hover/tools:translate-x-0.5 transition">▾</span>
+                      </button>
                     </div>
                     <div class="flex items-center justify-between text-slate-500 text-[10px]">
-                      <span>Model: <code class="text-indigo-400">${(a.preferred_model || '').split('/').pop()}</code></span>
-                      <span class="text-amber-400/90 truncate max-w-[130px]" title="Access limit: ${rolesText}">🔒 ${rolesText}</span>
+                      <span>Model: <code class="text-indigo-600 dark:text-indigo-400 font-semibold">${(a.preferred_model || '').split('/').pop()}</code></span>
+                      <span class="text-amber-600 dark:text-amber-400/90 truncate max-w-[130px]" title="Access limit: ${rolesText}">🔒 ${rolesText}</span>
                     </div>
                   </div>
                 </div>
 
-                <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                  <button onclick="openAgentAccessModal('${a.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700/80 transition flex items-center gap-1.5">
+                <div class="pt-3 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-2">
+                  <button onclick="openAgentAccessModal('${a.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 text-xs font-medium border border-slate-200 dark:border-slate-700/80 transition flex items-center gap-1.5 cursor-pointer">
                     ⚙️ Limits
                   </button>
-                  <button onclick="launchAgentInChat('${a.id}', '${encodeURIComponent(a.name)}')" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5 ${isDeactivated ? 'opacity-50 cursor-not-allowed' : ''}">
+                  <button onclick="launchAgentInChat('${a.id}', '${encodeURIComponent(a.name)}')" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5 cursor-pointer ${isDeactivated ? 'opacity-50 cursor-not-allowed' : ''}">
                     🚀 Chat
                   </button>
                 </div>
@@ -2333,16 +2694,11 @@ ${d.output || 'No output recorded.'}`;
               </div>
             </div>
 
-            <!-- Search and Filter Bar -->
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80">
-              <div class="relative flex-1 max-w-md">
+            <!-- Search Bar -->
+            <div class="bg-slate-900/60 p-3 rounded-2xl border border-slate-800/80">
+              <div class="relative w-full">
                 <span class="absolute left-3.5 top-2.5 text-slate-500 text-xs">🔍</span>
                 <input type="text" id="agentSearchInput" value="${window._agentsSearchQuery || ''}" oninput="handleAgentSearch(this.value)" placeholder="Search agent" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-4 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-
-              <!-- Scope Toggle: Your agents | All -->
-              <div class="flex items-center gap-2">
-                ${scopeToggleHtml}
               </div>
             </div>
 
@@ -2360,6 +2716,97 @@ ${d.output || 'No output recorded.'}`;
           mb.classList.add('hidden');
           mb.innerHTML = '';
         }
+      }
+
+      function openAgentToolsModal(agentId, e) {
+        if (e) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+
+        const agent = (window._allAgentsList || []).find(a => a.id === agentId);
+        if (!agent) return;
+
+        const toolsList = agent.allowed_tools || [];
+        const allTools = window._allToolsList || [];
+
+        const toolDetails = toolsList.map(tName => {
+          const matched = allTools.find(t => t.name === tName || t.name.startsWith(tName + '_') || t.name.includes(tName));
+          return {
+            name: tName,
+            description: matched ? (matched.description || '') : 'Automated tool capability for domain task execution.',
+            method: matched ? (matched.method || 'POST') : (tName.startsWith('get_') || tName.startsWith('list_') ? 'GET' : 'POST'),
+            service: matched ? (matched.service || agent.owner_team || 'cortex.ai') : (agent.owner_team || 'cortex.ai'),
+            path: matched ? (matched.path || `/api/v1/${tName.replace(/_/g, '/')}`) : `/api/v1/${tName.replace(/_/g, '/')}`,
+            requiresApproval: matched ? (matched.requires_human_approval || matched.require_confirmation || false) : (tName.includes('create') || tName.includes('submit') || tName.includes('restart') || tName.includes('delete'))
+          };
+        });
+
+        const toolsHtml = toolDetails.length === 0
+          ? `<div class="p-8 text-center text-xs text-slate-500 font-mono">No registered tools configured for this agent.</div>`
+          : toolDetails.map(t => {
+              const isGet = t.method === 'GET';
+              const methodBadge = isGet
+                ? `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800">GET</span>`
+                : `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800">${t.method}</span>`;
+              
+              const approvalBadge = t.requiresApproval
+                ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800">⚠️ Human Approval</span>`
+                : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700">✓ Direct Execution</span>`;
+
+              return `
+                <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 transition space-y-1.5">
+                  <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <div class="flex items-center gap-2">
+                      ${methodBadge}
+                      <code class="text-xs font-bold text-slate-900 dark:text-cyan-400 font-mono">${t.name}</code>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">${t.service}</span>
+                      ${approvalBadge}
+                    </div>
+                  </div>
+                  <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">${t.description}</p>
+                  <div class="text-[10px] font-mono text-slate-400 dark:text-slate-500">Path: <code>${t.path}</code></div>
+                </div>
+              `;
+            }).join('');
+
+        mb.classList.remove('hidden');
+        mb.innerHTML = `
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[85vh] transition-all" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/50 flex items-center justify-center text-lg text-cyan-700 dark:text-cyan-400 font-bold shadow-xs">
+                  🛠️
+                </div>
+                <div>
+                  <h4 class="text-base font-bold text-slate-900 dark:text-slate-100">${agent.name} - Associated Tools</h4>
+                  <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">${toolsList.length} permitted tools configured for this agent</p>
+                </div>
+              </div>
+              <button onclick="closeModal()" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-base font-bold transition cursor-pointer">✕</button>
+            </div>
+
+            <div class="space-y-2.5 max-h-[55vh] overflow-y-auto pr-1">
+              ${toolsHtml}
+            </div>
+
+            <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800 text-xs">
+              <span class="text-slate-500 font-mono text-[11px]">Enforced via Vertex AI Agent Engine RBAC</span>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium transition cursor-pointer">
+                  Close
+                </button>
+                <button type="button" onclick="closeModal(); launchAgentInChat('${agent.id}', '${encodeURIComponent(agent.name)}');" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-sm transition flex items-center gap-1.5 cursor-pointer">
+                  🚀 Chat with Agent
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
       }
 
       function launchAgentInChat(agentId, encodedName) {

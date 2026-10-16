@@ -77,7 +77,7 @@ In modern enterprises, data, tools, and operations are severely fragmented:
 |---|---|---|
 | **1** | **Multi-Agent Intent & Context Router** | Powered by Gemini 2.5 / 3 and Google ADK; multi-turn context memory; decomposes complex requests into domain tasks. |
 | **2** | **Two-Layer Zero-Trust Authorization** | Manifest-based tool allow-lists $\times$ User persona RBAC; immediate `403 DENY_AGENT_MANIFEST` on violations. |
-| **3** | **Google Model Armor Guardrails** | Real-time prompt injection and jailbreak interception; automated PII redaction (SSNs, accounts). |
+| **3** | **Google ShieldGemma & Model Armor Guardrails** | Real-time prompt injection, jailbreak interception, system prompt protection, and automated PII redaction powered by Google ShieldGemma (2B/9B). |
 | **4** | **Agents Hub Directory** | Searchable agent registry with scope toggles, rate limits, invocation ceilings, and runtime status monitoring. |
 | **5** | **Swagger-to-Agent Generator** | 1-Click ingestion of any OpenAPI 3.0 / Swagger JSON or URL into production ADK tools. |
 | **6** | **Microsoft 365 Connector** | Automated binary generation of `.docx` memos and `.pptx` presentations; Outlook draft creation. |
@@ -236,7 +236,7 @@ flowchart TD
 │ • Python 3.11 & FastAPI         │ • Angular 18 & TypeScript       │
 │ • Pydantic v2 Schema Validation │ • Tailwind CSS UI Design        │
 │ • HTTPX Concurrency Client      │ • python-docx & python-pptx     │
-│ • Model Armor Guardrail Engine  │ • Microsoft Graph API Stubs     │
+│ • ShieldGemma & Model Armor     │ • Microsoft Graph API Stubs     │
 │ • Pytest Automated Test Suite   │ • OpenAPI 3.0 / Swagger Factory │
 └─────────────────────────────────┴─────────────────────────────────┘
 ```
