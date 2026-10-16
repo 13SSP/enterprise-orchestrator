@@ -122,7 +122,7 @@ interface PromptItem {
             </span>
           </div>
           <div class="flex items-center gap-4 text-xs text-slate-400">
-            <span>Model Armor: <strong class="text-emerald-400">Active</strong></span>
+            <span>ShieldGemma: <strong class="text-blue-400">Active</strong></span>
             <span>Zero-Trust RBAC: <strong class="text-emerald-400">Enforced</strong></span>
           </div>
         </header>
@@ -312,10 +312,6 @@ interface PromptItem {
                   </div>
                   <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/90 text-xs font-mono text-slate-200 select-all leading-relaxed">
                     "{{ p.prompt }}"
-                  </div>
-                  <div class="p-2.5 rounded-lg bg-amber-950/20 border border-amber-900/30 text-[11px] text-amber-300/90 space-y-1">
-                    <div class="font-semibold flex items-center gap-1.5">💡 Hackathon Demo Note:</div>
-                    <div class="text-amber-400/80 leading-normal">{{ p.hackathon_highlight }}</div>
                   </div>
                   <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono pt-1">
                     <span>👤 Recommended: <strong class="text-slate-300">{{ p.persona_name }}</strong></span>

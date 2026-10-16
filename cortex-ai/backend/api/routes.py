@@ -22,6 +22,7 @@ from tool_registry.registry import tool_registry
 from model_gateway.provider import model_gateway
 from access_control.policy import DEMO_PERSONAS, UserContext, access_control
 from guardrails.model_armor import model_armor
+from guardrails.gemma_guardrail import gemma_guardrail, GemmaGuardrailResult
 from approvals.manager import approval_manager, PendingAction
 from router.agent_router import router, SESSION_HISTORY
 
@@ -58,24 +59,32 @@ def handle_chat(req: ChatRequest):
     trace_id = f"trace-{str(uuid.uuid4())[:8]}"
     chosen_model = req.model or model_gateway.get_default_model()
 
-    # 1. Model Armor Safety Screen (Prompt Injection)
+    # 1. Model Armor & ShieldGemma Safety Screen (Prompt Injection)
     guard_check = model_armor.screen_prompt(req.prompt)
     if not guard_check.is_safe:
+        guard_model = getattr(guard_check, "guardrail_model", "google/shieldgemma-2b")
         record_audit("PROMPT_INJECTION_BLOCKED", "ALERT", user.sub, {
             "prompt": req.prompt,
             "threat": guard_check.threat_category,
-            "details": guard_check.details
+            "details": guard_check.details,
+            "guardrail_engine": "ShieldGemma",
+            "guardrail_model": guard_model
         })
         return {
-            "reply": f"🛡️ **Security Alert - Model Armor Block**:\n\n{guard_check.details}\nYour request has been halted and logged.",
+            "reply": f"🛡️ **Security Alert - Model Armor Block**:\n\n{guard_check.details}\nYour request has been halted and logged by Google ShieldGemma.",
             "trace_id": trace_id,
             "handled_by": {
-                "agent": "model_armor_guardrail",
+                "agent": "shieldgemma_guardrail",
                 "tool": None,
-                "reasoning": "Adversarial prompt injection pattern blocked.",
-                "model": "model_armor"
+                "reasoning": f"Adversarial {guard_check.threat_category} blocked by ShieldGemma.",
+                "model": guard_model
             },
-            "status": "BLOCKED_BY_GUARDRAIL"
+            "status": "BLOCKED_BY_GUARDRAIL",
+            "guardrail": {
+                "engine": "ShieldGemma",
+                "model": guard_model,
+                "threat_category": guard_check.threat_category
+            }
         }
 
     # 2. Router Intent Detection & Context Recognition
@@ -802,6 +811,46 @@ def pick_system_folder(req: Optional[PickFolderRequest] = None):
     initial_dir = req.initial_dir if req else None
     selected = pick_folder_dialog(initial_dir=initial_dir)
     return {"status": "ok", "path": selected}
+
+
+# ==========================================
+# SHIELDGEMMA GUARDRAILS API
+# ==========================================
+class GuardrailScreenRequest(BaseModel):
+    text: str
+    direction: str = Field("input", description="'input' (prompt) or 'output' (response)")
+
+@router_api.post("/guardrails/screen", tags=["Guardrails"])
+def screen_content_guardrail(req: GuardrailScreenRequest):
+    """
+    Directly evaluates text against Google ShieldGemma safety policies.
+    """
+    if req.direction == "output":
+        cleaned = gemma_guardrail.screen_response(req.text)
+        is_modified = (cleaned != req.text)
+        return {
+            "direction": "output",
+            "is_safe": True,
+            "pii_masked": is_modified,
+            "original_text": req.text,
+            "cleaned_text": cleaned,
+            "guardrail_engine": "ShieldGemma",
+            "guardrail_model": gemma_guardrail.model_name
+        }
+    else:
+        res = gemma_guardrail.screen_prompt(req.text)
+        return {
+            "direction": "input",
+            "is_safe": res.is_safe,
+            "flagged": res.flagged,
+            "threat_category": res.threat_category,
+            "confidence": res.confidence,
+            "guardrail_engine": "ShieldGemma",
+            "guardrail_model": res.guardrail_model,
+            "details": res.details,
+            "explanation": res.explanation
+        }
+
 
 
 

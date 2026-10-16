@@ -337,12 +337,12 @@ def create_deck():
         p.font.color.rgb = TEXT_WHITE
 
     # Feature 3
-    add_card(s5, Inches(0.8), Inches(4.35), card_w, card_h, "3. MODEL ARMOR GUARDRAILS & HUMAN-IN-THE-LOOP")
+    add_card(s5, Inches(0.8), Inches(4.35), card_w, card_h, "3. SHIELDGEMMA & MODEL ARMOR GUARDRAILS")
     tb5_3 = s5.shapes.add_textbox(Inches(1.05), Inches(4.85), card_w - Inches(0.5), card_h - Inches(0.6))
     tf5_3 = tb5_3.text_frame
     tf5_3.word_wrap = True
     f3 = [
-        "• Real-time prompt injection interception (jailbreaks, prompt leaks).",
+        "• Google ShieldGemma & Model Armor prompt injection interception (jailbreaks, leaks).",
         "• Automated PII anonymization (masks SSNs, accounts, sensitive compensation).",
         "• Human-in-the-Loop pending approval action cards for sensitive mutations."
     ]
