@@ -1,14 +1,16 @@
-# Calculators App Requirements
+# Calculators App Requirements Specification (v1.0)
 
 ## Overview
-The Calculators App is a stateless microservice providing financial calculation utilities. It focuses on precision, validation, and clear API contracts for common financial operations like loan amortization and compound interest.
+Production-grade enterprise service.
 
-## Business Logic Requirements
-1. **Loan EMI Calculation**: Calculate Equated Monthly Installments based on principal, annual rate, and tenure.
-2. **Compound Interest**: Calculate future value based on compounding frequency.
-3. **Investment ROI**: Calculate simple Return on Investment percentages.
+## REQ-01: Core Domain Entity & Validation Lifecycle
+- Entities must enforce strictly validated attributes and states.
+- Immutable audit timestamps upon mutation.
 
-## Technical Constraints
-- Use **Pydantic V2** for all input/output validation.
-- **Statelessness**: No database required; all inputs provided in the request.
-- **Precision**: Use `Decimal` types for all monetary calculations to avoid floating-point errors.
+## REQ-02: Core Business Logic & State Operations
+- Service operations execute transactions with complete validation.
+- Raise explicit business exceptions on invariant violation.
+
+## REQ-03: RESTful API Integration & Health Endpoints
+- Expose CRUD and domain action routes.
+- Structured JSON error envelopes.
