@@ -70,9 +70,40 @@ fi
 bq mk -d --location=US "${PROJECT_ID}:cortex_audit_dataset" 2>/dev/null || true
 echo -e "${GREEN}✓ Firestore and BigQuery dataset ready.${NC}"
 
-# 5. Build Container with Cloud Build (Remote serverless build - no local Docker needed!)
-echo -e "\n${BLUE}📦 [4/5] Building container image using Google Cloud Build...${NC}"
-gcloud builds submit --tag "$IMAGE_TAG" .
+# 5. Build Container with Cloud Build (with automatic Docker fallback in Cloud Shell)
+echo -e "\n${BLUE}📦 [4/5] Building container image...${NC}"
+
+ACCOUNT=$(gcloud config get-value account 2>/dev/null || true)
+if [ -n "$ACCOUNT" ]; then
+    echo -e "Ensuring Cloud Build & Storage permissions for ${ACCOUNT}..."
+    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+        --member="user:$ACCOUNT" \
+        --role="roles/cloudbuild.builds.editor" --quiet 2>/dev/null || true
+    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+        --member="user:$ACCOUNT" \
+        --role="roles/storage.admin" --quiet 2>/dev/null || true
+fi
+
+BUILD_SUCCESS=false
+if gcloud builds submit --tag "$IMAGE_TAG" . ; then
+    BUILD_SUCCESS=true
+else
+    echo -e "${YELLOW}Notice: gcloud builds submit had a permission issue with the default staging bucket.${NC}"
+    echo -e "${YELLOW}Falling back to Cloud Shell built-in Docker engine...${NC}"
+    if command -v docker &>/dev/null; then
+        gcloud auth configure-docker --quiet || true
+        docker build -t "$IMAGE_TAG" .
+        docker push "$IMAGE_TAG"
+        BUILD_SUCCESS=true
+    else
+        echo -e "${RED}Docker is not available to fall back to.${NC}"
+    fi
+fi
+
+if [ "$BUILD_SUCCESS" = false ]; then
+    echo -e "${RED}Failed to build or push container image.${NC}"
+    exit 1
+fi
 
 echo -e "${GREEN}✓ Container built and pushed to Container Registry.${NC}"
 
