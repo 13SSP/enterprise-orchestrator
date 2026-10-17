@@ -255,7 +255,7 @@ def test_model_selection_and_switching_in_chat():
         assert "google/gemini-flash-lite-latest" in model_ids
         assert "google/gemini-3.5-flash-lite" in model_ids
         assert "google/gemini-3.1-flash-lite" in model_ids
-        assert m_data.get("default_model") == "google/gemini-3.7-flash"
+        assert m_data.get("default_model") == "google/gemini-flash-lite-latest"
 
         session_id = f"test-model-{uuid.uuid4().hex[:8]}"
 
@@ -279,13 +279,233 @@ def test_model_selection_and_switching_in_chat():
         })
         assert turn2.status_code == 200
         d2 = turn2.json()
-        assert "gemini-flash-lite-latest" in d2["handled_by"]["model"] or "google/" in d2["handled_by"]["model"]
+        assert d2["handled_by"]["model"] == "google/gemini-flash-lite-latest"
+        assert "(Fallback)" not in d2["handled_by"]["model"]
 
-        # 4. Verify session record in DB persists the selected model
+        # 4. Third chat turn without specifying model: verifies default model is used without (Fallback)
+        session_id_def = f"test-default-{uuid.uuid4().hex[:8]}"
+        turn_def = tc.post("/api/chat", json={
+            "prompt": "Hello there, what is your role?",
+            "persona": "bob_ops",
+            "session_id": session_id_def
+        })
+        assert turn_def.status_code == 200
+        d_def = turn_def.json()
+        assert d_def["handled_by"]["model"] == "google/gemini-flash-lite-latest"
+        assert "(Fallback)" not in d_def["handled_by"]["model"]
+        db.collection("chat_sessions").document(session_id_def).delete()
+
+        # 5. Verify session record in DB persists the selected model
         doc = db.collection("chat_sessions").document(session_id).get()
         assert doc.exists is True
         assert doc.to_dict().get("model") is not None
 
         db.collection("chat_sessions").document(session_id).delete()
+
+def test_optimized_swe_bench_and_benchmark_agent_selection():
+    with TestClient(app) as tc:
+        session_id = f"test-swe-{uuid.uuid4().hex[:8]}"
+
+        # 1. Target SWE-bench Agent for code testing
+        res_swe = tc.post("/api/chat", json={
+            "prompt": "Run unit tests and pytest runner on repository",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "agent_id": "swe_bench_agent",
+            "model": "offline/stub"
+        })
+        assert res_swe.status_code == 200
+        d_swe = res_swe.json()
+        assert d_swe["handled_by"]["agent_id"] == "swe_bench_agent"
+        assert d_swe["handled_by"]["tool"] == "pytest_runner"
+        assert d_swe["handled_by"]["is_enterprise_agent"] is True
+        assert "Pytest Runner Results" in d_swe["reply"]
+
+        # 2. Target Financial Benchmark for EBITDA calculation
+        res_fin = tc.post("/api/chat", json={
+            "prompt": "Calculate corporate EBITDA margin for Q3",
+            "persona": "charlie_fin",
+            "session_id": session_id,
+            "agent_id": "financial_benchmark",
+            "model": "offline/stub"
+        })
+        assert res_fin.status_code == 200
+        d_fin = res_fin.json()
+        assert d_fin["handled_by"]["agent_id"] == "financial_benchmark"
+        assert d_fin["handled_by"]["tool"] == "calculate_ebitda"
+        assert d_fin["handled_by"]["is_enterprise_agent"] is True
+        assert "EBITDA" in d_fin["reply"]
+
+        db.collection("chat_sessions").document(session_id).delete()
+
+def test_auto_routing_to_specialist_benchmark_and_code_agents():
+    with TestClient(app) as tc:
+        session_id = f"test-autoroute-{uuid.uuid4().hex[:8]}"
+
+        # Auto-route code test query to swe_bench_agent
+        res_code = tc.post("/api/chat", json={
+            "prompt": "Run pytest suite on backend repository",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "agent_id": "auto",
+            "model": "offline/stub"
+        })
+        assert res_code.status_code == 200
+        d_code = res_code.json()
+        assert d_code["handled_by"]["agent_id"] == "swe_bench_agent"
+        assert d_code["handled_by"]["tool"] == "pytest_runner"
+        assert d_code["handled_by"]["is_enterprise_agent"] is True
+
+        db.collection("chat_sessions").document(session_id).delete()
+
+def test_explicit_agent_switching_across_session_turns():
+    with TestClient(app) as tc:
+        session_id = f"test-switch-{uuid.uuid4().hex[:8]}"
+
+        # Turn 1: Start targeted session with hr_agent
+        turn1 = tc.post("/api/chat", json={
+            "prompt": "Check my leave balance",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "agent_id": "hr_agent",
+            "model": "offline/stub"
+        })
+        assert turn1.status_code == 200
+        assert turn1.json()["handled_by"]["agent_id"] == "hr_agent"
+
+        # Turn 2: Explicitly switch target agent to finance_agent
+        turn2 = tc.post("/api/chat", json={
+            "prompt": "List corporate expense claims",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "agent_id": "finance_agent",
+            "target_agent_id": "finance_agent",
+            "model": "offline/stub"
+        })
+        assert turn2.status_code == 200
+        d2 = turn2.json()
+        assert d2["handled_by"]["agent_id"] == "finance_agent"
+        assert d2["handled_by"]["tool"] == "list_claims"
+
+        # Turn 3: Explicitly switch target agent to auto
+        turn3 = tc.post("/api/chat", json={
+            "prompt": "what is weather in Pune",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "agent_id": "auto",
+            "target_agent_id": "auto"
+        })
+        assert turn3.status_code == 200
+        d3 = turn3.json()
+        assert d3["handled_by"]["agent_id"] == "cortex_assistant"
+        assert d3["handled_by"]["is_enterprise_agent"] is False
+
+        db.collection("chat_sessions").document(session_id).delete()
+
+def test_domain_agent_tool_execution():
+    with TestClient(app) as tc:
+        session_id = f"test-tools-{uuid.uuid4().hex[:8]}"
+
+        # 1. HR Agent: list_employees
+        res_hr = tc.post("/api/chat", json={
+            "prompt": "Show company employee directory",
+            "persona": "alice_hr",
+            "session_id": session_id,
+            "agent_id": "hr_agent",
+            "target_agent_id": "hr_agent",
+            "model": "offline/stub"
+        })
+        assert res_hr.status_code == 200
+        d_hr = res_hr.json()
+        assert d_hr["handled_by"]["tool"] == "list_employees"
+        assert "Employee Directory" in d_hr["reply"]
+
+        # 2. Ops Agent: get_system_health
+        res_ops = tc.post("/api/chat", json={
+            "prompt": "Check cluster system health and uptime",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "agent_id": "ops_agent",
+            "target_agent_id": "ops_agent",
+            "model": "offline/stub"
+        })
+        assert res_ops.status_code == 200
+        d_ops = res_ops.json()
+        assert d_ops["handled_by"]["tool"] == "get_system_health"
+        assert "HEALTHY" in d_ops["reply"]
+
+        # 3. IT Support Agent: list_tickets
+        res_it = tc.post("/api/chat", json={
+            "prompt": "List open Jira engineering tickets",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "agent_id": "it_support_agent",
+            "target_agent_id": "it_support_agent",
+            "model": "offline/stub"
+        })
+        assert res_it.status_code == 200
+        d_it = res_it.json()
+        assert d_it["handled_by"]["tool"] == "list_tickets"
+        assert "Active Engineering Jira Tickets" in d_it["reply"]
+
+        db.collection("chat_sessions").document(session_id).delete()
+
+def test_prompt_library_agent_resolution_and_chat_execution():
+    with TestClient(app) as tc:
+        # 1. Verify all prompt library entries have accurately resolved target_agent_id
+        res_prompts = tc.get("/api/prompts")
+        assert res_prompts.status_code == 200
+        p_data = res_prompts.json()
+        prompts = p_data.get("prompts", [])
+        assert len(prompts) >= 18
+
+        prompt_map = {p["id"]: p for p in prompts}
+
+        # Check key domain prompts
+        assert prompt_map["m365-slide-deck"]["target_agent_id"] == "productivity_agent"
+        assert prompt_map["m365-word-memo"]["target_agent_id"] == "productivity_agent"
+        assert prompt_map["it-ticket-proj102"]["target_agent_id"] == "it_support_agent"
+        assert prompt_map["hr-pto-balance"]["target_agent_id"] == "hr_agent"
+        assert prompt_map["fin-salary-authorized"]["target_agent_id"] == "finance_agent"
+        assert prompt_map["ops-system-health"]["target_agent_id"] == "ops_agent"
+        assert prompt_map["sec-contractor-denial"]["target_agent_id"] == "ops_agent"
+        assert prompt_map["gen-weather-query"]["target_agent_id"] == "auto"
+
+        # 2. Test "Try in Chat" execution for Productivity Agent (Sarah Connor persona)
+        p_slide = prompt_map["m365-slide-deck"]
+        session_slide = f"test-trychat-slide-{uuid.uuid4().hex[:8]}"
+        res_slide = tc.post("/api/chat", json={
+            "prompt": p_slide["prompt"],
+            "persona": p_slide["recommended_persona"],
+            "session_id": session_slide,
+            "agent_id": p_slide["target_agent_id"],
+            "target_agent_id": p_slide["target_agent_id"],
+            "model": "offline/stub"
+        })
+        assert res_slide.status_code == 200
+        d_slide = res_slide.json()
+        assert d_slide["handled_by"]["agent_id"] == "productivity_agent"
+        assert d_slide.get("download_card") is not None
+        assert d_slide["download_card"]["file_type"] == "pptx"
+        db.collection("chat_sessions").document(session_slide).delete()
+
+        # 3. Test "Try in Chat" execution for HR Agent (PTO balance lookup)
+        p_hr = prompt_map["hr-pto-balance"]
+        session_hr = f"test-trychat-hr-{uuid.uuid4().hex[:8]}"
+        res_hr = tc.post("/api/chat", json={
+            "prompt": p_hr["prompt"],
+            "persona": p_hr["recommended_persona"],
+            "session_id": session_hr,
+            "agent_id": p_hr["target_agent_id"],
+            "target_agent_id": p_hr["target_agent_id"],
+            "model": "offline/stub"
+        })
+        assert res_hr.status_code == 200
+        d_hr = res_hr.json()
+        assert d_hr["handled_by"]["agent_id"] == "hr_agent"
+        assert d_hr["handled_by"]["tool"] == "get_leave_balance"
+        db.collection("chat_sessions").document(session_hr).delete()
+
+
 
 

@@ -595,6 +595,11 @@
       color: #0f172a !important;
       border-color: #cbd5e1 !important;
     }
+    .theme-light #activeAgentInfoBar {
+      background-color: #f8fafc !important;
+      color: #334155 !important;
+      border-color: #e2e8f0 !important;
+    }
     .theme-light #currentSessionBadge {
       background-color: #f1f5f9 !important;
       color: #334155 !important;
@@ -653,6 +658,8 @@
             <option value="bob_ops" selected>Bob Martinez (DevOps Admin)</option>
             <option value="alice_hr">Alice Henderson (HR Manager)</option>
             <option value="charlie_fin">Charlie Zhao (Finance Officer)</option>
+            <option value="sarah_connor">Sarah Connor (VP of Engineering)</option>
+            <option value="alex_chen">Alex Chen (Security Lead)</option>
             <option value="dave_contractor">Dave Miller (Restricted Contractor)</option>
           </select>
 
@@ -714,6 +721,26 @@
                 </div>
               </div>
               <span id="sidebar-check-charlie_fin" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+            </div>
+            <div onclick="selectPersona('sarah_connor'); toggleSidebarUserMenu();" class="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition user-item">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-600/20 text-purple-600 dark:text-purple-400 font-bold text-[10px] flex items-center justify-center border border-purple-200 dark:border-purple-500/30">SC</div>
+                <div>
+                  <div class="text-xs font-semibold text-slate-800 dark:text-slate-200 user-name">Sarah Connor</div>
+                  <div class="text-[10px] text-slate-500 dark:text-slate-400 user-role">VP of Engineering</div>
+                </div>
+              </div>
+              <span id="sidebar-check-sarah_connor" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+            </div>
+            <div onclick="selectPersona('alex_chen'); toggleSidebarUserMenu();" class="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition user-item">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-cyan-100 dark:bg-cyan-600/20 text-cyan-600 dark:text-cyan-400 font-bold text-[10px] flex items-center justify-center border border-cyan-200 dark:border-cyan-500/30">AC</div>
+                <div>
+                  <div class="text-xs font-semibold text-slate-800 dark:text-slate-200 user-name">Alex Chen</div>
+                  <div class="text-[10px] text-slate-500 dark:text-slate-400 user-role">Security Lead</div>
+                </div>
+              </div>
+              <span id="sidebar-check-alex_chen" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
             </div>
             <div onclick="selectPersona('dave_contractor'); toggleSidebarUserMenu();" class="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition user-item">
               <div class="flex items-center gap-2">
@@ -824,6 +851,28 @@
                         <span id="check-charlie_fin" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
                       </div>
 
+                      <div onclick="selectPersona('sarah_connor')" id="user-opt-sarah_connor" class="flex items-center justify-between p-2 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/80 transition profile-menu-item">
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-7 h-7 rounded-full bg-purple-100 dark:bg-purple-600/30 text-purple-600 dark:text-purple-300 font-bold text-xs flex items-center justify-center border border-purple-200 dark:border-purple-500/30">SC</div>
+                          <div>
+                            <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">Sarah Connor</div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400">VP of Engineering</div>
+                          </div>
+                        </div>
+                        <span id="check-sarah_connor" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+                      </div>
+
+                      <div onclick="selectPersona('alex_chen')" id="user-opt-alex_chen" class="flex items-center justify-between p-2 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/80 transition profile-menu-item">
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-7 h-7 rounded-full bg-cyan-100 dark:bg-cyan-600/30 text-cyan-600 dark:text-cyan-300 font-bold text-xs flex items-center justify-center border border-cyan-200 dark:border-cyan-500/30">AC</div>
+                          <div>
+                            <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">Alex Chen</div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400">Security Lead</div>
+                          </div>
+                        </div>
+                        <span id="check-alex_chen" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+                      </div>
+
                       <div onclick="selectPersona('dave_contractor')" id="user-opt-dave_contractor" class="flex items-center justify-between p-2 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/80 transition profile-menu-item">
                         <div class="flex items-center gap-2.5">
                           <div class="w-7 h-7 rounded-full bg-amber-100 dark:bg-amber-600/30 text-amber-600 dark:text-amber-300 font-bold text-xs flex items-center justify-center border border-amber-200 dark:border-amber-500/30">DM</div>
@@ -906,29 +955,38 @@
           <!-- Chat Panel -->
           <div id="chatView" class="h-full flex flex-col justify-between max-w-4xl mx-auto">
             <!-- Chat Controls Bar: Agent Selector & Current Session -->
-            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-2 border-b border-slate-200 dark:border-slate-800 text-xs">
-              <div class="flex items-center gap-2">
-                <label for="chatAgentSelect" class="text-slate-500 dark:text-slate-400 font-medium text-xs flex items-center gap-1.5">
-                  <span>🤖</span>
-                  <span>Target Agent:</span>
-                </label>
-                <select id="chatAgentSelect" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-sm transition">
-                  <option value="auto" selected>⚡ Auto-Route (Intelligent Orchestrator)</option>
-                  <option value="hr_agent">👥 HR Operations Agent</option>
-                  <option value="finance_agent">💼 Corporate Finance Agent</option>
-                  <option value="it_support_agent">🎫 IT Support Agent</option>
-                  <option value="ops_agent">☁️ Cloud Operations Agent</option>
-                  <option value="productivity_agent">📝 Productivity & Office Agent</option>
-                  <option value="financial_benchmark">📊 Financial Benchmark Agent</option>
-                  <option value="swe_bench_agent">💻 SWE-bench Agent</option>
-                </select>
+            <div class="flex flex-col gap-2 pb-3 mb-2 border-b border-slate-200 dark:border-slate-800 text-xs">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <label for="chatAgentSelect" class="text-slate-500 dark:text-slate-400 font-medium text-xs flex items-center gap-1.5">
+                    <span>🤖</span>
+                    <span>Target Agent:</span>
+                  </label>
+                  <select id="chatAgentSelect" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-sm transition">
+                    <option value="auto" selected>⚡ Auto-Route (Intelligent Orchestrator)</option>
+                    <option value="hr_agent">👥 HR Operations Agent</option>
+                    <option value="finance_agent">💼 Corporate Finance Agent</option>
+                    <option value="it_support_agent">🎫 IT Support Agent</option>
+                    <option value="ops_agent">☁️ Cloud Operations Agent</option>
+                    <option value="productivity_agent">📝 Productivity & Office Agent</option>
+                    <option value="financial_benchmark">📊 Financial Benchmark Agent</option>
+                    <option value="swe_bench_agent">💻 SWE-bench Agent</option>
+                  </select>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span id="currentSessionBadge" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-[11px] border border-slate-200 dark:border-slate-700 truncate max-w-[220px]" title="Current Active Session">Session: New</span>
+                  <button type="button" onclick="startNewChatSession()" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-600/20 hover:bg-blue-100 dark:hover:bg-blue-600/30 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30 flex items-center gap-1 transition cursor-pointer" title="Start a fresh chat context">
+                    <span>➕</span>
+                    <span>New Chat</span>
+                  </button>
+                </div>
               </div>
-              <div class="flex items-center gap-2">
-                <span id="currentSessionBadge" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-[11px] border border-slate-200 dark:border-slate-700 truncate max-w-[220px]" title="Current Active Session">Session: New</span>
-                <button type="button" onclick="startNewChatSession()" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-600/20 hover:bg-blue-100 dark:hover:bg-blue-600/30 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30 flex items-center gap-1 transition cursor-pointer" title="Start a fresh chat context">
-                  <span>➕</span>
-                  <span>New Chat</span>
-                </button>
+              <!-- Active Agent Info & Capabilities Bar -->
+              <div id="activeAgentInfoBar" class="text-[11px] px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 transition">
+                <div class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                  <span class="text-blue-500">⚡</span>
+                  <span><strong>Auto-Route Mode:</strong> The intelligent orchestrator dynamically classifies intent and invokes the optimal domain agent, tools, or knowledge base.</span>
+                </div>
               </div>
             </div>
 
@@ -960,19 +1018,19 @@
                 <input type="text" id="promptInput" placeholder="Ask cortex.ai anything across HR, IT, Finance, Operations, or Office documents..." class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-3.5 pl-4 pr-64 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs" />
                 <div class="absolute right-2 top-2 bottom-2 flex items-center gap-2">
                   <select id="modelSelect" class="bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700/80 text-xs font-medium text-slate-800 dark:text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-xs cursor-pointer transition">
-                    <option value="google/gemini-3.7-flash" selected>Gemini 3.7 Flash (High Performance)</option>
-                    <option value="google/gemini-flash-lite-latest">Gemini Flash Lite (Fast & Active)</option>
+                    <option value="google/gemini-flash-lite-latest" selected>Gemini Flash Lite (Fast & Active)</option>
                     <option value="google/gemini-3.5-flash-lite">Gemini 3.5 Flash Lite</option>
                     <option value="google/gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+                    <option value="google/gemini-3.5-flash">Gemini 3.5 Flash</option>
+                    <option value="google/gemini-3.7-flash">Gemini 3.7 Flash (High Performance)</option>
+                    <option value="google/gemini-3.8-flash">Gemini 3.8 Flash</option>
                     <option value="google/gemini-3-flash-preview">Gemini 3 Flash Preview</option>
                     <option value="google/gemini-flash-latest">Gemini Flash Latest</option>
-                    <option value="google/gemini-3.8-flash">Gemini 3.8 Flash</option>
-                    <option value="google/gemini-3.5-flash">Gemini 3.5 Flash</option>
                     <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option>
                     <option value="anthropic/claude-3-5-sonnet" disabled>Claude 3.5 Sonnet (No API Key)</option>
                     <option value="anthropic/claude-3-opus" disabled>Claude 3 Opus (No API Key)</option>
                   </select>
-                  <button type="submit" class="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white shadow-md shadow-blue-600/30 transition cursor-pointer">➤</button>
+                  <button type="submit" id="chatSubmitBtn" class="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white shadow-md shadow-blue-600/30 transition cursor-pointer">➤</button>
                 </div>
               </div>
             </form>
@@ -1210,6 +1268,8 @@
         bob_ops: 'DevOps Admin',
         alice_hr: 'HR Manager',
         charlie_fin: 'Finance Officer',
+        sarah_connor: 'VP of Engineering',
+        alex_chen: 'Security Lead',
         dave_contractor: 'Restricted Contractor'
       };
 
@@ -1234,6 +1294,20 @@
           email: 'charlie.fin@company.internal',
           initials: 'CZ',
           department: 'Finance & Payroll'
+        },
+        sarah_connor: {
+          name: 'Sarah Connor',
+          role: 'VP of Engineering',
+          email: 's.connor@company.internal',
+          initials: 'SC',
+          department: 'Engineering Leadership'
+        },
+        alex_chen: {
+          name: 'Alex Chen',
+          role: 'Security Lead',
+          email: 'alex.chen@company.internal',
+          initials: 'AC',
+          department: 'Zero-Trust & Security'
         },
         dave_contractor: {
           name: 'Dave Miller',
@@ -1390,8 +1464,10 @@
       // Synchronize changes to personaSelect
       document.getElementById('personaSelect').addEventListener('change', (e) => {
         const val = e.target.value;
+        const currentRole = roleMap[val] || 'Employee';
+        window._currentPersonaRole = currentRole;
         LocalPrototypeManager.purgeMemoryOnUserSwitch();
-        document.getElementById('roleBadge').innerText = 'Role: ' + (roleMap[val] || 'Employee');
+        document.getElementById('roleBadge').innerText = 'Role: ' + currentRole;
         updateUserProfileDisplay(val);
         if (currentTab === 'pods' || currentTab === 'workspaces') {
           if (window._activePodData) {
@@ -1403,14 +1479,22 @@
         if (typeof loadChatHistory === 'function') {
           loadChatHistory();
         }
+        if (window._suppressPersonaChatReset) {
+          return;
+        }
+        if (typeof window.syncChatAgentSelect === 'function') {
+          window.syncChatAgentSelect('auto');
+        }
         if (typeof startNewChatSession === 'function') {
-          startNewChatSession();
+          startNewChatSession('auto');
         }
       });
 
       // Initialize theme and profile on load
       setTheme(currentTheme);
-      updateUserProfileDisplay(document.getElementById('personaSelect').value || 'bob_ops');
+      const initPersonaVal = document.getElementById('personaSelect').value || 'bob_ops';
+      window._currentPersonaRole = roleMap[initPersonaVal] || 'DevOps Admin';
+      updateUserProfileDisplay(initPersonaVal);
 
       async function switchTab(tab) {
         currentTab = tab;
@@ -1607,19 +1691,21 @@
           window._activeChatSessionId = sessionId;
           if (badge && data.title) badge.innerText = data.title.slice(0, 22) + (data.title.length > 22 ? '...' : '');
 
-          if (data.agent_id) {
-            window._activeChatAgentId = data.agent_id;
-            const agentSel = document.getElementById('chatAgentSelect');
-            if (agentSel) {
-              let opt = Array.from(agentSel.options).find(o => o.value === data.agent_id);
-              if (!opt && data.agent_id !== 'auto') {
-                const newOpt = document.createElement('option');
-                newOpt.value = data.agent_id;
-                newOpt.textContent = `🤖 ${data.agent_id}`;
-                agentSel.appendChild(newOpt);
-              }
-              agentSel.value = data.agent_id;
+          const activeAgent = data.target_agent_id || data.agent_id || 'auto';
+          window._activeChatAgentId = activeAgent;
+          const agentSel = document.getElementById('chatAgentSelect');
+          if (agentSel) {
+            let opt = Array.from(agentSel.options).find(o => o.value === activeAgent);
+            if (!opt && activeAgent !== 'auto') {
+              const newOpt = document.createElement('option');
+              newOpt.value = activeAgent;
+              newOpt.textContent = `🤖 ${activeAgent}`;
+              agentSel.appendChild(newOpt);
             }
+            agentSel.value = activeAgent;
+          }
+          if (typeof window.updateActiveAgentBadge === 'function') {
+            window.updateActiveAgentBadge();
           }
 
           if (data.model) {
@@ -1712,19 +1798,21 @@
         if (badge) badge.innerText = 'Session: New';
 
         const agentSel = document.getElementById('chatAgentSelect');
-        const agentToSet = targetAgentId || (agentSel ? agentSel.value : 'auto');
+        const agentToSet = targetAgentId || 'auto';
         window._activeChatAgentId = agentToSet;
 
-        if (targetAgentId && agentSel) {
-          let opt = Array.from(agentSel.options).find(o => o.value === targetAgentId);
-          if (!opt) {
+        if (agentSel) {
+          let opt = Array.from(agentSel.options).find(o => o.value === agentToSet);
+          if (!opt && agentToSet !== 'auto') {
             const newOpt = document.createElement('option');
-            newOpt.value = targetAgentId;
-            newOpt.textContent = `🤖 ${targetAgentId}`;
+            newOpt.value = agentToSet;
+            newOpt.textContent = `🤖 ${agentToSet}`;
             agentSel.appendChild(newOpt);
           }
-          agentSel.value = targetAgentId;
-          agentSel.dispatchEvent(new Event('change'));
+          agentSel.value = agentToSet;
+        }
+        if (typeof window.updateActiveAgentBadge === 'function') {
+          window.updateActiveAgentBadge();
         }
 
         const mc = document.getElementById('messagesContainer');
@@ -1788,20 +1876,55 @@
 
         const mc = document.getElementById('messagesContainer');
         mc.innerHTML += `<div class="flex gap-3 justify-end"><div class="chat-bubble-user p-4 max-w-2xl text-sm shadow-md leading-relaxed font-normal">${text || '(Attached document context)'}${userDocsHtml}</div></div>`;
+
+        // Thinking loader indicator
+        const loaderId = 'chat-loader-' + Date.now();
+        const agentSel = document.getElementById('chatAgentSelect');
+        let targetAgent = agentSel ? agentSel.value : (window._activeChatAgentId || 'auto');
+
+        let thinkingAgentName = 'Cortex Orchestrator';
+        if (targetAgent && targetAgent !== 'auto') {
+          if (agentSel && agentSel.options[agentSel.selectedIndex]) {
+            thinkingAgentName = agentSel.options[agentSel.selectedIndex].textContent.replace(/[🔒⚡🤖👥💰🔧☁️📝📈💻🔬👤🧮]|(\(Role Restricted\))/g, '').trim();
+          }
+          if (!thinkingAgentName) thinkingAgentName = targetAgent;
+        }
+        const thinkingText = (targetAgent && targetAgent !== 'auto')
+          ? `Thinking & consulting ${thinkingAgentName}...`
+          : 'Thinking & orchestrating response...';
+
+        mc.innerHTML += `
+          <div id="${loaderId}" class="flex gap-3 chat-thinking-row animate-fade-in">
+            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white shadow-sm flex items-center justify-center font-bold text-xs shrink-0 ring-2 ring-white dark:ring-slate-800 animate-pulse">
+              ⚡
+            </div>
+            <div class="chat-bubble-ai border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 rounded-2xl max-w-2xl text-sm shadow-sm flex items-center gap-3">
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span class="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style="animation-delay: 0ms;"></span>
+                <span class="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style="animation-delay: 150ms;"></span>
+                <span class="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style="animation-delay: 300ms;"></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono font-medium text-slate-500 dark:text-slate-400 tracking-tight">${thinkingText}</span>
+              </div>
+            </div>
+          </div>
+        `;
         mc.scrollTop = mc.scrollHeight;
+
+        const submitBtn = document.getElementById('chatSubmitBtn');
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.classList.add('opacity-50', 'pointer-events-none');
+        }
 
         try {
           const persona = document.getElementById('personaSelect').value;
           const modelSel = document.getElementById('modelSelect');
-          const model = (modelSel && modelSel.value) ? modelSel.value : (window._activeChatModel || 'google/gemini-3.7-flash');
+          const model = (modelSel && modelSel.value) ? modelSel.value : (window._activeChatModel || 'google/gemini-flash-lite-latest');
           window._activeChatModel = model;
           try { localStorage.setItem('cortex_selected_model', model); } catch (_) {}
-          const agentSel = document.getElementById('chatAgentSelect');
-          let targetAgent = agentSel ? agentSel.value : (window._activeChatAgentId || 'auto');
-          if ((!targetAgent || targetAgent === 'auto') && window._activeChatAgentId && window._activeChatAgentId !== 'auto') {
-            targetAgent = window._activeChatAgentId;
-            if (agentSel) agentSel.value = targetAgent;
-          }
+          targetAgent = agentSel ? agentSel.value : (window._activeChatAgentId || 'auto');
           window._activeChatAgentId = targetAgent;
           const sessionId = window._activeChatSessionId || ('session-' + Date.now());
 
@@ -1814,10 +1937,15 @@
               model: model,
               session_id: sessionId,
               agent_id: targetAgent,
+              target_agent_id: targetAgent,
               context_documents: docsToSend
             })
           });
           const data = await r.json();
+
+          // Remove thinking loader before appending final response
+          const loaderEl = document.getElementById(loaderId);
+          if (loaderEl) loaderEl.remove();
 
           if (data.session_id) {
             window._activeChatSessionId = data.session_id;
@@ -1825,7 +1953,7 @@
             if (badge) badge.innerText = 'Session: ' + data.session_id.slice(-8);
           }
 
-          if (data.handled_by && data.handled_by.agent_id && data.handled_by.agent_id !== 'cortex_assistant') {
+          if (targetAgent !== 'auto' && data.handled_by && data.handled_by.agent_id && data.handled_by.agent_id !== 'cortex_assistant') {
             window._activeChatAgentId = data.handled_by.agent_id;
             if (agentSel && agentSel.value !== data.handled_by.agent_id) {
               let opt = Array.from(agentSel.options).find(o => o.value === data.handled_by.agent_id);
@@ -1837,6 +1965,9 @@
               }
               agentSel.value = data.handled_by.agent_id;
             }
+          }
+          if (typeof window.updateActiveAgentBadge === 'function') {
+            window.updateActiveAgentBadge();
           }
 
           let extra = '';
@@ -1901,7 +2032,14 @@
           mc.scrollTop = mc.scrollHeight;
           loadChatHistory();
         } catch(err) {
-          mc.innerHTML += `<div class="text-red-400 text-xs p-2">Error communicating with cortex.ai hub (:8000).</div>`;
+          const loaderEl = document.getElementById(loaderId);
+          if (loaderEl) loaderEl.remove();
+          mc.innerHTML += `<div class="text-red-400 text-xs p-2">Error communicating with cortex.ai hub (:8000): ${err.message || err}</div>`;
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'pointer-events-none');
+          }
         }
       }
 
@@ -1952,15 +2090,21 @@
           cardsHtml = filtered.map(p => {
             const encPrompt = encodeURIComponent(p.prompt);
             const encPersona = encodeURIComponent(p.recommended_persona);
-            const targetAgentId = p.target_agent_id || (
-              (p.target_agent || '').toLowerCase().includes('hr') ? 'hr_agent' :
-              (p.target_agent || '').toLowerCase().includes('fin') ? 'finance_agent' :
-              (p.target_agent || '').toLowerCase().includes('it') ? 'it_support_agent' :
-              (p.target_agent || '').toLowerCase().includes('ops') ? 'ops_agent' :
-              (p.target_agent || '').toLowerCase().includes('prod') ? 'productivity_agent' :
-              (p.target_agent || '').toLowerCase().includes('benchmark') ? 'financial_benchmark' :
-              (p.target_agent || '').toLowerCase().includes('swe') ? 'swe_bench_agent' : 'auto'
-            );
+            let targetAgentId = p.target_agent_id;
+            if (!targetAgentId || targetAgentId === 'cortex_assistant') {
+              const ta = (p.target_agent || '').toLowerCase();
+              if (ta.includes('financial benchmark')) targetAgentId = 'financial_benchmark';
+              else if (ta.includes('swe')) targetAgentId = 'swe_bench_agent';
+              else if (ta.includes('a2a')) targetAgentId = 'a2a_benchmark';
+              else if (ta.includes('human')) targetAgentId = 'human_benchmark';
+              else if (ta.includes('math')) targetAgentId = 'math_agent';
+              else if (ta.includes('prod') || ta.includes('office') || ta.includes('m365')) targetAgentId = 'productivity_agent';
+              else if (ta.includes('fin') || ta.includes('payroll')) targetAgentId = 'finance_agent';
+              else if (/hr/.test(ta) || ta.includes('people') || ta.includes('human resources')) targetAgentId = 'hr_agent';
+              else if (/it/.test(ta) || ta.includes('support') || ta.includes('jira')) targetAgentId = 'it_support_agent';
+              else if (ta.includes('ops') || ta.includes('cloud') || ta.includes('devops')) targetAgentId = 'ops_agent';
+              else targetAgentId = 'auto';
+            }
             const encAgentId = encodeURIComponent(targetAgentId);
             const tagsHtml = (p.tags || []).map(t => `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700/60">${t}</span>`).join('');
             
@@ -2050,21 +2194,46 @@
         });
       }
 
-      function tryPromptInChat(encodedPrompt, encodedPersona, encodedAgentId) {
+      async function tryPromptInChat(encodedPrompt, encodedPersona, encodedAgentId) {
         const text = decodeURIComponent(encodedPrompt);
         const persona = decodeURIComponent(encodedPersona || '');
-        const agentId = decodeURIComponent(encodedAgentId || 'auto');
-        const personaSel = document.getElementById('personaSelect');
-        if (personaSel && persona) {
-          personaSel.value = persona;
-          personaSel.dispatchEvent(new Event('change'));
-        }
-        switchTab('chat');
-        startNewChatSession(agentId);
-        const input = document.getElementById('promptInput');
-        if (input) {
-          input.value = text;
-          handleSend();
+        let agentId = decodeURIComponent(encodedAgentId || 'auto');
+        if (agentId === 'cortex_assistant') agentId = 'auto';
+
+        window._suppressPersonaChatReset = true;
+        try {
+          const personaSel = document.getElementById('personaSelect');
+          if (personaSel && persona) {
+            let pOpt = Array.from(personaSel.options).find(o => o.value === persona);
+            if (!pOpt) {
+              const newPOpt = document.createElement('option');
+              newPOpt.value = persona;
+              newPOpt.textContent = persona;
+              personaSel.appendChild(newPOpt);
+            }
+            personaSel.value = persona;
+            const currentRole = roleMap[persona] || 'Employee';
+            window._currentPersonaRole = currentRole;
+            const roleBadge = document.getElementById('roleBadge');
+            if (roleBadge) roleBadge.innerText = 'Role: ' + currentRole;
+            updateUserProfileDisplay(persona);
+          }
+
+          switchTab('chat');
+
+          if (typeof window.syncChatAgentSelect === 'function') {
+            await window.syncChatAgentSelect(agentId);
+          }
+
+          startNewChatSession(agentId);
+
+          const input = document.getElementById('promptInput');
+          if (input) {
+            input.value = text;
+            await handleSend();
+          }
+        } finally {
+          window._suppressPersonaChatReset = false;
         }
       }
 
@@ -5578,6 +5747,9 @@ Would you like to download the full application bundle (.ZIP) to your machine no
           setTimeout(() => {
             closeModal();
             loadAgentsHub();
+            if (typeof window.syncChatAgentSelect === 'function') {
+              window.syncChatAgentSelect(data.agent.id);
+            }
           }, 1500);
         } catch(err) {
           fb.className = 'text-xs p-3 rounded-xl font-mono bg-red-950/40 text-red-400 border border-red-900';
@@ -5756,7 +5928,7 @@ Would you like to download the full application bundle (.ZIP) to your machine no
                 <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 font-mono text-[11px] text-slate-300">
                   id: inventory_agent<br/>
                   name: Inventory Ops Agent<br/>
-                  preferred_model: google/gemini-2.5-flash<br/>
+                  preferred_model: google/gemini-flash-lite-latest<br/>
                   allowed_tools: [list_inventory_items, create_restock_order]
                 </div>
               </div>
@@ -5801,7 +5973,11 @@ Would you like to download the full application bundle (.ZIP) to your machine no
           const data = await res.json();
           const select = document.getElementById('modelSelect');
           if (data.models && select) {
-            const savedModel = window._activeChatModel || localStorage.getItem('cortex_selected_model') || data.default_model;
+            const rawStored = localStorage.getItem('cortex_selected_model');
+            const staleDefaults = ['google/gemini-3.7-flash', 'google/gemini-3.8-flash'];
+            const validSaved = (rawStored && !staleDefaults.includes(rawStored)) 
+              ? rawStored 
+              : (window._activeChatModel && !staleDefaults.includes(window._activeChatModel) ? window._activeChatModel : (data.default_model || 'google/gemini-flash-lite-latest'));
             select.innerHTML = '';
             data.models.forEach(m => {
               const opt = document.createElement('option');
@@ -5812,13 +5988,14 @@ Would you like to download the full application bundle (.ZIP) to your machine no
                 opt.textContent = `${m.name} (No API Key)`;
                 opt.disabled = true;
               }
-              if (m.id === savedModel) {
+              if (m.id === validSaved) {
                 opt.selected = true;
               }
               select.appendChild(opt);
             });
             if (select.value) {
               window._activeChatModel = select.value;
+              try { localStorage.setItem('cortex_selected_model', select.value); } catch (_) {}
             }
           }
         } catch (e) {
@@ -5829,16 +6006,187 @@ Would you like to download the full application bundle (.ZIP) to your machine no
       const modelSelectEl = document.getElementById('modelSelect');
       if (modelSelectEl) {
         const storedModel = localStorage.getItem('cortex_selected_model');
-        if (storedModel) {
+        if (storedModel && storedModel !== 'google/gemini-3.7-flash' && storedModel !== 'google/gemini-3.8-flash') {
           window._activeChatModel = storedModel;
           modelSelectEl.value = storedModel;
+        } else {
+          window._activeChatModel = 'google/gemini-flash-lite-latest';
+          modelSelectEl.value = 'google/gemini-flash-lite-latest';
+          try { localStorage.setItem('cortex_selected_model', 'google/gemini-flash-lite-latest'); } catch (_) {}
         }
         modelSelectEl.addEventListener('change', (e) => {
           window._activeChatModel = e.target.value;
           try { localStorage.setItem('cortex_selected_model', e.target.value); } catch (_) {}
         });
       }
+      // Dynamic Chat Agent Synchronization & Info Badge
+      window.syncChatAgentSelect = async function(preserveId) {
+        const select = document.getElementById('chatAgentSelect');
+        if (!select) return;
+
+        const currentVal = preserveId || (window._activeChatAgentId !== undefined ? window._activeChatAgentId : select.value) || 'auto';
+        const personaSel = document.getElementById('personaSelect');
+        const persona = personaSel ? personaSel.value : 'bob_ops';
+
+        try {
+          const r = await fetch('/api/agents?scope=all&persona=' + encodeURIComponent(persona));
+          if (!r.ok) return;
+          const data = await r.json();
+          const agents = data.agents || [];
+          window._availableAgentsList = agents;
+
+          const getAgentEmoji = (a) => {
+            if (a.id === 'hr_agent') return '👥';
+            if (a.id === 'finance_agent') return '💼';
+            if (a.id === 'it_support_agent') return '🎫';
+            if (a.id === 'ops_agent') return '☁️';
+            if (a.id === 'productivity_agent') return '📝';
+            if (a.id === 'financial_benchmark') return '📊';
+            if (a.id === 'swe_bench_agent') return '💻';
+            if (a.id === 'a2a_benchmark') return '🔬';
+            if (a.id === 'human_benchmark') return '👤';
+            if (a.id === 'math_agent') return '🧮';
+            return '🤖';
+          };
+
+          select.innerHTML = '';
+
+          const autoOpt = document.createElement('option');
+          autoOpt.value = 'auto';
+          autoOpt.textContent = '⚡ Auto-Route (Intelligent Orchestrator)';
+          select.appendChild(autoOpt);
+
+          const enterpriseGroup = document.createElement('optgroup');
+          enterpriseGroup.label = 'Enterprise Specialist Agents';
+
+          const benchmarkGroup = document.createElement('optgroup');
+          benchmarkGroup.label = 'Research & Engineering Benchmarks';
+
+          const customGroup = document.createElement('optgroup');
+          customGroup.label = 'Onboarded & Custom Agents';
+
+          agents.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id;
+            const emoji = getAgentEmoji(a);
+            opt.textContent = `${emoji} ${a.name}`;
+
+            const userRole = (window._currentPersonaRole || (roleMap[persona]) || 'DevOps Admin');
+            const userRoleNorm = userRole.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const allowedRoles = a.allowed_roles || ['*'];
+            const isRoleAllowed = allowedRoles.includes('*') || allowedRoles.some(r => {
+              const rNorm = r.toLowerCase().replace(/[^a-z0-9]/g, '');
+              return rNorm === userRoleNorm || rNorm.includes(userRoleNorm) || userRoleNorm.includes(rNorm);
+            });
+            if (!isRoleAllowed) {
+              opt.textContent += ' 🔒 (Role Restricted)';
+            }
+
+            if (['hr_agent', 'finance_agent', 'it_support_agent', 'ops_agent', 'productivity_agent'].includes(a.id)) {
+              enterpriseGroup.appendChild(opt);
+            } else if (['financial_benchmark', 'swe_bench_agent', 'a2a_benchmark', 'human_benchmark', 'math_agent'].includes(a.id)) {
+              benchmarkGroup.appendChild(opt);
+            } else {
+              customGroup.appendChild(opt);
+            }
+          });
+
+          if (enterpriseGroup.children.length > 0) select.appendChild(enterpriseGroup);
+          if (benchmarkGroup.children.length > 0) select.appendChild(benchmarkGroup);
+          if (customGroup.children.length > 0) select.appendChild(customGroup);
+
+          let matching = Array.from(select.options).find(o => o.value === currentVal);
+          if (matching) {
+            select.value = currentVal;
+            window._activeChatAgentId = currentVal;
+          } else if (currentVal !== 'auto') {
+            const customOpt = document.createElement('option');
+            customOpt.value = currentVal;
+            customOpt.textContent = `🤖 ${currentVal}`;
+            select.appendChild(customOpt);
+            select.value = currentVal;
+            window._activeChatAgentId = currentVal;
+          } else {
+            select.value = 'auto';
+            window._activeChatAgentId = 'auto';
+          }
+          if (typeof window.updateActiveAgentBadge === 'function') {
+            window.updateActiveAgentBadge();
+          }
+        } catch (e) {
+          console.warn('Could not sync chat agents:', e);
+        }
+      };
+
+      window.updateActiveAgentBadge = function() {
+        const select = document.getElementById('chatAgentSelect');
+        const badgeEl = document.getElementById('activeAgentInfoBar');
+        if (!select || !badgeEl) return;
+
+        const val = select.value;
+        if (!val || val === 'auto') {
+          badgeEl.innerHTML = `
+            <div class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <span class="text-blue-500 font-bold">⚡</span>
+              <span><strong>Auto-Route Mode:</strong> The intelligent orchestrator dynamically classifies intent and invokes the optimal domain agent, tools, or enterprise knowledge base.</span>
+            </div>
+          `;
+          return;
+        }
+
+        const agent = (window._availableAgentsList || []).find(a => a.id === val);
+        const name = agent ? agent.name : val;
+        const desc = agent ? agent.description : '';
+        const tools = (agent && agent.allowed_tools && agent.allowed_tools.length) ? agent.allowed_tools.slice(0, 3).join(', ') : '';
+
+        badgeEl.innerHTML = `
+          <div class="flex items-center justify-between w-full flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-semibold text-[11px] font-mono">Targeted: ${name}</span>
+              <span class="text-slate-500 dark:text-slate-400 text-[11px] truncate max-w-md">${desc ? desc.slice(0, 75) + '...' : ''}${tools ? ' • Tools: ' + tools : ''}</span>
+            </div>
+            <button type="button" onclick="resetChatAgentToAuto()" class="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-medium transition cursor-pointer flex items-center gap-1" title="Switch back to dynamic Auto-Routing">
+              <span>⚡</span><span>Reset to Auto-Route</span>
+            </button>
+          </div>
+        `;
+      };
+
+      window.resetChatAgentToAuto = function() {
+        const select = document.getElementById('chatAgentSelect');
+        if (select) {
+          select.value = 'auto';
+          window._activeChatAgentId = 'auto';
+          select.dispatchEvent(new Event('change'));
+        }
+      };
+
+      const chatAgentSelectEl = document.getElementById('chatAgentSelect');
+      if (chatAgentSelectEl) {
+        chatAgentSelectEl.addEventListener('change', (e) => {
+          window._activeChatAgentId = e.target.value;
+          if (typeof window.updateActiveAgentBadge === 'function') {
+            window.updateActiveAgentBadge();
+          }
+          const mc = document.getElementById('messagesContainer');
+          if (mc && (!mc.querySelector('.chat-bubble-user'))) {
+            let welcomeName = 'cortex.ai';
+            if (e.target.value !== 'auto') {
+              const opt = chatAgentSelectEl.options[chatAgentSelectEl.selectedIndex];
+              welcomeName = opt ? opt.textContent.replace(/^[^\w]+/, '').trim() : e.target.value;
+            }
+            const welcomeDiv = mc.querySelector('.chat-text-content');
+            if (welcomeDiv) {
+              welcomeDiv.innerHTML = `👋 Welcome! You are now chatting with <strong>${welcomeName}</strong>. How can I assist you today?`;
+            }
+          }
+        });
+      }
+
       loadModels();
+      if (typeof window.syncChatAgentSelect === 'function') {
+        window.syncChatAgentSelect();
+      }
       if (typeof loadChatHistory === 'function') {
         loadChatHistory();
       }

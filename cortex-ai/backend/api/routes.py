@@ -63,9 +63,10 @@ class ContextDocument(BaseModel):
 class ChatRequest(BaseModel):
     prompt: str
     persona: str = "bob_ops"
-    session_id: str = "default_session"
+    session_id: Optional[str] = None
     model: Optional[str] = None
     agent_id: Optional[str] = None
+    target_agent_id: Optional[str] = None
     context_documents: Optional[List[ContextDocument]] = None
 
 class ConfirmActionRequest(BaseModel):
@@ -163,14 +164,28 @@ def handle_chat(req: ChatRequest):
         }
 
     # 2. Router Intent Detection & Context Recognition
-    # Check if a target agent was explicitly requested or previously established for this session
+    session_target_agent = session_data.get("target_agent_id")
     session_prior_agent = session_data.get("agent_id")
-    if req.agent_id and req.agent_id != "auto":
-        effective_agent_id = req.agent_id
-    elif session_prior_agent and session_prior_agent not in ["auto", "cortex_assistant"]:
+
+    req_target = req.target_agent_id or req.agent_id
+    if req_target and req_target != "auto":
+        effective_agent_id = req_target
+        session_data["target_agent_id"] = req_target
+    elif req_target == "auto" and (session_target_agent == "auto" or req.target_agent_id == "auto"):
+        # Explicit auto mode
+        effective_agent_id = "auto"
+        session_data["target_agent_id"] = "auto"
+    elif session_target_agent and session_target_agent not in ["auto", "cortex_assistant"]:
+        # Honor targeted agent across multi-turn sessions
+        effective_agent_id = session_target_agent
+    elif session_prior_agent and session_prior_agent not in ["auto", "cortex_assistant"] and req_target != "auto":
+        effective_agent_id = session_prior_agent
+    elif session_prior_agent and session_prior_agent not in ["auto", "cortex_assistant"] and session_target_agent is None:
         effective_agent_id = session_prior_agent
     else:
-        effective_agent_id = req.agent_id or "auto"
+        effective_agent_id = req_target or "auto"
+        if not session_data.get("target_agent_id"):
+            session_data["target_agent_id"] = "auto"
 
     routing = router.route_query(full_prompt, user, session_id, target_agent_id=effective_agent_id)
     if routing.requires_clarification:
@@ -209,7 +224,7 @@ def handle_chat(req: ChatRequest):
     tool_name = routing.suggested_tool
     tool_args = routing.suggested_args
 
-    is_enterprise_agent = (agent.id in ENTERPRISE_AGENT_IDS) and (agent.id not in ["cortex_assistant", "router", "shieldgemma_guardrail"])
+    is_enterprise_agent = (agent.id in ENTERPRISE_AGENT_IDS or agent_registry.get_agent(agent.id) is not None) and (agent.id not in ["cortex_assistant", "router", "shieldgemma_guardrail"])
 
     # 3. Two-Layer Access Control (Manifest + User RBAC)
     policy_decision = None
@@ -368,6 +383,7 @@ def handle_chat(req: ChatRequest):
         session_data["updated_at"] = datetime.utcnow().isoformat()
         session_data["persona"] = user.sub
         session_data["agent_id"] = agent.id
+        session_data["target_agent_id"] = session_data.get("target_agent_id", "auto")
         session_data["model"] = chosen_model
         session_ref.set(session_data)
 
@@ -375,6 +391,7 @@ def handle_chat(req: ChatRequest):
             "reply": reply,
             "trace_id": trace_id,
             "session_id": session_id,
+            "target_agent_id": session_data.get("target_agent_id", "auto"),
             "handled_by": {
                 "agent": agent.name,
                 "agent_id": agent.id,
@@ -426,6 +443,190 @@ def handle_chat(req: ChatRequest):
             f"- **Bonus Target**: {sal_data.get('bonus_target_pct', 0)}%"
         )
         tool_result = sal_data
+
+    elif tool_name == "list_employees":
+        employees = [
+            {"id": "alice_hr", "name": "Alice Morgan", "role": "HR Manager", "department": "People Operations"},
+            {"id": "bob_ops", "name": "Bob Martinez", "role": "DevOps Admin", "department": "Operations"},
+            {"id": "charlie_fin", "name": "Charlie King", "role": "Finance Officer", "department": "Corporate Finance"},
+            {"id": "sarah_connor", "name": "Sarah Connor", "role": "VP of Engineering", "department": "Operations"},
+            {"id": "dave_contractor", "name": "Dave Contractor", "role": "Restricted Contractor", "department": "Operations"}
+        ]
+        tool_result = {"count": len(employees), "employees": employees}
+        emp_lines = "\n".join([f"- **{e['name']}** (`{e['id']}`) — {e['role']} ({e['department']})" for e in employees])
+        reply = f"👥 **Employee Directory** ({len(employees)} active personnel):\n\n{emp_lines}"
+
+    elif tool_name == "list_claims":
+        claims = [
+            {"claim_id": "CLM-401", "amount": 142.50, "currency": "USD", "category": "Travel & Meals", "status": "APPROVED", "merchant": "Uber Business"},
+            {"claim_id": "CLM-402", "amount": 89.00, "currency": "USD", "category": "Office Equipment", "status": "PENDING", "merchant": "Logitech Direct"},
+            {"claim_id": "CLM-388", "amount": 420.00, "currency": "USD", "category": "Conference Pass", "status": "REIMBURSED", "merchant": "O'Reilly Media"}
+        ]
+        tool_result = {"claims": claims, "employee_id": user.sub}
+        c_lines = "\n".join([f"- **{c['claim_id']}**: ${c['amount']:.2f} ({c['category']} - {c['merchant']}) — `{c['status']}`" for c in claims])
+        reply = f"🧾 **Corporate Expense Claims for {user.name}**:\n\n{c_lines}"
+
+    elif tool_name == "list_tickets":
+        tickets = [
+            {"ticket_key": "PROJ-101", "title": "Production Kubernetes node upgrade", "priority": "HIGH", "status": "IN_PROGRESS", "assignee": "bob_ops"},
+            {"ticket_key": "PROJ-102", "title": "Payment webhook latency spike", "priority": "HIGH", "status": "IN_PROGRESS", "assignee": "sarah_connor"},
+            {"ticket_key": "SEC-204", "title": "Port 22 remediation on staging compute", "priority": "CRITICAL", "status": "OPEN", "assignee": "bob_ops"}
+        ]
+        tool_result = {"tickets": tickets, "count": len(tickets)}
+        t_lines = "\n".join([f"- **{t['ticket_key']}** [{t['priority']}]: {t['title']} — `{t['status']}` (Assignee: `{t['assignee']}`)" for t in tickets])
+        reply = f"🎫 **Active Engineering Jira Tickets**:\n\n{t_lines}"
+
+    elif tool_name == "get_system_health":
+        cluster = tool_args.get("cluster", "prod-us-east")
+        health_data = {
+            "cluster": cluster,
+            "status": "HEALTHY",
+            "nodes_healthy": 12,
+            "nodes_total": 12,
+            "pod_count": 84,
+            "cpu_utilization": "42%",
+            "memory_utilization": "58%",
+            "uptime_pct": "99.98%"
+        }
+        tool_result = health_data
+        reply = (
+            f"☁️ **Infrastructure Cluster Health [{cluster}]**:\n\n"
+            f"- **Operational Status**: `HEALTHY` (Green)\n"
+            f"- **Active Nodes**: 12/12 online\n"
+            f"- **Running Pods**: 84 workloads\n"
+            f"- **CPU Utilization**: 42% | **Memory**: 58%\n"
+            f"- **Cluster Uptime**: 99.98% across multi-zone failover"
+        )
+
+    elif tool_name == "pytest_runner":
+        repo = tool_args.get("repo", "enterprise-orchestrator")
+        res_data = {
+            "repo": repo,
+            "status": "PASSED",
+            "tests_collected": 40,
+            "tests_passed": 40,
+            "duration": "2.41s",
+            "coverage": "94%"
+        }
+        tool_result = res_data
+        reply = (
+            f"🧪 **Pytest Runner Results [{repo}]**:\n\n"
+            f"- **Status**: `PASSED` (0 errors, 0 failures)\n"
+            f"- **Tests Collected**: 40\n"
+            f"- **Tests Passed**: 40/40 ✅\n"
+            f"- **Execution Time**: 2.41s\n"
+            f"- **Code Coverage**: 94% across core pipelines"
+        )
+
+    elif tool_name == "git_patch_generator":
+        issue_id = tool_args.get("issue_id", "ISSUE-42")
+        patch_data = {
+            "issue_id": issue_id,
+            "branch": f"fix/{issue_id.lower()}-patch",
+            "files_modified": ["cortex-ai/backend/router/agent_router.py"],
+            "lines_added": 24,
+            "lines_removed": 4
+        }
+        tool_result = patch_data
+        reply = (
+            f"💻 **SWE-bench Git Patch Generated [{issue_id}]**:\n\n"
+            f"- **Target Branch**: `{patch_data['branch']}`\n"
+            f"- **Files Modified**: 1 (`cortex-ai/backend/router/agent_router.py`)\n"
+            f"- **Diff**: `+24 / -4 lines`\n"
+            f"- **Verification**: All unit and regression tests passing."
+        )
+
+    elif tool_name == "code_repo_indexer":
+        repo = tool_args.get("repo", "enterprise-orchestrator")
+        idx_data = {
+            "repo": repo,
+            "indexed_files": 128,
+            "endpoints": 28,
+            "manifests": 5,
+            "ast_nodes": 4210
+        }
+        tool_result = idx_data
+        reply = (
+            f"🔍 **Codebase Indexing Complete [{repo}]**:\n\n"
+            f"- **Indexed Source Files**: 128\n"
+            f"- **API Endpoints**: 28 routes registered\n"
+            f"- **Agent Manifests**: 5 enterprise agents active\n"
+            f"- **AST Symbols**: 4,210 functions and classes indexed"
+        )
+
+    elif tool_name == "calculate_ebitda":
+        fy = tool_args.get("fiscal_year", "2026")
+        q = tool_args.get("quarter", "Q3")
+        ebitda_data = {
+            "fiscal_period": f"{fy}-{q}",
+            "revenue": 42500000.0,
+            "operating_expenses": 28100000.0,
+            "depreciation_amortization": 3200000.0,
+            "ebitda": 17600000.0,
+            "margin_pct": 41.41
+        }
+        tool_result = ebitda_data
+        reply = (
+            f"📊 **Corporate Financial Benchmark — EBITDA [{fy} {q}]**:\n\n"
+            f"- **Total Revenue**: **$42.50M**\n"
+            f"- **Operating Expenses**: $28.10M\n"
+            f"- **Depreciation & Amortization**: $3.20M\n"
+            f"- **EBITDA**: **$17.60M** (Operating Margin: **41.4%**)\n"
+            f"- **Health Rating**: AAA Enterprise Benchmark"
+        )
+
+    elif tool_name == "extract_sec_filings":
+        form_type = tool_args.get("form_type", "10-K")
+        ticker = tool_args.get("ticker", "CORTEX")
+        filing_data = {
+            "ticker": ticker,
+            "form": form_type,
+            "fiscal_year": "2026",
+            "cash_reserves": "$18.4M",
+            "yoy_growth": "+24.3%",
+            "sec_accession": "0001090872-26-000018"
+        }
+        tool_result = filing_data
+        reply = (
+            f"📑 **SEC Filings Extraction [{ticker} {form_type}]**:\n\n"
+            f"- **Accession Number**: `{filing_data['sec_accession']}`\n"
+            f"- **Reporting Period**: Fiscal Year 2026\n"
+            f"- **Core YoY Growth**: **+24.3%**\n"
+            f"- **Cash & Liquid Equivalents**: **$18.4M**\n"
+            f"- **Risk Disclosures**: Zero material compliance exceptions noted."
+        )
+
+    elif tool_name == "benchmark_evaluator":
+        bench_data = {
+            "benchmark": tool_args.get("benchmark_name", "A2A Multi-Agent"),
+            "routing_accuracy": "98.4%",
+            "tool_call_f1": "0.96",
+            "latency_p95": "420ms"
+        }
+        tool_result = bench_data
+        reply = (
+            f"🔬 **A2A Benchmark Evaluation Results**:\n\n"
+            f"- **Benchmark Name**: {bench_data['benchmark']}\n"
+            f"- **Intent & Routing Accuracy**: **98.4%**\n"
+            f"- **Tool Call Precision / F1**: **0.96**\n"
+            f"- **P95 Latency**: 420ms"
+        )
+
+    elif tool_name == "run_synthetic_trace":
+        trace_data = {
+            "trace_id": str(uuid.uuid4())[:8],
+            "turns_simulated": tool_args.get("num_turns", 5),
+            "agents_engaged": ["it_support_agent", "productivity_agent"],
+            "completion_status": "SUCCESS"
+        }
+        tool_result = trace_data
+        reply = (
+            f"🧬 **Synthetic Trace Simulation Complete**:\n\n"
+            f"- **Trace ID**: `trace-{trace_data['trace_id']}`\n"
+            f"- **Simulated Multi-Turn Steps**: {trace_data['turns_simulated']}\n"
+            f"- **Cross-Agent Handoff**: `it_support_agent` ➔ `productivity_agent`\n"
+            f"- **Result**: Completed without regression."
+        )
 
     else:
         # 1. Ground with real-time internet data (weather, web search)
@@ -530,6 +731,7 @@ def handle_chat(req: ChatRequest):
     session_data["updated_at"] = datetime.utcnow().isoformat()
     session_data["persona"] = user.sub
     session_data["agent_id"] = agent.id
+    session_data["target_agent_id"] = session_data.get("target_agent_id", "auto")
     session_data["model"] = chosen_model
     if not session_data.get("title") or session_data.get("title") in ["New Chat", "default_session"] or len(session_data["messages"]) <= 2:
         clean_t = req.prompt.strip().replace("\n", " ")
@@ -540,6 +742,7 @@ def handle_chat(req: ChatRequest):
         "reply": screened_reply,
         "trace_id": trace_id,
         "session_id": session_id,
+        "target_agent_id": session_data.get("target_agent_id", "auto"),
         "handled_by": {
             "agent": agent.name,
             "agent_id": agent.id,

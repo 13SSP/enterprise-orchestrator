@@ -14,7 +14,7 @@ class AgentManifest(BaseModel):
     name: str
     owner_team: str
     description: str
-    preferred_model: str = "google/gemini-2.5-flash"
+    preferred_model: str = "google/gemini-flash-lite-latest"
     fallback_models: List[str] = Field(default_factory=list)
     allowed_tools: List[str] = Field(default_factory=list)
     knowledge_scopes: List[str] = Field(default_factory=list)
@@ -35,7 +35,7 @@ BENCHMARK_AGENTS = [
         author_id="google",
         icon="hexagon",
         description="Comprehensive benchmark assessing conversational accuracy and multi-agent routing performance in end-to-end applications.",
-        preferred_model="google/gemini-2.5-flash",
+        preferred_model="google/gemini-flash-lite-latest",
         allowed_tools=["benchmark_evaluator", "run_synthetic_trace"],
         knowledge_scopes=["evaluation_metrics", "benchmarks"],
         active=True,
@@ -51,7 +51,7 @@ BENCHMARK_AGENTS = [
         author_id="google",
         icon="user",
         description="Simulates human baseline comparisons and reasoning benchmarks for conversational evaluation and qualitative validation.",
-        preferred_model="google/gemini-2.5-flash",
+        preferred_model="google/gemini-flash-lite-latest",
         allowed_tools=["simulate_human_response", "baseline_score"],
         knowledge_scopes=["human_eval", "qualitative_rubric"],
         active=True,
@@ -83,7 +83,7 @@ BENCHMARK_AGENTS = [
         author_id="google",
         icon="code",
         description="Software engineering agent specialized in resolving GitHub issues, analyzing repository codebases, and patch synthesis.",
-        preferred_model="google/gemini-2.5-flash",
+        preferred_model="google/gemini-flash-lite-latest",
         allowed_tools=["code_repo_indexer", "git_patch_generator", "pytest_runner"],
         knowledge_scopes=["swe_bench", "repo_graphs"],
         active=True,
@@ -99,7 +99,7 @@ BENCHMARK_AGENTS = [
         author_id="google",
         icon="trending-up",
         description="Financial reasoning and benchmark evaluation agent for market analytics, 10-K extraction, and corporate accounting workflows.",
-        preferred_model="google/gemini-2.5-flash",
+        preferred_model="google/gemini-flash-lite-latest",
         allowed_tools=["get_employee_salary", "extract_sec_filings", "calculate_ebitda"],
         knowledge_scopes=["finance_statements", "tax_compliance"],
         active=True,

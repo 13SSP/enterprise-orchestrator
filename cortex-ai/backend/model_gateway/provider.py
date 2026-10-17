@@ -33,8 +33,8 @@ class BaseModelProvider(ABC):
 class VertexGeminiProvider(BaseModelProvider):
     _shared_client = None
 
-    def __init__(self, model_name: str = "gemini-flash-latest", api_key: Optional[str] = None):
-        self.model_name = model_name
+    def __init__(self, model_name: str = "gemini-flash-lite-latest", api_key: Optional[str] = None):
+        self.model_name = model_name.replace("google/", "")
         self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
 
     def _get_client(self):
@@ -85,10 +85,11 @@ class VertexGeminiProvider(BaseModelProvider):
         # Candidate models to try in order: requested model first, then verified working fallbacks
         candidate_models = [self.model_name]
         for fallback in [
-            "gemini-3.7-flash",
             "gemini-flash-lite-latest",
             "gemini-3.5-flash-lite",
             "gemini-3.1-flash-lite",
+            "gemini-3.5-flash",
+            "gemini-3.7-flash",
             "gemini-3-flash-preview",
             "gemini-flash-latest",
             "gemini-3.8-flash"
@@ -348,20 +349,24 @@ class OfflineStubProvider(BaseModelProvider):
 class ModelGateway:
     def __init__(self):
         self.providers: Dict[str, BaseModelProvider] = {
-            "google/gemini-3.7-flash": VertexGeminiProvider(model_name="gemini-3.7-flash"),
             "google/gemini-flash-lite-latest": VertexGeminiProvider(model_name="gemini-flash-lite-latest"),
             "google/gemini-3.5-flash-lite": VertexGeminiProvider(model_name="gemini-3.5-flash-lite"),
             "google/gemini-3.1-flash-lite": VertexGeminiProvider(model_name="gemini-3.1-flash-lite"),
+            "google/gemini-3.5-flash": VertexGeminiProvider(model_name="gemini-3.5-flash"),
+            "google/gemini-3.7-flash": VertexGeminiProvider(model_name="gemini-3.7-flash"),
+            "google/gemini-3.8-flash": VertexGeminiProvider(model_name="gemini-3.8-flash"),
             "google/gemini-3-flash-preview": VertexGeminiProvider(model_name="gemini-3-flash-preview"),
             "google/gemini-flash-latest": VertexGeminiProvider(model_name="gemini-flash-latest"),
-            "google/gemini-3.8-flash": VertexGeminiProvider(model_name="gemini-3.8-flash"),
-            "google/gemini-3.5-flash": VertexGeminiProvider(model_name="gemini-3.5-flash"),
             "google/gemini-3.1-pro-preview": VertexGeminiProvider(model_name="gemini-3.1-pro-preview"),
+            # Legacy and alias mapping to active reliable model
+            "google/gemini-2.5-flash": VertexGeminiProvider(model_name="gemini-flash-lite-latest"),
+            "google/gemini-1.5-pro": VertexGeminiProvider(model_name="gemini-flash-lite-latest"),
+            "google/gemini-1.5-flash": VertexGeminiProvider(model_name="gemini-flash-lite-latest"),
             "anthropic/claude-3-5-sonnet": AnthropicClaudeProvider(model_name="claude-3-5-sonnet-20241022"),
             "anthropic/claude-3-opus": AnthropicClaudeProvider(model_name="claude-3-opus-20240229"),
             "offline/stub": OfflineStubProvider()
         }
-        self.default_provider_key = "google/gemini-3.7-flash"
+        self.default_provider_key = "google/gemini-flash-lite-latest"
         self.stub_provider = self.providers["offline/stub"]
 
     def get_available_models(self) -> List[Dict[str, Any]]:
@@ -373,14 +378,6 @@ class ModelGateway:
         anthropic_key = (os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_KEY", "")).strip()
 
         return [
-            {
-                "id": "google/gemini-3.7-flash",
-                "name": "Gemini 3.7 Flash (High Performance)",
-                "provider": "Google",
-                "family": "gemini",
-                "available": bool(gemini_key),
-                "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
-            },
             {
                 "id": "google/gemini-flash-lite-latest",
                 "name": "Gemini Flash Lite (Fast & Active)",
@@ -406,16 +403,16 @@ class ModelGateway:
                 "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
             },
             {
-                "id": "google/gemini-3-flash-preview",
-                "name": "Gemini 3 Flash Preview",
+                "id": "google/gemini-3.5-flash",
+                "name": "Gemini 3.5 Flash",
                 "provider": "Google",
                 "family": "gemini",
                 "available": bool(gemini_key),
                 "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
             },
             {
-                "id": "google/gemini-flash-latest",
-                "name": "Gemini Flash Latest",
+                "id": "google/gemini-3.7-flash",
+                "name": "Gemini 3.7 Flash (High Performance)",
                 "provider": "Google",
                 "family": "gemini",
                 "available": bool(gemini_key),
@@ -430,8 +427,16 @@ class ModelGateway:
                 "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
             },
             {
-                "id": "google/gemini-3.5-flash",
-                "name": "Gemini 3.5 Flash",
+                "id": "google/gemini-3-flash-preview",
+                "name": "Gemini 3 Flash Preview",
+                "provider": "Google",
+                "family": "gemini",
+                "available": bool(gemini_key),
+                "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
+            },
+            {
+                "id": "google/gemini-flash-latest",
+                "name": "Gemini Flash Latest",
                 "provider": "Google",
                 "family": "gemini",
                 "available": bool(gemini_key),
@@ -500,10 +505,11 @@ class ModelGateway:
 
         # High-reliability working fallbacks
         for working_fb in [
-            "google/gemini-3.7-flash",
             "google/gemini-flash-lite-latest",
             "google/gemini-3.5-flash-lite",
             "google/gemini-3.1-flash-lite",
+            "google/gemini-3.5-flash",
+            "google/gemini-3.7-flash",
             "google/gemini-3-flash-preview"
         ]:
             if working_fb not in candidates and working_fb in self.providers:

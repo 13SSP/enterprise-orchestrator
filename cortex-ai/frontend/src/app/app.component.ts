@@ -74,6 +74,8 @@ interface PromptItem {
               <option value="bob_ops">Bob Martinez (DevOps Admin)</option>
               <option value="alice_hr">Alice Henderson (HR Manager)</option>
               <option value="charlie_fin">Charlie Zhao (Finance Officer)</option>
+              <option value="sarah_connor">Sarah Connor (VP of Engineering)</option>
+              <option value="alex_chen">Alex Chen (Security Lead)</option>
               <option value="dave_contractor">Dave Miller (Restricted Contractor)</option>
             </select>
           </div>
@@ -183,6 +185,21 @@ interface PromptItem {
                       </button>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <!-- Thinking Loader Indicator -->
+              <div *ngIf="loading" class="flex gap-3 items-start animate-fade-in">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white shadow-sm flex items-center justify-center font-bold text-xs shrink-0 ring-2 ring-slate-800 animate-pulse">
+                  ⚡
+                </div>
+                <div class="border border-slate-800 bg-slate-900 px-4 py-3 rounded-2xl max-w-2xl text-sm shadow-sm flex items-center gap-3">
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="w-2 h-2 rounded-full bg-blue-500 animate-bounce"></span>
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style="animation-delay: 150ms;"></span>
+                    <span class="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style="animation-delay: 300ms;"></span>
+                  </div>
+                  <span class="text-xs font-mono font-medium text-slate-400">Thinking and consulting agent...</span>
                 </div>
               </div>
             </div>
@@ -379,10 +396,13 @@ export class AppComponent implements OnInit {
   agentsList: any[] = [];
   toolsList: any[] = [];
   auditList: any[] = [];
-  selectedModel: string = 'google/gemini-3.8-flash';
+  selectedModel: string = 'google/gemini-flash-lite-latest';
   modelsList: any[] = [
-    { id: 'google/gemini-3.8-flash', name: 'Gemini 3.8 Flash', provider: 'Google', family: 'gemini', available: true },
-    { id: 'google/gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'Google', family: 'gemini', available: true },
+    { id: 'google/gemini-flash-lite-latest', name: 'Gemini Flash Lite (Fast & Active)', provider: 'Google', family: 'gemini', available: true },
+    { id: 'google/gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', provider: 'Google', family: 'gemini', available: true },
+    { id: 'google/gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', provider: 'Google', family: 'gemini', available: true },
+    { id: 'google/gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'Google', family: 'gemini', available: true },
+    { id: 'google/gemini-3.7-flash', name: 'Gemini 3.7 Flash (High Performance)', provider: 'Google', family: 'gemini', available: true },
     { id: 'anthropic/claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', family: 'claude', available: false, disabled_reason: 'Missing ANTHROPIC_API_KEY in .env' },
     { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic', family: 'claude', available: false, disabled_reason: 'Missing ANTHROPIC_API_KEY in .env' }
   ];
@@ -398,6 +418,8 @@ export class AppComponent implements OnInit {
       bob_ops: 'DevOps Admin',
       alice_hr: 'HR Manager',
       charlie_fin: 'Finance Officer',
+      sarah_connor: 'VP of Engineering',
+      alex_chen: 'Security Lead',
       dave_contractor: 'Contractor'
     };
     return map[this.currentPersona] || 'Employee';
@@ -424,7 +446,8 @@ export class AppComponent implements OnInit {
           prompt: userText,
           persona: this.currentPersona,
           model: this.selectedModel,
-          agent_id: this.selectedAgent
+          agent_id: this.selectedAgent,
+          target_agent_id: this.selectedAgent
         })
       });
       const data = await res.json();
@@ -552,9 +575,16 @@ export class AppComponent implements OnInit {
       'Ops Agent': 'ops_agent',
       'Productivity Agent': 'productivity_agent',
       'Financial Benchmark': 'financial_benchmark',
-      'SWE-bench Agent': 'swe_bench_agent'
+      'SWE-bench Agent': 'swe_bench_agent',
+      'A2A Benchmark': 'a2a_benchmark',
+      'Human Benchmark': 'human_benchmark',
+      'Math Agent': 'math_agent'
     };
-    const targetAgentId = p.target_agent ? (agentMap[p.target_agent] || 'auto') : 'auto';
+    let targetAgentId = (p as any).target_agent_id;
+    if (!targetAgentId || targetAgentId === 'cortex_assistant') {
+      targetAgentId = p.target_agent ? (agentMap[p.target_agent] || 'auto') : 'auto';
+    }
+    this.selectedAgent = targetAgentId;
     this.startNewChatSession(targetAgentId);
     this.activeTab = 'chat';
     this.currentInput = p.prompt;

@@ -7,22 +7,32 @@ Enables rapid discovery and execution across HR, IT, Finance, Operations, M365, 
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
+import re
+
 def resolve_target_agent_id(target_agent: str) -> str:
     ta = (target_agent or "").lower()
-    if "hr" in ta or "people" in ta:
-        return "hr_agent"
-    if "finance" in ta or "payroll" in ta:
-        return "finance_agent"
-    if "it" in ta or "support" in ta or "jira" in ta:
-        return "it_support_agent"
-    if "ops" in ta or "cloud" in ta or "devops" in ta:
-        return "ops_agent"
-    if "productivity" in ta or "office" in ta or "m365" in ta:
-        return "productivity_agent"
     if "financial benchmark" in ta:
         return "financial_benchmark"
     if "swe" in ta:
         return "swe_bench_agent"
+    if "a2a" in ta:
+        return "a2a_benchmark"
+    if "human" in ta:
+        return "human_benchmark"
+    if "math" in ta:
+        return "math_agent"
+    if "productivity" in ta or "office" in ta or "m365" in ta:
+        return "productivity_agent"
+    if "finance" in ta or "payroll" in ta:
+        return "finance_agent"
+    if re.search(r"\bhr\b", ta) or "people" in ta or "human resources" in ta:
+        return "hr_agent"
+    if re.search(r"\bit\b", ta) or "support" in ta or "jira" in ta:
+        return "it_support_agent"
+    if "ops" in ta or "cloud" in ta or "devops" in ta:
+        return "ops_agent"
+    if "cortex" in ta or "assistant" in ta:
+        return "auto"
     return "auto"
 
 class PromptTemplate(BaseModel):
