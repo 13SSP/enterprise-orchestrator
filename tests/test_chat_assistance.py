@@ -436,5 +436,62 @@ def test_domain_agent_tool_execution():
 
         db.collection("chat_sessions").document(session_id).delete()
 
+def test_prompt_library_agent_resolution_and_chat_execution():
+    with TestClient(app) as tc:
+        # 1. Verify all prompt library entries have accurately resolved target_agent_id
+        res_prompts = tc.get("/api/prompts")
+        assert res_prompts.status_code == 200
+        p_data = res_prompts.json()
+        prompts = p_data.get("prompts", [])
+        assert len(prompts) >= 18
+
+        prompt_map = {p["id"]: p for p in prompts}
+
+        # Check key domain prompts
+        assert prompt_map["m365-slide-deck"]["target_agent_id"] == "productivity_agent"
+        assert prompt_map["m365-word-memo"]["target_agent_id"] == "productivity_agent"
+        assert prompt_map["it-ticket-proj102"]["target_agent_id"] == "it_support_agent"
+        assert prompt_map["hr-pto-balance"]["target_agent_id"] == "hr_agent"
+        assert prompt_map["fin-salary-authorized"]["target_agent_id"] == "finance_agent"
+        assert prompt_map["ops-system-health"]["target_agent_id"] == "ops_agent"
+        assert prompt_map["sec-contractor-denial"]["target_agent_id"] == "ops_agent"
+        assert prompt_map["gen-weather-query"]["target_agent_id"] == "auto"
+
+        # 2. Test "Try in Chat" execution for Productivity Agent (Sarah Connor persona)
+        p_slide = prompt_map["m365-slide-deck"]
+        session_slide = f"test-trychat-slide-{uuid.uuid4().hex[:8]}"
+        res_slide = tc.post("/api/chat", json={
+            "prompt": p_slide["prompt"],
+            "persona": p_slide["recommended_persona"],
+            "session_id": session_slide,
+            "agent_id": p_slide["target_agent_id"],
+            "target_agent_id": p_slide["target_agent_id"],
+            "model": "offline/stub"
+        })
+        assert res_slide.status_code == 200
+        d_slide = res_slide.json()
+        assert d_slide["handled_by"]["agent_id"] == "productivity_agent"
+        assert d_slide.get("download_card") is not None
+        assert d_slide["download_card"]["file_type"] == "pptx"
+        db.collection("chat_sessions").document(session_slide).delete()
+
+        # 3. Test "Try in Chat" execution for HR Agent (PTO balance lookup)
+        p_hr = prompt_map["hr-pto-balance"]
+        session_hr = f"test-trychat-hr-{uuid.uuid4().hex[:8]}"
+        res_hr = tc.post("/api/chat", json={
+            "prompt": p_hr["prompt"],
+            "persona": p_hr["recommended_persona"],
+            "session_id": session_hr,
+            "agent_id": p_hr["target_agent_id"],
+            "target_agent_id": p_hr["target_agent_id"],
+            "model": "offline/stub"
+        })
+        assert res_hr.status_code == 200
+        d_hr = res_hr.json()
+        assert d_hr["handled_by"]["agent_id"] == "hr_agent"
+        assert d_hr["handled_by"]["tool"] == "get_leave_balance"
+        db.collection("chat_sessions").document(session_hr).delete()
+
+
 
 

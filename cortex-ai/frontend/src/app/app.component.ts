@@ -74,6 +74,8 @@ interface PromptItem {
               <option value="bob_ops">Bob Martinez (DevOps Admin)</option>
               <option value="alice_hr">Alice Henderson (HR Manager)</option>
               <option value="charlie_fin">Charlie Zhao (Finance Officer)</option>
+              <option value="sarah_connor">Sarah Connor (VP of Engineering)</option>
+              <option value="alex_chen">Alex Chen (Security Lead)</option>
               <option value="dave_contractor">Dave Miller (Restricted Contractor)</option>
             </select>
           </div>
@@ -183,6 +185,21 @@ interface PromptItem {
                       </button>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <!-- Thinking Loader Indicator -->
+              <div *ngIf="loading" class="flex gap-3 items-start animate-fade-in">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white shadow-sm flex items-center justify-center font-bold text-xs shrink-0 ring-2 ring-slate-800 animate-pulse">
+                  ⚡
+                </div>
+                <div class="border border-slate-800 bg-slate-900 px-4 py-3 rounded-2xl max-w-2xl text-sm shadow-sm flex items-center gap-3">
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="w-2 h-2 rounded-full bg-blue-500 animate-bounce"></span>
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style="animation-delay: 150ms;"></span>
+                    <span class="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style="animation-delay: 300ms;"></span>
+                  </div>
+                  <span class="text-xs font-mono font-medium text-slate-400">Thinking and consulting agent...</span>
                 </div>
               </div>
             </div>
@@ -398,6 +415,8 @@ export class AppComponent implements OnInit {
       bob_ops: 'DevOps Admin',
       alice_hr: 'HR Manager',
       charlie_fin: 'Finance Officer',
+      sarah_connor: 'VP of Engineering',
+      alex_chen: 'Security Lead',
       dave_contractor: 'Contractor'
     };
     return map[this.currentPersona] || 'Employee';
@@ -558,7 +577,11 @@ export class AppComponent implements OnInit {
       'Human Benchmark': 'human_benchmark',
       'Math Agent': 'math_agent'
     };
-    const targetAgentId = p.target_agent ? (agentMap[p.target_agent] || 'auto') : 'auto';
+    let targetAgentId = (p as any).target_agent_id;
+    if (!targetAgentId || targetAgentId === 'cortex_assistant') {
+      targetAgentId = p.target_agent ? (agentMap[p.target_agent] || 'auto') : 'auto';
+    }
+    this.selectedAgent = targetAgentId;
     this.startNewChatSession(targetAgentId);
     this.activeTab = 'chat';
     this.currentInput = p.prompt;
