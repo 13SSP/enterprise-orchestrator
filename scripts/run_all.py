@@ -21,6 +21,22 @@ if sys.platform == "win32":
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
+# Load .env into os.environ for all child services
+env_file = ROOT_DIR / ".env"
+if env_file.exists():
+    try:
+        with open(env_file, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip("'\"")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
+    except Exception:
+        pass
+
 SERVICES = [
     {
         "name": "hr-api",

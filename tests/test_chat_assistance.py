@@ -51,7 +51,8 @@ def test_chat_context_storage_and_multi_turn_history():
         turn2_res = tc.post("/api/chat", json={
             "prompt": "Can you summarize that in 1 sentence?",
             "persona": "bob_ops",
-            "session_id": session_id
+            "session_id": session_id,
+            "model": "offline/stub"
         })
         assert turn2_res.status_code == 200
         turn2_data = turn2_res.json()
@@ -93,6 +94,7 @@ def test_context_document_upload_in_chat():
             "prompt": "What does the attached policy document specify regarding remote working hours?",
             "persona": "bob_ops",
             "session_id": session_id,
+            "model": "offline/stub",
             "context_documents": [
                 {
                     "name": "remote_work_policy.txt",
@@ -121,7 +123,8 @@ def test_document_download_url_and_endpoint():
         # Generate word document
         res = tc.post("/api/chat", json={
             "prompt": "Create a word document summary memo",
-            "persona": "bob_ops"
+            "persona": "bob_ops",
+            "model": "offline/stub"
         })
         assert res.status_code == 200
         data = res.json()
@@ -147,7 +150,8 @@ def test_chat_history_api():
         tc.post("/api/chat", json={
             "prompt": "Hello test assistant query",
             "persona": "alice_hr",
-            "session_id": test_session_id
+            "session_id": test_session_id,
+            "model": "offline/stub"
         })
 
         # List chat history

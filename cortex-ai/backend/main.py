@@ -19,6 +19,22 @@ backend_dir = Path(__file__).resolve().parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
+# Automatically load environment variables from root .env if not already set
+env_path = root_dir / ".env"
+if env_path.exists():
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip("'\"")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
+    except Exception:
+        pass
+
 from api.routes import router_api
 from agent_registry.registry import agent_registry
 from tool_factory.generator import tool_factory

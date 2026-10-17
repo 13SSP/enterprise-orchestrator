@@ -317,16 +317,16 @@ def build_dist_html():
 
             <div id="messagesContainer" class="flex-1 overflow-y-auto space-y-4 mb-3 pr-2">
               <div class="flex gap-3">
-                <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
-                <div class="border border-slate-800 bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-2">
-                  <div class="leading-relaxed">👋 Welcome to <strong>cortex.ai</strong>! I am your enterprise orchestration hub. Ask me about HR, IT Support, Finance, Cloud Ops, or Microsoft 365 office documents.</div>
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white shadow-sm flex items-center justify-center font-bold text-xs shrink-0 ring-2 ring-white dark:ring-slate-800">⚡</div>
+                <div class="chat-bubble-ai border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-2">
+                  <div class="chat-text-content leading-relaxed">👋 Welcome to <strong>cortex.ai</strong>! I am your enterprise orchestration hub. Ask me about HR, IT Support, Finance, Cloud Ops, or Microsoft 365 office documents.</div>
                 </div>
               </div>
             </div>
 
             <!-- Attached Context Documents Container -->
-            <div id="attachedDocsContainer" class="hidden flex-wrap items-center gap-2 mb-2 p-2 bg-slate-900/90 border border-slate-800 rounded-xl">
-              <span class="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+            <div id="attachedDocsContainer" class="hidden flex-wrap items-center gap-2 mb-2 p-2 bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl">
+              <span class="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
                 <span>📎</span>
                 <span>Context Documents:</span>
               </span>
@@ -336,16 +336,18 @@ def build_dist_html():
             <!-- Chat Input Form -->
             <form onsubmit="handleSend(event)" class="relative flex items-center gap-2">
               <input type="file" id="chatDocInput" multiple onchange="handleChatDocUpload(event)" class="hidden" accept=".txt,.md,.json,.csv,.py,.js,.html,.pdf,.doc,.docx" />
-              <button type="button" onclick="document.getElementById('chatDocInput').click()" class="w-11 h-11 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 flex items-center justify-center shadow-inner hover:border-slate-700 transition cursor-pointer shrink-0" title="Upload context document (.txt, .md, .json, .csv, .pdf, .docx)">
+              <button type="button" onclick="document.getElementById('chatDocInput').click()" class="chat-attach-btn w-11 h-11 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-300 flex items-center justify-center shadow-xs transition cursor-pointer shrink-0" title="Upload context document (.txt, .md, .json, .csv, .pdf, .docx)">
                 📎
               </button>
               <div class="relative flex-1 flex items-center">
-                <input type="text" id="promptInput" placeholder="Ask cortex.ai anything across HR, IT, Finance, Operations, or Office documents..." class="w-full bg-slate-900 border border-slate-800 rounded-2xl py-3.5 pl-4 pr-64 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" />
+                <input type="text" id="promptInput" placeholder="Ask cortex.ai anything across HR, IT, Finance, Operations, or Office documents..." class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-3.5 pl-4 pr-64 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs" />
                 <div class="absolute right-2 top-2 bottom-2 flex items-center gap-2">
-                  <select id="modelSelect" class="bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-medium text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm cursor-pointer transition">
-                    <option value="google/gemini-3-flash-preview">Gemini 3 Flash (Active)</option>
-                    <option value="google/gemini-3.5-flash">Gemini 3.5 Flash</option>
+                  <select id="modelSelect" class="bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700/80 text-xs font-medium text-slate-800 dark:text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-xs cursor-pointer transition">
+                    <option value="google/gemini-flash-latest" selected>Gemini Flash (Latest & Active)</option>
                     <option value="google/gemini-3.8-flash">Gemini 3.8 Flash</option>
+                    <option value="google/gemini-3.5-flash">Gemini 3.5 Flash</option>
+                    <option value="google/gemini-flash-lite-latest">Gemini Flash Lite</option>
+                    <option value="google/gemini-3-flash-preview">Gemini 3 Flash Preview</option>
                     <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option>
                     <option value="anthropic/claude-3-5-sonnet" disabled>Claude 3.5 Sonnet (No API Key)</option>
                     <option value="anthropic/claude-3-opus" disabled>Claude 3 Opus (No API Key)</option>
@@ -1003,35 +1005,35 @@ def build_dist_html():
             if (m.role === 'user') {
               let docsHtml = '';
               if (m.documents && m.documents.length > 0) {
-                docsHtml = `<div class="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-blue-500/30 text-[10px] text-blue-200">
-                  ${m.documents.map(d => `<span class="px-1.5 py-0.5 rounded bg-blue-700/60 font-mono">📎 ${d.name}</span>`).join('')}
+                docsHtml = `<div class="flex flex-wrap gap-1 mt-2 pt-2 border-t border-white/20 text-[10px] text-blue-100">
+                  ${m.documents.map(d => `<span class="px-2 py-0.5 rounded-md bg-white/20 text-white font-mono">📎 ${d.name}</span>`).join('')}
                 </div>`;
               }
-              html += `<div class="flex gap-3 justify-end"><div class="bg-blue-600 p-4 rounded-2xl max-w-2xl text-sm shadow-sm leading-relaxed">${m.content}${docsHtml}</div></div>`;
+              html += `<div class="flex gap-3 justify-end"><div class="chat-bubble-user p-4 max-w-2xl text-sm shadow-md leading-relaxed font-normal">${m.content}${docsHtml}</div></div>`;
             } else {
               let extra = '';
               if (m.handled_by) {
                 const isEnt = m.handled_by.is_enterprise_agent || (m.handled_by.agent_id && m.handled_by.agent_id !== 'cortex_assistant');
                 const badgeClass = isEnt 
-                  ? 'bg-indigo-950/80 text-indigo-300 border-indigo-700/60 font-semibold shadow-sm' 
-                  : 'bg-slate-800 text-blue-400 border-slate-700';
+                  ? 'badge-agent-enterprise bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700/60 font-semibold shadow-xs' 
+                  : 'badge-agent-default bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-slate-200 dark:border-slate-700 font-medium';
                 const agentLabel = isEnt ? `🤖 Enterprise Agent: ${m.handled_by.agent}` : `⚡ Handled by: ${m.handled_by.agent}`;
-                extra += `<div class="pt-2 border-t border-slate-800 flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
+                extra += `<div class="chat-meta-bar chat-meta-divider pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
                   <span class="px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${badgeClass}">${agentLabel}</span>
-                  ${m.handled_by.tool ? `<span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">Tool: ${m.handled_by.tool}</span>` : ''}
-                  <span class="px-2 py-0.5 rounded bg-slate-800 text-amber-400 border border-slate-700">Model: ${m.handled_by.model || 'Gemini'}</span>
+                  ${m.handled_by.tool ? `<span class="badge-tool px-2 py-0.5 rounded bg-cyan-50 dark:bg-slate-800 text-cyan-800 dark:text-cyan-400 border border-cyan-200 dark:border-slate-700">Tool: ${m.handled_by.tool}</span>` : ''}
+                  <span class="badge-model px-2 py-0.5 rounded bg-amber-50 dark:bg-slate-800 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-slate-700">Model: ${m.handled_by.model || 'Gemini'}</span>
                 </div>`;
               }
               if (m.download_card) {
                 let downUrl = m.download_card.download_url || '';
                 downUrl = downUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, '');
                 if (!downUrl.startsWith('/') && !downUrl.startsWith('http')) downUrl = '/' + downUrl;
-                extra += `<div class="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-between gap-3">
+                extra += `<div class="chat-download-box p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 shadow-xs">
                   <div class="flex items-center gap-3">
                     <span class="text-2xl">${m.download_card.file_type === 'pptx' ? '📊' : '📝'}</span>
                     <div>
-                      <div class="font-semibold text-xs text-slate-200">${m.download_card.title}</div>
-                      <div class="text-[11px] text-slate-400 font-mono">${m.download_card.file_name}</div>
+                      <div class="chat-doc-title font-semibold text-xs text-slate-800 dark:text-slate-200">${m.download_card.title}</div>
+                      <div class="chat-doc-name text-[11px] text-slate-500 dark:text-slate-400 font-mono">${m.download_card.file_name}</div>
                     </div>
                   </div>
                   <a href="${downUrl}" download="${m.download_card.file_name}" class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer">
@@ -1041,9 +1043,9 @@ def build_dist_html():
                 </div>`;
               }
               html += `<div class="flex gap-3">
-                <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
-                <div class="border border-slate-800 bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-3">
-                  <div class="whitespace-pre-wrap leading-relaxed">${m.content}</div>
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white shadow-sm flex items-center justify-center font-bold text-xs shrink-0 ring-2 ring-white dark:ring-slate-800">⚡</div>
+                <div class="chat-bubble-ai border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-3">
+                  <div class="chat-text-content whitespace-pre-wrap leading-relaxed">${m.content}</div>
                   ${extra}
                 </div>
               </div>`;
@@ -1111,13 +1113,13 @@ def build_dist_html():
 
         let userDocsHtml = '';
         if (docsToSend.length > 0) {
-          userDocsHtml = `<div class="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-blue-500/30 text-[10px] text-blue-200">
-            ${docsToSend.map(d => `<span class="px-1.5 py-0.5 rounded bg-blue-700/60 font-mono">📎 ${d.name}</span>`).join('')}
+          userDocsHtml = `<div class="flex flex-wrap gap-1 mt-2 pt-2 border-t border-white/20 text-[10px] text-blue-100">
+            ${docsToSend.map(d => `<span class="px-2 py-0.5 rounded-md bg-white/20 text-white font-mono">📎 ${d.name}</span>`).join('')}
           </div>`;
         }
 
         const mc = document.getElementById('messagesContainer');
-        mc.innerHTML += `<div class="flex gap-3 justify-end"><div class="bg-blue-600 p-4 rounded-2xl max-w-2xl text-sm shadow-sm leading-relaxed">${text || '(Attached document context)'}${userDocsHtml}</div></div>`;
+        mc.innerHTML += `<div class="flex gap-3 justify-end"><div class="chat-bubble-user p-4 max-w-2xl text-sm shadow-md leading-relaxed font-normal">${text || '(Attached document context)'}${userDocsHtml}</div></div>`;
         mc.scrollTop = mc.scrollHeight;
 
         try {
@@ -1150,13 +1152,13 @@ def build_dist_html():
           if (data.handled_by) {
             const isEnt = data.handled_by.is_enterprise_agent || (data.handled_by.agent_id && data.handled_by.agent_id !== 'cortex_assistant');
             const badgeClass = isEnt 
-              ? 'bg-indigo-950/80 text-indigo-300 border-indigo-700/60 font-semibold shadow-sm' 
-              : 'bg-slate-800 text-blue-400 border-slate-700';
+              ? 'badge-agent-enterprise bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700/60 font-semibold shadow-xs' 
+              : 'badge-agent-default bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-slate-200 dark:border-slate-700 font-medium';
             const agentLabel = isEnt ? `🤖 Enterprise Agent: ${data.handled_by.agent}` : `⚡ Handled by: ${data.handled_by.agent}`;
-            extra += `<div class="pt-2 border-t border-slate-800 flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
+            extra += `<div class="chat-meta-bar chat-meta-divider pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
               <span class="px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${badgeClass}">${agentLabel}</span>
-              ${data.handled_by.tool ? `<span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">Tool: ${data.handled_by.tool}</span>` : ''}
-              <span class="px-2 py-0.5 rounded bg-slate-800 text-amber-400 border border-slate-700">Model: ${data.handled_by.model || 'Gemini'}</span>
+              ${data.handled_by.tool ? `<span class="badge-tool px-2 py-0.5 rounded bg-cyan-50 dark:bg-slate-800 text-cyan-800 dark:text-cyan-400 border border-cyan-200 dark:border-slate-700">Tool: ${data.handled_by.tool}</span>` : ''}
+              <span class="badge-model px-2 py-0.5 rounded bg-amber-50 dark:bg-slate-800 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-slate-700">Model: ${data.handled_by.model || 'Gemini'}</span>
             </div>`;
           }
 
@@ -1164,12 +1166,12 @@ def build_dist_html():
             let downUrl = data.download_card.download_url || '';
             downUrl = downUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, '');
             if (!downUrl.startsWith('/') && !downUrl.startsWith('http')) downUrl = '/' + downUrl;
-            extra += `<div class="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-between gap-3">
+            extra += `<div class="chat-download-box p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 shadow-xs">
               <div class="flex items-center gap-3">
                 <span class="text-2xl">${data.download_card.file_type === 'pptx' ? '📊' : '📝'}</span>
                 <div>
-                  <div class="font-semibold text-xs text-slate-200">${data.download_card.title}</div>
-                  <div class="text-[11px] text-slate-400 font-mono">${data.download_card.file_name} ${data.download_card.slide_count ? `(${data.download_card.slide_count} slides)` : ''}</div>
+                  <div class="chat-doc-title font-semibold text-xs text-slate-800 dark:text-slate-200">${data.download_card.title}</div>
+                  <div class="chat-doc-name text-[11px] text-slate-500 dark:text-slate-400 font-mono">${data.download_card.file_name} ${data.download_card.slide_count ? `(${data.download_card.slide_count} slides)` : ''}</div>
                 </div>
               </div>
               <a href="${downUrl}" download="${data.download_card.file_name}" class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer">
@@ -1180,28 +1182,28 @@ def build_dist_html():
           }
 
           if (data.email_draft) {
-            extra += `<div class="p-3 rounded-xl bg-indigo-950/40 border border-indigo-800/60 text-xs space-y-1">
-              <div class="text-indigo-400 font-semibold">✉️ Outlook Draft Saved (Local MOCK store):</div>
-              <div class="text-slate-300"><strong>To:</strong> ${data.email_draft.recipient_email}</div>
-              <div class="text-slate-300"><strong>Subject:</strong> ${data.email_draft.subject}</div>
+            extra += `<div class="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs space-y-1">
+              <div class="text-indigo-600 dark:text-indigo-400 font-semibold">✉️ Outlook Draft Saved (Local MOCK store):</div>
+              <div class="text-slate-700 dark:text-slate-300"><strong>To:</strong> ${data.email_draft.recipient_email}</div>
+              <div class="text-slate-700 dark:text-slate-300"><strong>Subject:</strong> ${data.email_draft.subject}</div>
             </div>`;
           }
 
           if (data.pending_approval) {
-            extra += `<div class="p-4 rounded-xl bg-amber-950/30 border border-amber-600/40 space-y-3">
-              <div class="text-amber-400 text-xs font-semibold">⚠️ Sensitive Action Pending User Confirmation</div>
-              <div class="text-xs text-slate-300">${data.pending_approval.summary}</div>
+            extra += `<div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-600/40 space-y-3">
+              <div class="text-amber-800 dark:text-amber-400 text-xs font-semibold">⚠️ Sensitive Action Pending User Confirmation</div>
+              <div class="text-xs text-slate-700 dark:text-slate-300">${data.pending_approval.summary}</div>
               <div class="flex items-center gap-2 pt-1">
                 <button onclick="approveAction('${data.pending_approval.confirmation_id}', 'approve')" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition">✓ Approve & Execute</button>
-                <button onclick="approveAction('${data.pending_approval.confirmation_id}', 'reject')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition">✕ Reject</button>
+                <button onclick="approveAction('${data.pending_approval.confirmation_id}', 'reject')" class="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs border border-slate-300 dark:border-slate-700 transition">✕ Reject</button>
               </div>
             </div>`;
           }
 
           mc.innerHTML += `<div class="flex gap-3">
-            <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
-            <div class="border border-slate-800 bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-3">
-              <div class="whitespace-pre-wrap leading-relaxed">${data.reply}</div>
+            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white shadow-sm flex items-center justify-center font-bold text-xs shrink-0 ring-2 ring-white dark:ring-slate-800">⚡</div>
+            <div class="chat-bubble-ai border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-3">
+              <div class="chat-text-content whitespace-pre-wrap leading-relaxed">${data.reply}</div>
               ${extra}
             </div>
           </div>`;

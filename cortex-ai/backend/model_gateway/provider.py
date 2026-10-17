@@ -31,19 +31,26 @@ class BaseModelProvider(ABC):
 
 
 class VertexGeminiProvider(BaseModelProvider):
-    def __init__(self, model_name: str = "gemini-3-flash-preview", api_key: Optional[str] = None):
+    _shared_client = None
+
+    def __init__(self, model_name: str = "gemini-flash-latest", api_key: Optional[str] = None):
         self.model_name = model_name
         self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
-        self._client = None
-        if self.api_key:
-            try:
-                from google import genai
-                self._client = genai.Client(api_key=self.api_key)
-            except Exception as e:
-                logger.warning(f"Failed to initialize Vertex Gemini client: {e}")
+
+    def _get_client(self):
+        if VertexGeminiProvider._shared_client is None:
+            key = self.api_key or os.getenv("GEMINI_API_KEY", "")
+            if key:
+                try:
+                    from google import genai
+                    VertexGeminiProvider._shared_client = genai.Client(api_key=key)
+                except Exception as e:
+                    logger.warning(f"Failed to initialize Vertex Gemini client: {e}")
+        return VertexGeminiProvider._shared_client
 
     def is_available(self) -> bool:
-        return bool(self.api_key and self.api_key.strip())
+        key = self.api_key or os.getenv("GEMINI_API_KEY", "")
+        return bool(key and key.strip())
 
     def generate_content(
         self,
@@ -52,14 +59,15 @@ class VertexGeminiProvider(BaseModelProvider):
         response_mime_type: Optional[str] = None,
         history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
-        if not self._client:
+        client = self._get_client()
+        if not client:
             raise RuntimeError(f"Gemini client not initialized for {self.model_name}; missing or invalid API key.")
         
-        config = {}
+        config_kwargs = {}
         if system_instruction:
-            config["system_instruction"] = system_instruction
+            config_kwargs["system_instruction"] = system_instruction
         if response_mime_type:
-            config["response_mime_type"] = response_mime_type
+            config_kwargs["response_mime_type"] = response_mime_type
 
         # Multi-turn conversation context
         if history:
@@ -76,18 +84,27 @@ class VertexGeminiProvider(BaseModelProvider):
 
         # Candidate models to try in order of availability and stability
         candidate_models = [self.model_name]
-        for fallback in ["gemini-3-flash-preview", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.8-flash"]:
+        for fallback in [
+            "gemini-flash-latest",
+            "gemini-3.8-flash",
+            "gemini-3.5-flash",
+            "gemini-flash-lite-latest",
+            "gemini-3.1-flash-lite",
+            "gemini-3-flash-preview"
+        ]:
             if fallback not in candidate_models:
                 candidate_models.append(fallback)
 
         last_err = None
         for m in candidate_models:
             try:
-                res = self._client.models.generate_content(
-                    model=m,
-                    contents=contents_payload,
-                    config=config
-                )
+                call_kwargs = {
+                    "model": m,
+                    "contents": contents_payload
+                }
+                if config_kwargs:
+                    call_kwargs["config"] = config_kwargs
+                res = client.models.generate_content(**call_kwargs)
                 if res and res.text:
                     return {
                         "text": res.text.strip(),
@@ -98,8 +115,6 @@ class VertexGeminiProvider(BaseModelProvider):
                 err_str = str(e)
                 logger.warning(f"Gemini model {m} call failed ({e}); attempting next candidate.")
                 last_err = e
-                if "RESOURCE_EXHAUSTED" in err_str or "429" in err_str or "quota" in err_str.lower():
-                    break
 
         raise RuntimeError(f"All Gemini candidates failed. Last error: {last_err}")
 
@@ -295,15 +310,18 @@ class OfflineStubProvider(BaseModelProvider):
 class ModelGateway:
     def __init__(self):
         self.providers: Dict[str, BaseModelProvider] = {
-            "google/gemini-3-flash-preview": VertexGeminiProvider(model_name="gemini-3-flash-preview"),
-            "google/gemini-3.5-flash": VertexGeminiProvider(model_name="gemini-3.5-flash"),
+            "google/gemini-flash-latest": VertexGeminiProvider(model_name="gemini-flash-latest"),
             "google/gemini-3.8-flash": VertexGeminiProvider(model_name="gemini-3.8-flash"),
+            "google/gemini-3.5-flash": VertexGeminiProvider(model_name="gemini-3.5-flash"),
+            "google/gemini-flash-lite-latest": VertexGeminiProvider(model_name="gemini-flash-lite-latest"),
+            "google/gemini-3.1-flash-lite": VertexGeminiProvider(model_name="gemini-3.1-flash-lite"),
+            "google/gemini-3-flash-preview": VertexGeminiProvider(model_name="gemini-3-flash-preview"),
             "google/gemini-3.1-pro-preview": VertexGeminiProvider(model_name="gemini-3.1-pro-preview"),
             "anthropic/claude-3-5-sonnet": AnthropicClaudeProvider(model_name="claude-3-5-sonnet-20241022"),
             "anthropic/claude-3-opus": AnthropicClaudeProvider(model_name="claude-3-opus-20240229"),
             "offline/stub": OfflineStubProvider()
         }
-        self.default_provider_key = "google/gemini-3-flash-preview"
+        self.default_provider_key = "google/gemini-flash-latest"
         self.stub_provider = self.providers["offline/stub"]
 
     def get_available_models(self) -> List[Dict[str, Any]]:
@@ -316,8 +334,16 @@ class ModelGateway:
 
         return [
             {
-                "id": "google/gemini-3-flash-preview",
-                "name": "Gemini 3 Flash (Fast & Active)",
+                "id": "google/gemini-flash-latest",
+                "name": "Gemini Flash (Latest & Active)",
+                "provider": "Google",
+                "family": "gemini",
+                "available": bool(gemini_key),
+                "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
+            },
+            {
+                "id": "google/gemini-3.8-flash",
+                "name": "Gemini 3.8 Flash",
                 "provider": "Google",
                 "family": "gemini",
                 "available": bool(gemini_key),
@@ -332,8 +358,16 @@ class ModelGateway:
                 "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
             },
             {
-                "id": "google/gemini-3.8-flash",
-                "name": "Gemini 3.8 Flash",
+                "id": "google/gemini-flash-lite-latest",
+                "name": "Gemini Flash Lite",
+                "provider": "Google",
+                "family": "gemini",
+                "available": bool(gemini_key),
+                "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
+            },
+            {
+                "id": "google/gemini-3-flash-preview",
+                "name": "Gemini 3 Flash Preview",
                 "provider": "Google",
                 "family": "gemini",
                 "available": bool(gemini_key),
@@ -358,6 +392,12 @@ class ModelGateway:
         ]
 
     def get_default_model(self) -> str:
+        env_default = os.getenv("GEMINI_MODEL") or os.getenv("DEFAULT_GEMINI_MODEL")
+        if env_default:
+            if not env_default.startswith("google/") and not env_default.startswith("anthropic/"):
+                env_default = f"google/{env_default}"
+            if env_default in self.providers and hasattr(self.providers[env_default], "is_available") and self.providers[env_default].is_available():
+                return env_default
         models = self.get_available_models()
         for m in models:
             if m["available"]:
@@ -382,8 +422,12 @@ class ModelGateway:
         candidates = []
         if preferred_model:
             # Map legacy or generic aliases
-            if preferred_model in ["gemini", "google/gemini", "gemini-3.8-flash", "google/gemini-3.8-flash"]:
-                candidates.extend(["google/gemini-3-flash-preview", "google/gemini-3.5-flash", "google/gemini-3.8-flash"])
+            if preferred_model in ["gemini", "google/gemini", "gemini-flash", "google/gemini-flash", "gemini-flash-latest", "google/gemini-flash-latest"]:
+                candidates.extend(["google/gemini-flash-latest", "google/gemini-3.8-flash", "google/gemini-3.5-flash", "google/gemini-flash-lite-latest"])
+            elif preferred_model in ["gemini-3.8-flash", "google/gemini-3.8-flash"]:
+                candidates.extend(["google/gemini-3.8-flash", "google/gemini-flash-latest", "google/gemini-3.5-flash"])
+            elif preferred_model in ["gemini-3-flash-preview", "google/gemini-3-flash-preview"]:
+                candidates.extend(["google/gemini-flash-latest", "google/gemini-3.8-flash", "google/gemini-3.5-flash", "google/gemini-3-flash-preview"])
             elif preferred_model in self.providers:
                 candidates.append(preferred_model)
         if fallback_models:
