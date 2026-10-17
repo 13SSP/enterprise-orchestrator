@@ -424,7 +424,8 @@ export class AppComponent implements OnInit {
           prompt: userText,
           persona: this.currentPersona,
           model: this.selectedModel,
-          agent_id: this.selectedAgent
+          agent_id: this.selectedAgent,
+          target_agent_id: this.selectedAgent
         })
       });
       const data = await res.json();
@@ -552,7 +553,10 @@ export class AppComponent implements OnInit {
       'Ops Agent': 'ops_agent',
       'Productivity Agent': 'productivity_agent',
       'Financial Benchmark': 'financial_benchmark',
-      'SWE-bench Agent': 'swe_bench_agent'
+      'SWE-bench Agent': 'swe_bench_agent',
+      'A2A Benchmark': 'a2a_benchmark',
+      'Human Benchmark': 'human_benchmark',
+      'Math Agent': 'math_agent'
     };
     const targetAgentId = p.target_agent ? (agentMap[p.target_agent] || 'auto') : 'auto';
     this.startNewChatSession(targetAgentId);

@@ -289,29 +289,38 @@ def build_dist_html():
           <!-- Chat Panel -->
           <div id="chatView" class="h-full flex flex-col justify-between max-w-4xl mx-auto">
             <!-- Chat Controls Bar: Agent Selector & Current Session -->
-            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-2 border-b border-slate-200 dark:border-slate-800 text-xs">
-              <div class="flex items-center gap-2">
-                <label for="chatAgentSelect" class="text-slate-500 dark:text-slate-400 font-medium text-xs flex items-center gap-1.5">
-                  <span>🤖</span>
-                  <span>Target Agent:</span>
-                </label>
-                <select id="chatAgentSelect" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-sm transition">
-                  <option value="auto" selected>⚡ Auto-Route (Intelligent Orchestrator)</option>
-                  <option value="hr_agent">👥 HR Operations Agent</option>
-                  <option value="finance_agent">💼 Corporate Finance Agent</option>
-                  <option value="it_support_agent">🎫 IT Support Agent</option>
-                  <option value="ops_agent">☁️ Cloud Operations Agent</option>
-                  <option value="productivity_agent">📝 Productivity & Office Agent</option>
-                  <option value="financial_benchmark">📊 Financial Benchmark Agent</option>
-                  <option value="swe_bench_agent">💻 SWE-bench Agent</option>
-                </select>
+            <div class="flex flex-col gap-2 pb-3 mb-2 border-b border-slate-200 dark:border-slate-800 text-xs">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <label for="chatAgentSelect" class="text-slate-500 dark:text-slate-400 font-medium text-xs flex items-center gap-1.5">
+                    <span>🤖</span>
+                    <span>Target Agent:</span>
+                  </label>
+                  <select id="chatAgentSelect" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-sm transition">
+                    <option value="auto" selected>⚡ Auto-Route (Intelligent Orchestrator)</option>
+                    <option value="hr_agent">👥 HR Operations Agent</option>
+                    <option value="finance_agent">💼 Corporate Finance Agent</option>
+                    <option value="it_support_agent">🎫 IT Support Agent</option>
+                    <option value="ops_agent">☁️ Cloud Operations Agent</option>
+                    <option value="productivity_agent">📝 Productivity & Office Agent</option>
+                    <option value="financial_benchmark">📊 Financial Benchmark Agent</option>
+                    <option value="swe_bench_agent">💻 SWE-bench Agent</option>
+                  </select>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span id="currentSessionBadge" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-[11px] border border-slate-200 dark:border-slate-700 truncate max-w-[220px]" title="Current Active Session">Session: New</span>
+                  <button type="button" onclick="startNewChatSession()" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-600/20 hover:bg-blue-100 dark:hover:bg-blue-600/30 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30 flex items-center gap-1 transition cursor-pointer" title="Start a fresh chat context">
+                    <span>➕</span>
+                    <span>New Chat</span>
+                  </button>
+                </div>
               </div>
-              <div class="flex items-center gap-2">
-                <span id="currentSessionBadge" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-[11px] border border-slate-200 dark:border-slate-700 truncate max-w-[220px]" title="Current Active Session">Session: New</span>
-                <button type="button" onclick="startNewChatSession()" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-600/20 hover:bg-blue-100 dark:hover:bg-blue-600/30 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30 flex items-center gap-1 transition cursor-pointer" title="Start a fresh chat context">
-                  <span>➕</span>
-                  <span>New Chat</span>
-                </button>
+              <!-- Active Agent Info & Capabilities Bar -->
+              <div id="activeAgentInfoBar" class="text-[11px] px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 transition">
+                <div class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                  <span class="text-blue-500">⚡</span>
+                  <span><strong>Auto-Route Mode:</strong> The intelligent orchestrator dynamically classifies intent and invokes the optimal domain agent, tools, or knowledge base.</span>
+                </div>
               </div>
             </div>
 
@@ -990,19 +999,21 @@ def build_dist_html():
           window._activeChatSessionId = sessionId;
           if (badge && data.title) badge.innerText = data.title.slice(0, 22) + (data.title.length > 22 ? '...' : '');
 
-          if (data.agent_id) {
-            window._activeChatAgentId = data.agent_id;
-            const agentSel = document.getElementById('chatAgentSelect');
-            if (agentSel) {
-              let opt = Array.from(agentSel.options).find(o => o.value === data.agent_id);
-              if (!opt && data.agent_id !== 'auto') {
-                const newOpt = document.createElement('option');
-                newOpt.value = data.agent_id;
-                newOpt.textContent = `🤖 ${data.agent_id}`;
-                agentSel.appendChild(newOpt);
-              }
-              agentSel.value = data.agent_id;
+          const activeAgent = data.target_agent_id || data.agent_id || 'auto';
+          window._activeChatAgentId = activeAgent;
+          const agentSel = document.getElementById('chatAgentSelect');
+          if (agentSel) {
+            let opt = Array.from(agentSel.options).find(o => o.value === activeAgent);
+            if (!opt && activeAgent !== 'auto') {
+              const newOpt = document.createElement('option');
+              newOpt.value = activeAgent;
+              newOpt.textContent = `🤖 ${activeAgent}`;
+              agentSel.appendChild(newOpt);
             }
+            agentSel.value = activeAgent;
+          }
+          if (typeof window.updateActiveAgentBadge === 'function') {
+            window.updateActiveAgentBadge();
           }
 
           if (data.model) {
@@ -1095,19 +1106,21 @@ def build_dist_html():
         if (badge) badge.innerText = 'Session: New';
 
         const agentSel = document.getElementById('chatAgentSelect');
-        const agentToSet = targetAgentId || (agentSel ? agentSel.value : 'auto');
+        const agentToSet = targetAgentId || 'auto';
         window._activeChatAgentId = agentToSet;
 
-        if (targetAgentId && agentSel) {
-          let opt = Array.from(agentSel.options).find(o => o.value === targetAgentId);
-          if (!opt) {
+        if (agentSel) {
+          let opt = Array.from(agentSel.options).find(o => o.value === agentToSet);
+          if (!opt && agentToSet !== 'auto') {
             const newOpt = document.createElement('option');
-            newOpt.value = targetAgentId;
-            newOpt.textContent = `🤖 ${targetAgentId}`;
+            newOpt.value = agentToSet;
+            newOpt.textContent = `🤖 ${agentToSet}`;
             agentSel.appendChild(newOpt);
           }
-          agentSel.value = targetAgentId;
-          agentSel.dispatchEvent(new Event('change'));
+          agentSel.value = agentToSet;
+        }
+        if (typeof window.updateActiveAgentBadge === 'function') {
+          window.updateActiveAgentBadge();
         }
 
         const mc = document.getElementById('messagesContainer');
@@ -1181,10 +1194,6 @@ def build_dist_html():
           try { localStorage.setItem('cortex_selected_model', model); } catch (_) {}
           const agentSel = document.getElementById('chatAgentSelect');
           let targetAgent = agentSel ? agentSel.value : (window._activeChatAgentId || 'auto');
-          if ((!targetAgent || targetAgent === 'auto') && window._activeChatAgentId && window._activeChatAgentId !== 'auto') {
-            targetAgent = window._activeChatAgentId;
-            if (agentSel) agentSel.value = targetAgent;
-          }
           window._activeChatAgentId = targetAgent;
           const sessionId = window._activeChatSessionId || ('session-' + Date.now());
 
@@ -1197,6 +1206,7 @@ def build_dist_html():
               model: model,
               session_id: sessionId,
               agent_id: targetAgent,
+              target_agent_id: targetAgent,
               context_documents: docsToSend
             })
           });
@@ -1208,7 +1218,7 @@ def build_dist_html():
             if (badge) badge.innerText = 'Session: ' + data.session_id.slice(-8);
           }
 
-          if (data.handled_by && data.handled_by.agent_id && data.handled_by.agent_id !== 'cortex_assistant') {
+          if (targetAgent !== 'auto' && data.handled_by && data.handled_by.agent_id && data.handled_by.agent_id !== 'cortex_assistant') {
             window._activeChatAgentId = data.handled_by.agent_id;
             if (agentSel && agentSel.value !== data.handled_by.agent_id) {
               let opt = Array.from(agentSel.options).find(o => o.value === data.handled_by.agent_id);
@@ -1220,6 +1230,9 @@ def build_dist_html():
               }
               agentSel.value = data.handled_by.agent_id;
             }
+          }
+          if (typeof window.updateActiveAgentBadge === 'function') {
+            window.updateActiveAgentBadge();
           }
 
           let extra = '';
@@ -4958,6 +4971,9 @@ Identity and access management microservice providing user registration, passwor
           setTimeout(() => {
             closeModal();
             loadAgentsHub();
+            if (typeof window.syncChatAgentSelect === 'function') {
+              window.syncChatAgentSelect(data.agent.id);
+            }
           }, 1500);
         } catch(err) {
           fb.className = 'text-xs p-3 rounded-xl font-mono bg-red-950/40 text-red-400 border border-red-900';
@@ -5218,7 +5234,173 @@ Identity and access management microservice providing user registration, passwor
           try { localStorage.setItem('cortex_selected_model', e.target.value); } catch (_) {}
         });
       }
+      // Dynamic Chat Agent Synchronization & Info Badge
+      window.syncChatAgentSelect = async function(preserveId) {
+        const select = document.getElementById('chatAgentSelect');
+        if (!select) return;
+
+        const currentVal = preserveId || (window._activeChatAgentId !== undefined ? window._activeChatAgentId : select.value) || 'auto';
+        const personaSel = document.getElementById('personaSelect');
+        const persona = personaSel ? personaSel.value : 'bob_ops';
+
+        try {
+          const r = await fetch('/api/agents?scope=all&persona=' + encodeURIComponent(persona));
+          if (!r.ok) return;
+          const data = await r.json();
+          const agents = data.agents || [];
+          window._availableAgentsList = agents;
+
+          const getAgentEmoji = (a) => {
+            if (a.id === 'hr_agent') return '👥';
+            if (a.id === 'finance_agent') return '💼';
+            if (a.id === 'it_support_agent') return '🎫';
+            if (a.id === 'ops_agent') return '☁️';
+            if (a.id === 'productivity_agent') return '📝';
+            if (a.id === 'financial_benchmark') return '📊';
+            if (a.id === 'swe_bench_agent') return '💻';
+            if (a.id === 'a2a_benchmark') return '🔬';
+            if (a.id === 'human_benchmark') return '👤';
+            if (a.id === 'math_agent') return '🧮';
+            return '🤖';
+          };
+
+          select.innerHTML = '';
+
+          const autoOpt = document.createElement('option');
+          autoOpt.value = 'auto';
+          autoOpt.textContent = '⚡ Auto-Route (Intelligent Orchestrator)';
+          select.appendChild(autoOpt);
+
+          const enterpriseGroup = document.createElement('optgroup');
+          enterpriseGroup.label = 'Enterprise Specialist Agents';
+
+          const benchmarkGroup = document.createElement('optgroup');
+          benchmarkGroup.label = 'Research & Engineering Benchmarks';
+
+          const customGroup = document.createElement('optgroup');
+          customGroup.label = 'Onboarded & Custom Agents';
+
+          agents.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id;
+            const emoji = getAgentEmoji(a);
+            opt.textContent = `${emoji} ${a.name}`;
+
+            const userRole = (window._currentPersonaRole || 'DevOps Admin');
+            const allowedRoles = a.allowed_roles || ['*'];
+            const isRoleAllowed = allowedRoles.includes('*') || allowedRoles.includes(userRole);
+            if (!isRoleAllowed) {
+              opt.disabled = true;
+              opt.textContent += ' 🔒 (Role Restricted)';
+            }
+
+            if (['hr_agent', 'finance_agent', 'it_support_agent', 'ops_agent', 'productivity_agent'].includes(a.id)) {
+              enterpriseGroup.appendChild(opt);
+            } else if (['financial_benchmark', 'swe_bench_agent', 'a2a_benchmark', 'human_benchmark', 'math_agent'].includes(a.id)) {
+              benchmarkGroup.appendChild(opt);
+            } else {
+              customGroup.appendChild(opt);
+            }
+          });
+
+          if (enterpriseGroup.children.length > 0) select.appendChild(enterpriseGroup);
+          if (benchmarkGroup.children.length > 0) select.appendChild(benchmarkGroup);
+          if (customGroup.children.length > 0) select.appendChild(customGroup);
+
+          let matching = Array.from(select.options).find(o => o.value === currentVal && !o.disabled);
+          if (matching) {
+            select.value = currentVal;
+            window._activeChatAgentId = currentVal;
+          } else {
+            select.value = 'auto';
+            window._activeChatAgentId = 'auto';
+          }
+          if (typeof window.updateActiveAgentBadge === 'function') {
+            window.updateActiveAgentBadge();
+          }
+        } catch (e) {
+          console.warn('Could not sync chat agents:', e);
+        }
+      };
+
+      window.updateActiveAgentBadge = function() {
+        const select = document.getElementById('chatAgentSelect');
+        const badgeEl = document.getElementById('activeAgentInfoBar');
+        if (!select || !badgeEl) return;
+
+        const val = select.value;
+        if (!val || val === 'auto') {
+          badgeEl.innerHTML = `
+            <div class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <span class="text-blue-500 font-bold">⚡</span>
+              <span><strong>Auto-Route Mode:</strong> The intelligent orchestrator dynamically classifies intent and invokes the optimal domain agent, tools, or enterprise knowledge base.</span>
+            </div>
+          `;
+          return;
+        }
+
+        const agent = (window._availableAgentsList || []).find(a => a.id === val);
+        const name = agent ? agent.name : val;
+        const desc = agent ? agent.description : '';
+        const tools = (agent && agent.allowed_tools && agent.allowed_tools.length) ? agent.allowed_tools.slice(0, 3).join(', ') : '';
+
+        badgeEl.innerHTML = `
+          <div class="flex items-center justify-between w-full flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-semibold text-[11px] font-mono">Targeted: ${name}</span>
+              <span class="text-slate-500 dark:text-slate-400 text-[11px] truncate max-w-md">${desc ? desc.slice(0, 75) + '...' : ''}${tools ? ' • Tools: ' + tools : ''}</span>
+            </div>
+            <button type="button" onclick="resetChatAgentToAuto()" class="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-medium transition cursor-pointer flex items-center gap-1" title="Switch back to dynamic Auto-Routing">
+              <span>⚡</span><span>Reset to Auto-Route</span>
+            </button>
+          </div>
+        `;
+      };
+
+      window.resetChatAgentToAuto = function() {
+        const select = document.getElementById('chatAgentSelect');
+        if (select) {
+          select.value = 'auto';
+          window._activeChatAgentId = 'auto';
+          select.dispatchEvent(new Event('change'));
+        }
+      };
+
+      const chatAgentSelectEl = document.getElementById('chatAgentSelect');
+      if (chatAgentSelectEl) {
+        chatAgentSelectEl.addEventListener('change', (e) => {
+          window._activeChatAgentId = e.target.value;
+          if (typeof window.updateActiveAgentBadge === 'function') {
+            window.updateActiveAgentBadge();
+          }
+          const mc = document.getElementById('messagesContainer');
+          if (mc && (!mc.querySelector('.chat-bubble-user'))) {
+            let welcomeName = 'cortex.ai';
+            if (e.target.value !== 'auto') {
+              const opt = chatAgentSelectEl.options[chatAgentSelectEl.selectedIndex];
+              welcomeName = opt ? opt.textContent.replace(/^[^\w]+/, '').trim() : e.target.value;
+            }
+            const welcomeDiv = mc.querySelector('.chat-text-content');
+            if (welcomeDiv) {
+              welcomeDiv.innerHTML = `👋 Welcome! You are now chatting with <strong>${welcomeName}</strong>. How can I assist you today?`;
+            }
+          }
+        });
+      }
+
+      const personaSelectEl = document.getElementById('personaSelect');
+      if (personaSelectEl) {
+        personaSelectEl.addEventListener('change', () => {
+          if (typeof window.syncChatAgentSelect === 'function') {
+            window.syncChatAgentSelect();
+          }
+        });
+      }
+
       loadModels();
+      if (typeof window.syncChatAgentSelect === 'function') {
+        window.syncChatAgentSelect();
+      }
       if (typeof loadChatHistory === 'function') {
         loadChatHistory();
       }

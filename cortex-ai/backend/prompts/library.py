@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 def resolve_target_agent_id(target_agent: str) -> str:
     ta = (target_agent or "").lower()
+    if "financial benchmark" in ta:
+        return "financial_benchmark"
     if "hr" in ta or "people" in ta:
         return "hr_agent"
     if "finance" in ta or "payroll" in ta:
@@ -19,10 +21,16 @@ def resolve_target_agent_id(target_agent: str) -> str:
         return "ops_agent"
     if "productivity" in ta or "office" in ta or "m365" in ta:
         return "productivity_agent"
-    if "financial benchmark" in ta:
-        return "financial_benchmark"
     if "swe" in ta:
         return "swe_bench_agent"
+    if "a2a" in ta:
+        return "a2a_benchmark"
+    if "human" in ta:
+        return "human_benchmark"
+    if "math" in ta:
+        return "math_agent"
+    if "cortex" in ta or "assistant" in ta:
+        return "cortex_assistant"
     return "auto"
 
 class PromptTemplate(BaseModel):
