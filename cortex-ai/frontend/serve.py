@@ -1621,6 +1621,10 @@ def build_dist_html():
                       ? `<span class="px-2 py-0.5 rounded bg-indigo-950/60 border border-indigo-900 text-indigo-300 text-[10px] font-mono">Linked Spec: ${linkedFeature.feature_id} (${linkedFeature.title})</span>`
                       : '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px] font-mono">Pod Baseline</span>';
 
+                    const rawTarget = p.local_path || ('workspace-projects/' + ws.workspace_id + '/Prototype/' + p.name);
+                    const cleanPath = String(rawTarget).split(String.fromCharCode(92)).join('/');
+                    const encPath = encodeURIComponent(cleanPath);
+
                     return `
                       <div class="p-5 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col justify-between space-y-4 shadow-sm hover:border-slate-700 transition">
                         <div class="space-y-3">
@@ -1653,14 +1657,14 @@ def build_dist_html():
                                 <span>💻</span>
                                 <span>Instructions to Run Locally</span>
                               </span>
-                              <button type="button" onclick="navigator.clipboard.writeText('cd &quot;${(p.local_path || '').replace(/\\\\/g, '/')}&quot; &amp;&amp; pip install fastapi uvicorn pytest &amp;&amp; uvicorn main:app --reload'); Toast.show('Run commands copied to clipboard!', 'info');" class="text-blue-400 hover:text-blue-300 text-[10px] font-medium cursor-pointer flex items-center gap-1 transition">
+                              <button type="button" onclick="copyProtoRunCommands('${encPath}')" class="text-blue-400 hover:text-blue-300 text-[10px] font-medium cursor-pointer flex items-center gap-1 transition">
                                 <span>📋</span>
                                 <span>Copy</span>
                               </button>
                             </div>
                             <div class="text-slate-300 text-[11px] space-y-1.5 select-all leading-relaxed">
                               <div><span class="text-slate-500"># 1. Open terminal & navigate to code:</span></div>
-                              <div class="text-emerald-400 bg-slate-900/80 px-2 py-1 rounded border border-slate-800/60 overflow-x-auto">cd "${(p.local_path || 'workspace-projects/' + ws.workspace_id + '/Prototype/' + p.name).replace(/\\/g, '/')}"</div>
+                              <div class="text-emerald-400 bg-slate-900/80 px-2 py-1 rounded border border-slate-800/60 overflow-x-auto">cd "${cleanPath}"</div>
                               <div><span class="text-slate-500"># 2. Run local application:</span></div>
                               <div class="text-emerald-400 bg-slate-900/80 px-2 py-1 rounded border border-slate-800/60 overflow-x-auto">uvicorn main:app --reload</div>
                               <div><span class="text-slate-500"># 3. Run Pytest suite:</span></div>
@@ -2957,6 +2961,16 @@ Identity and access management microservice providing user registration, passwor
         });
       }
       window.submitBuildPrototype = submitBuildPrototype;
+
+      function copyProtoRunCommands(encPath) {
+        const cleanPath = encPath ? decodeURIComponent(encPath) : '';
+        const cmd = 'cd "' + cleanPath + '" && pip install fastapi uvicorn pytest && uvicorn main:app --reload';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(cmd);
+        }
+        Toast.show('Run commands copied to clipboard!', 'info');
+      }
+      window.copyProtoRunCommands = copyProtoRunCommands;
 
       async function downloadPrototypeZip(wsIdOrProtoId, maybeProtoId) {
         let wsId = wsIdOrProtoId;

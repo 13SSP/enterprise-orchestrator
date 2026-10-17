@@ -349,8 +349,8 @@
         }
       },
       "required": [
-        "target_version",
-        "service_name"
+        "service_name",
+        "target_version"
       ]
     },
     "is_write": true,
@@ -388,8 +388,8 @@
         }
       },
       "required": [
-        "severity",
-        "title"
+        "title",
+        "severity"
       ]
     },
     "is_write": true,
