@@ -197,23 +197,35 @@ def test_real_time_internet_grounding_weather_and_search():
         assert any(k in reply_lower for k in ["temperature", "high", "low", "humidity", "outlook", "weather", "°c"])
         db.collection("chat_sessions").document(session_id).delete()
 
-def test_smart_orchestrator_routes_general_query_even_when_agent_targeted():
+def test_target_agent_persistence_across_multiple_chat_turns():
     with TestClient(app) as tc:
-        session_id = f"test-smart-route-{uuid.uuid4().hex[:8]}"
-        # User targeted HR agent, but asks a general weather question
-        res = tc.post("/api/chat", json={
-            "prompt": "what is weather in Pune",
+        session_id = f"test-persist-{uuid.uuid4().hex[:8]}"
+        # Turn 1: User targeted HR agent with initial question
+        res1 = tc.post("/api/chat", json={
+            "prompt": "Check my remaining PTO leave balance",
             "persona": "bob_ops",
             "session_id": session_id,
-            "agent_id": "hr_agent"
+            "agent_id": "hr_agent",
+            "model": "offline/stub"
         })
-        assert res.status_code == 200
-        data = res.json()
-        assert data["status"] == "SUCCESS"
-        # Smart orchestrator routes out-of-domain query autonomously to cortex_assistant
-        assert data["handled_by"]["agent_id"] == "cortex_assistant"
-        assert data["handled_by"]["is_enterprise_agent"] is False
-        assert "Pune" in data["reply"]
+        assert res1.status_code == 200
+        d1 = res1.json()
+        assert d1["handled_by"]["agent_id"] == "hr_agent"
+        assert d1["handled_by"]["is_enterprise_agent"] is True
+
+        # Turn 2: Follow-up question in the same chat session (even if agent_id is omitted or auto)
+        res2 = tc.post("/api/chat", json={
+            "prompt": "what is todays date",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "agent_id": "auto",
+            "model": "offline/stub"
+        })
+        assert res2.status_code == 200
+        d2 = res2.json()
+        # Verify agent does NOT change to a different agent on subsequent chats in this session
+        assert d2["handled_by"]["agent_id"] == "hr_agent"
+        assert d2["handled_by"]["is_enterprise_agent"] is True
         db.collection("chat_sessions").document(session_id).delete()
 
 def test_enterprise_knowledge_base_rag_retrieval():

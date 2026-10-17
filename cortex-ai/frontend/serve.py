@@ -984,7 +984,23 @@ def build_dist_html():
           const r = await fetch('/api/chat/sessions/' + sessionId);
           if (!r.ok) throw new Error('Session not found');
           const data = await r.json();
+          window._activeChatSessionId = sessionId;
           if (badge && data.title) badge.innerText = data.title.slice(0, 22) + (data.title.length > 22 ? '...' : '');
+
+          if (data.agent_id) {
+            window._activeChatAgentId = data.agent_id;
+            const agentSel = document.getElementById('chatAgentSelect');
+            if (agentSel) {
+              let opt = Array.from(agentSel.options).find(o => o.value === data.agent_id);
+              if (!opt && data.agent_id !== 'auto') {
+                const newOpt = document.createElement('option');
+                newOpt.value = data.agent_id;
+                newOpt.textContent = `🤖 ${data.agent_id}`;
+                agentSel.appendChild(newOpt);
+              }
+              agentSel.value = data.agent_id;
+            }
+          }
 
           const messages = data.messages || [];
           if (messages.length === 0) {
@@ -1060,26 +1076,50 @@ def build_dist_html():
       }
       window.loadChatSession = loadChatSession;
 
-      function startNewChatSession() {
+      function startNewChatSession(targetAgentId) {
         window._activeChatSessionId = 'session-' + Date.now();
         window._chatAttachedDocs = [];
         renderAttachedDocsList();
         const badge = document.getElementById('currentSessionBadge');
         if (badge) badge.innerText = 'Session: New';
 
+        const agentSel = document.getElementById('chatAgentSelect');
+        const agentToSet = targetAgentId || (agentSel ? agentSel.value : 'auto');
+        window._activeChatAgentId = agentToSet;
+
+        if (targetAgentId && agentSel) {
+          let opt = Array.from(agentSel.options).find(o => o.value === targetAgentId);
+          if (!opt) {
+            const newOpt = document.createElement('option');
+            newOpt.value = targetAgentId;
+            newOpt.textContent = `🤖 ${targetAgentId}`;
+            agentSel.appendChild(newOpt);
+          }
+          agentSel.value = targetAgentId;
+          agentSel.dispatchEvent(new Event('change'));
+        }
+
         const mc = document.getElementById('messagesContainer');
         if (mc) {
+          let welcomeAgent = "cortex.ai";
+          if (agentSel && agentSel.value !== 'auto') {
+            const selectedOpt = agentSel.options[agentSel.selectedIndex];
+            welcomeAgent = selectedOpt ? selectedOpt.textContent.trim() : (targetAgentId || 'Agent');
+          }
           mc.innerHTML = `
             <div class="flex gap-3">
-              <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
-              <div class="border border-slate-800 bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-2">
-                <div class="leading-relaxed">👋 Welcome to <strong>cortex.ai</strong>! I am your enterprise orchestration hub. Ask me about HR, IT Support, Finance, Cloud Ops, or Microsoft 365 office documents.</div>
+              <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white shadow-sm flex items-center justify-center font-bold text-xs shrink-0 ring-2 ring-white dark:ring-slate-800">⚡</div>
+              <div class="chat-bubble-ai border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-2">
+                <div class="chat-text-content leading-relaxed">👋 Welcome! You are now in a new chat session with <strong>${welcomeAgent}</strong>. How can I help you today?</div>
               </div>
             </div>
           `;
         }
         const promptInput = document.getElementById('promptInput');
-        if (promptInput) promptInput.focus();
+        if (promptInput) {
+          promptInput.value = '';
+          promptInput.focus();
+        }
         loadChatHistory();
       }
       window.startNewChatSession = startNewChatSession;
@@ -1125,7 +1165,13 @@ def build_dist_html():
         try {
           const persona = document.getElementById('personaSelect').value;
           const model = document.getElementById('modelSelect') ? document.getElementById('modelSelect').value : null;
-          const targetAgent = document.getElementById('chatAgentSelect') ? document.getElementById('chatAgentSelect').value : 'auto';
+          const agentSel = document.getElementById('chatAgentSelect');
+          let targetAgent = agentSel ? agentSel.value : (window._activeChatAgentId || 'auto');
+          if ((!targetAgent || targetAgent === 'auto') && window._activeChatAgentId && window._activeChatAgentId !== 'auto') {
+            targetAgent = window._activeChatAgentId;
+            if (agentSel) agentSel.value = targetAgent;
+          }
+          window._activeChatAgentId = targetAgent;
           const sessionId = window._activeChatSessionId || ('session-' + Date.now());
 
           const r = await fetch('/api/chat', {
@@ -1146,6 +1192,20 @@ def build_dist_html():
             window._activeChatSessionId = data.session_id;
             const badge = document.getElementById('currentSessionBadge');
             if (badge) badge.innerText = 'Session: ' + data.session_id.slice(-8);
+          }
+
+          if (data.handled_by && data.handled_by.agent_id && data.handled_by.agent_id !== 'cortex_assistant') {
+            window._activeChatAgentId = data.handled_by.agent_id;
+            if (agentSel && agentSel.value !== data.handled_by.agent_id) {
+              let opt = Array.from(agentSel.options).find(o => o.value === data.handled_by.agent_id);
+              if (!opt) {
+                const newOpt = document.createElement('option');
+                newOpt.value = data.handled_by.agent_id;
+                newOpt.textContent = `🤖 ${data.handled_by.agent_id}`;
+                agentSel.appendChild(newOpt);
+              }
+              agentSel.value = data.handled_by.agent_id;
+            }
           }
 
           let extra = '';
@@ -1261,6 +1321,16 @@ def build_dist_html():
           cardsHtml = filtered.map(p => {
             const encPrompt = encodeURIComponent(p.prompt);
             const encPersona = encodeURIComponent(p.recommended_persona);
+            const targetAgentId = p.target_agent_id || (
+              (p.target_agent || '').toLowerCase().includes('hr') ? 'hr_agent' :
+              (p.target_agent || '').toLowerCase().includes('fin') ? 'finance_agent' :
+              (p.target_agent || '').toLowerCase().includes('it') ? 'it_support_agent' :
+              (p.target_agent || '').toLowerCase().includes('ops') ? 'ops_agent' :
+              (p.target_agent || '').toLowerCase().includes('prod') ? 'productivity_agent' :
+              (p.target_agent || '').toLowerCase().includes('benchmark') ? 'financial_benchmark' :
+              (p.target_agent || '').toLowerCase().includes('swe') ? 'swe_bench_agent' : 'auto'
+            );
+            const encAgentId = encodeURIComponent(targetAgentId);
             const tagsHtml = (p.tags || []).map(t => `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700/60">${t}</span>`).join('');
             
             return `
@@ -1288,7 +1358,7 @@ def build_dist_html():
                 <button onclick="copyPromptText('${encPrompt}', this)" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition flex items-center gap-1.5">
                   📋 Copy Prompt
                 </button>
-                <button onclick="tryPromptInChat('${encPrompt}', '${encPersona}')" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5">
+                <button onclick="tryPromptInChat('${encPrompt}', '${encPersona}', '${encAgentId}')" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5 cursor-pointer">
                   🚀 Try in Chat
                 </button>
               </div>
@@ -1349,15 +1419,17 @@ def build_dist_html():
         });
       }
 
-      function tryPromptInChat(encodedPrompt, encodedPersona) {
+      function tryPromptInChat(encodedPrompt, encodedPersona, encodedAgentId) {
         const text = decodeURIComponent(encodedPrompt);
-        const persona = decodeURIComponent(encodedPersona);
+        const persona = decodeURIComponent(encodedPersona || '');
+        const agentId = decodeURIComponent(encodedAgentId || 'auto');
         const personaSel = document.getElementById('personaSelect');
         if (personaSel && persona) {
           personaSel.value = persona;
           personaSel.dispatchEvent(new Event('change'));
         }
         switchTab('chat');
+        startNewChatSession(agentId);
         const input = document.getElementById('promptInput');
         if (input) {
           input.value = text;
@@ -4695,8 +4767,9 @@ Identity and access management microservice providing user registration, passwor
       }
 
       function launchAgentInChat(agentId, encodedName) {
-        const name = decodeURIComponent(encodedName);
+        const name = decodeURIComponent(encodedName || agentId);
         switchTab('chat');
+        startNewChatSession(agentId);
         const input = document.getElementById('promptInput');
         if (input) {
           input.value = `Ask ${name} to assist with domain tasks`;

@@ -215,7 +215,12 @@ interface PromptItem {
                 <div class="text-[11px] font-mono text-slate-500 pt-2 border-t border-slate-800/80">
                   <div>Team: <span class="text-slate-300">{{ a.owner_team }}</span></div>
                   <div>Model: <span class="text-indigo-400">{{ a.preferred_model }}</span></div>
-                  <div>Tools: <span class="text-cyan-400">{{ a.allowed_tools.length }} permitted</span></div>
+                  <div class="flex items-center justify-between pt-1">
+                    <span class="text-cyan-400">{{ a.allowed_tools.length }} permitted tools</span>
+                    <button (click)="launchAgentInChat(a)" class="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1 cursor-pointer">
+                      🚀 Chat
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -341,6 +346,7 @@ export class AppComponent implements OnInit {
   currentPersona: string = 'bob_ops';
   currentInput: string = '';
   loading: boolean = false;
+  selectedAgent: string = 'auto';
 
   promptsList: PromptItem[] = [];
   promptCategories: string[] = ['All'];
@@ -417,7 +423,8 @@ export class AppComponent implements OnInit {
         body: JSON.stringify({
           prompt: userText,
           persona: this.currentPersona,
-          model: this.selectedModel
+          model: this.selectedModel,
+          agent_id: this.selectedAgent
         })
       });
       const data = await res.json();
@@ -522,12 +529,41 @@ export class AppComponent implements OnInit {
     });
   }
 
+  startNewChatSession(agentId: string = 'auto') {
+    this.selectedAgent = agentId;
+    this.messages = [
+      {
+        sender: 'cortex',
+        text: `👋 Welcome! You are now in a new chat session with ${agentId !== 'auto' ? agentId : 'cortex.ai'}. How can I help you today?`,
+        timestamp: new Date().toLocaleTimeString()
+      }
+    ];
+    this.currentInput = '';
+  }
+
   tryPromptInChat(p: PromptItem) {
     if (p.recommended_persona) {
       this.currentPersona = p.recommended_persona;
     }
+    const agentMap: Record<string, string> = {
+      'HR Agent': 'hr_agent',
+      'Finance Agent': 'finance_agent',
+      'IT Support Agent': 'it_support_agent',
+      'Ops Agent': 'ops_agent',
+      'Productivity Agent': 'productivity_agent',
+      'Financial Benchmark': 'financial_benchmark',
+      'SWE-bench Agent': 'swe_bench_agent'
+    };
+    const targetAgentId = p.target_agent ? (agentMap[p.target_agent] || 'auto') : 'auto';
+    this.startNewChatSession(targetAgentId);
     this.activeTab = 'chat';
     this.currentInput = p.prompt;
     this.submitPrompt();
+  }
+
+  launchAgentInChat(a: any) {
+    this.startNewChatSession(a.id);
+    this.activeTab = 'chat';
+    this.currentInput = `Ask ${a.name} to assist with domain tasks`;
   }
 }

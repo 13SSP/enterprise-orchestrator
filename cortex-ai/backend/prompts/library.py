@@ -4,8 +4,26 @@ Curated catalog of domain-specific prompts for employees and hackathon demonstra
 Enables rapid discovery and execution across HR, IT, Finance, Operations, M365, and Security.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
+
+def resolve_target_agent_id(target_agent: str) -> str:
+    ta = (target_agent or "").lower()
+    if "hr" in ta or "people" in ta:
+        return "hr_agent"
+    if "finance" in ta or "payroll" in ta:
+        return "finance_agent"
+    if "it" in ta or "support" in ta or "jira" in ta:
+        return "it_support_agent"
+    if "ops" in ta or "cloud" in ta or "devops" in ta:
+        return "ops_agent"
+    if "productivity" in ta or "office" in ta or "m365" in ta:
+        return "productivity_agent"
+    if "financial benchmark" in ta:
+        return "financial_benchmark"
+    if "swe" in ta:
+        return "swe_bench_agent"
+    return "auto"
 
 class PromptTemplate(BaseModel):
     id: str
@@ -16,6 +34,7 @@ class PromptTemplate(BaseModel):
     recommended_persona: str
     persona_name: str
     target_agent: str
+    target_agent_id: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     hackathon_highlight: str
 
@@ -263,8 +282,14 @@ SAMPLE_PROMPTS: List[PromptTemplate] = [
 ]
 
 def get_prompt_library() -> Dict[str, Any]:
+    prompts_data = []
+    for p in SAMPLE_PROMPTS:
+        d = p.model_dump()
+        if not d.get("target_agent_id"):
+            d["target_agent_id"] = resolve_target_agent_id(p.target_agent)
+        prompts_data.append(d)
     return {
         "categories": PROMPT_CATEGORIES,
-        "prompts": [p.model_dump() for p in SAMPLE_PROMPTS],
+        "prompts": prompts_data,
         "total_count": len(SAMPLE_PROMPTS)
     }

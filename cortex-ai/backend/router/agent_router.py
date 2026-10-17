@@ -45,15 +45,9 @@ class OrchestratorRouter:
         p_lower = prompt.lower().strip()
         history = SESSION_HISTORY.get(session_id, [])
 
-        # ----------------- Smart Orchestrator Intent Check -----------------
-        # Real-time internet, weather, external search, and general queries are handled autonomously by cortex_assistant
-        is_general_or_web = any(k in p_lower for k in [
-            "weather", "forecast", "temperature", "climate", "who is", "search for", "latest on",
-            "what is the weather", "current weather", "tell me about", "explain", "analogy"
-        ])
-
         # ----------------- 0. User Selected Target Agent -----------------
-        if target_agent_id and target_agent_id not in ["auto", "cortex_assistant"] and not is_general_or_web:
+        # If user explicitly selected an agent (or continuing session with selected agent), strictly preserve it
+        if target_agent_id and target_agent_id not in ["auto", "cortex_assistant"]:
             if target_agent_id == "hr_agent":
                 if any(k in p_lower for k in ["pto", "leave", "vacation", "holiday", "sick day", "balance"]):
                     return RoutingResult(
@@ -192,6 +186,20 @@ class OrchestratorRouter:
                     confidence=0.99,
                     reasoning=f"User targeted agent: {target_agent_id}."
                 )
+
+        # ----------------- Smart Orchestrator Intent Check (Auto-Route Mode) -----------------
+        # Real-time internet, weather, external search, and general inquiries in auto-route are handled by cortex_assistant
+        if any(k in p_lower for k in [
+            "weather", "forecast", "temperature", "climate", "who is", "search for", "latest on",
+            "what is the weather", "current weather", "tell me about", "explain", "analogy"
+        ]):
+            return RoutingResult(
+                selected_agent_id="cortex_assistant",
+                intent="CONVERSATIONAL",
+                suggested_tool=None,
+                confidence=0.95,
+                reasoning="General external/internet inquiry in auto-route mode -> handled by cortex.ai Digital Assistant."
+            )
 
         # ----------------- 1. Follow-up Context Recognition -----------------
         # Handle follow-up references like "send that to my manager" or "and for last quarter"

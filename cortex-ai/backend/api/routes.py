@@ -163,7 +163,16 @@ def handle_chat(req: ChatRequest):
         }
 
     # 2. Router Intent Detection & Context Recognition
-    routing = router.route_query(full_prompt, user, session_id, target_agent_id=req.agent_id)
+    # Check if a target agent was explicitly requested or previously established for this session
+    session_prior_agent = session_data.get("agent_id")
+    if req.agent_id and req.agent_id != "auto":
+        effective_agent_id = req.agent_id
+    elif session_prior_agent and session_prior_agent not in ["auto", "cortex_assistant"]:
+        effective_agent_id = session_prior_agent
+    else:
+        effective_agent_id = req.agent_id or "auto"
+
+    routing = router.route_query(full_prompt, user, session_id, target_agent_id=effective_agent_id)
     if routing.requires_clarification:
         return {
             "reply": routing.clarification_question,
@@ -179,13 +188,13 @@ def handle_chat(req: ChatRequest):
             "status": "CLARIFICATION_REQUIRED"
         }
 
-    # If router determined this is a general/weather/search inquiry, cortex_assistant handles it
-    if routing.selected_agent_id == "cortex_assistant":
-        target_agent_id = "cortex_assistant"
-    elif req.agent_id and req.agent_id != "auto":
-        target_agent_id = req.agent_id
+    # If the user/session has a specific enterprise agent selected, honor it across all chat turns
+    if effective_agent_id and effective_agent_id not in ["auto", "cortex_assistant"]:
+        target_agent_id = effective_agent_id
+    elif routing.selected_agent_id:
+        target_agent_id = routing.selected_agent_id
     else:
-        target_agent_id = routing.selected_agent_id or "cortex_assistant"
+        target_agent_id = "cortex_assistant"
 
     agent = agent_registry.get_agent(target_agent_id)
     if not agent or target_agent_id == "cortex_assistant":
@@ -438,9 +447,13 @@ def handle_chat(req: ChatRequest):
             pass
 
         # 3. Conversational generation with tailored system instruction
+        current_date_str = datetime.utcnow().strftime("%A, %B %d, %Y")
+        if any(w in req.prompt.lower() for w in ["today", "date", "day", "current year", "current date", "year"]):
+            full_prompt = f"[Temporal Context: Today's date is {current_date_str}]\n{full_prompt}"
+
         if agent.id == "cortex_assistant":
             system_inst = (
-                "You are cortex.ai, an intelligent enterprise AI assistant and digital workplace integration hub. "
+                f"You are cortex.ai, an intelligent enterprise AI assistant and digital workplace integration hub. Today's date is {current_date_str}. "
                 "Answer general questions (weather, current forecasts, general knowledge, creative writing, explanations, code) "
                 "naturally, conversationally, helpfully, and with complete detail. "
                 "When real-time data or live internet search information is provided, integrate it seamlessly into a structured response. "
@@ -449,7 +462,7 @@ def handle_chat(req: ChatRequest):
             )
         else:
             system_inst = (
-                f"You are {agent.name} ({agent.owner_team}), an intelligent enterprise AI assistant on the cortex.ai platform. "
+                f"You are {agent.name} ({agent.owner_team}), an intelligent enterprise AI assistant on the cortex.ai platform. Today's date is {current_date_str}. "
                 "Answer questions naturally, conversationally, and accurately. "
                 "When context documents are provided by the user, thoroughly analyze and directly reference their content. "
                 "For organizational operations, you can also connect to HR, IT Jira, Finance, Ops, and Microsoft 365 tools."
