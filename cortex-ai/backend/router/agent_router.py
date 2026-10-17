@@ -39,10 +39,152 @@ class OrchestratorRouter:
         self,
         prompt: str,
         user: UserContext,
-        session_id: str = "default_session"
+        session_id: str = "default_session",
+        target_agent_id: Optional[str] = None
     ) -> RoutingResult:
         p_lower = prompt.lower().strip()
         history = SESSION_HISTORY.get(session_id, [])
+
+        # ----------------- 0. User Selected Target Agent -----------------
+        if target_agent_id and target_agent_id not in ["auto", "cortex_assistant"]:
+            if target_agent_id == "hr_agent":
+                if any(k in p_lower for k in ["pto", "leave", "vacation", "holiday", "sick day", "balance"]):
+                    return RoutingResult(
+                        selected_agent_id="hr_agent",
+                        intent="DATA_LOOKUP",
+                        suggested_tool="get_leave_balance",
+                        suggested_args={"employee_id": user.sub},
+                        confidence=0.99,
+                        reasoning="User targeted HR Agent -> executed get_leave_balance."
+                    )
+                elif any(k in p_lower for k in ["employee", "directory", "staff", "personnel", "headcount"]):
+                    return RoutingResult(
+                        selected_agent_id="hr_agent",
+                        intent="DATA_LOOKUP",
+                        suggested_tool="list_employees",
+                        suggested_args={},
+                        confidence=0.99,
+                        reasoning="User targeted HR Agent -> executed list_employees."
+                    )
+                else:
+                    return RoutingResult(
+                        selected_agent_id="hr_agent",
+                        intent="CONVERSATIONAL",
+                        suggested_tool=None,
+                        confidence=0.99,
+                        reasoning="User targeted HR Operations Agent."
+                    )
+            elif target_agent_id in ["finance_agent", "financial_benchmark"]:
+                if any(k in p_lower for k in ["salary", "compensation", "payroll", "pay rate"]):
+                    m = re.search(r"\b(bob_ops|alice_hr|charlie_fin|sarah_connor|alex_chen|dave_contractor|marcus_vance|elena_rostova|maya_lin|priya_sharma)\b", p_lower)
+                    target_emp = m.group(1) if m else user.sub
+                    return RoutingResult(
+                        selected_agent_id=target_agent_id,
+                        intent="DATA_LOOKUP",
+                        suggested_tool="get_employee_salary",
+                        suggested_args={"employee_id": target_emp},
+                        confidence=0.99,
+                        reasoning="User targeted Finance Agent -> executed get_employee_salary."
+                    )
+                elif any(k in p_lower for k in ["expense", "claim", "receipt", "reimbursement"]):
+                    return RoutingResult(
+                        selected_agent_id=target_agent_id,
+                        intent="DATA_LOOKUP",
+                        suggested_tool="list_claims",
+                        suggested_args={"employee_id": user.sub},
+                        confidence=0.99,
+                        reasoning="User targeted Finance Agent -> executed list_claims."
+                    )
+                else:
+                    return RoutingResult(
+                        selected_agent_id=target_agent_id,
+                        intent="CONVERSATIONAL",
+                        suggested_tool=None,
+                        confidence=0.99,
+                        reasoning="User targeted Corporate Finance Agent."
+                    )
+            elif target_agent_id == "it_support_agent":
+                ticket_m = re.search(r"([A-Z]+-\d+)", prompt, re.IGNORECASE)
+                t_key = ticket_m.group(1).upper() if ticket_m else None
+                return RoutingResult(
+                    selected_agent_id="it_support_agent",
+                    intent="DATA_LOOKUP",
+                    suggested_tool="get_ticket" if t_key else "list_tickets",
+                    suggested_args={"ticket_key": t_key} if t_key else {},
+                    confidence=0.99,
+                    reasoning=f"User targeted IT Support Agent ({t_key or 'tickets'})."
+                )
+            elif target_agent_id == "ops_agent":
+                return RoutingResult(
+                    selected_agent_id="ops_agent",
+                    intent="ACTION_MUTATION" if "restart" in p_lower else "DATA_LOOKUP",
+                    suggested_tool="restart_cloud_service" if "restart" in p_lower else "get_system_health",
+                    suggested_args={"service_name": "payments-api"} if "restart" in p_lower else {"cluster": "prod-us-east"},
+                    confidence=0.99,
+                    reasoning="User targeted Cloud Operations Agent."
+                )
+            elif target_agent_id == "productivity_agent":
+                if any(k in p_lower for k in ["slide", "deck", "presentation", "powerpoint"]):
+                    return RoutingResult(
+                        selected_agent_id="productivity_agent",
+                        intent="DOCUMENT_CREATION",
+                        suggested_tool="generate_powerpoint_presentation",
+                        suggested_args={
+                            "deck_title": "Enterprise Operations Presentation",
+                            "deck_subtitle": f"Generated for {user.name}",
+                            "slides": [
+                                {"title": "Overview & Objectives", "bullets": ["Enterprise operations", "Automated orchestration"]},
+                                {"title": "Milestones & Metrics", "bullets": ["99.9% availability", "Zero-trust compliance"]}
+                            ]
+                        },
+                        confidence=0.99,
+                        reasoning="User targeted Productivity Agent -> PowerPoint generation."
+                    )
+                elif any(k in p_lower for k in ["word", "docx", "memo", "report"]):
+                    return RoutingResult(
+                        selected_agent_id="productivity_agent",
+                        intent="DOCUMENT_CREATION",
+                        suggested_tool="generate_word_document",
+                        suggested_args={
+                            "title": "Corporate Memorandum",
+                            "subtitle": f"Prepared for {user.name}",
+                            "sections": [
+                                {"heading": "Overview", "content": "Summary of active enterprise processes and metrics."},
+                                {"heading": "Key Directives", "bullets": ["Operational readiness", "System synchronization"]}
+                            ]
+                        },
+                        confidence=0.99,
+                        reasoning="User targeted Productivity Agent -> Word doc generation."
+                    )
+                elif any(k in p_lower for k in ["email", "draft"]):
+                    return RoutingResult(
+                        selected_agent_id="productivity_agent",
+                        intent="EMAIL_DRAFT",
+                        suggested_tool="create_email_draft",
+                        suggested_args={
+                            "recipient_email": f"{user.manager_id or 'manager'}@company.internal",
+                            "subject": "Enterprise Operational Update",
+                            "body": f"Hi,\n\nFollowing up on our recent operational discussion.\n\nBest regards,\n{user.name}"
+                        },
+                        confidence=0.99,
+                        reasoning="User targeted Productivity Agent -> Email draft."
+                    )
+                else:
+                    return RoutingResult(
+                        selected_agent_id="productivity_agent",
+                        intent="CONVERSATIONAL",
+                        suggested_tool=None,
+                        confidence=0.99,
+                        reasoning="User targeted Productivity Agent."
+                    )
+            else:
+                return RoutingResult(
+                    selected_agent_id=target_agent_id,
+                    intent="CONVERSATIONAL",
+                    suggested_tool=None,
+                    confidence=0.99,
+                    reasoning=f"User targeted agent: {target_agent_id}."
+                )
 
         # ----------------- 1. Follow-up Context Recognition -----------------
         # Handle follow-up references like "send that to my manager" or "and for last quarter"

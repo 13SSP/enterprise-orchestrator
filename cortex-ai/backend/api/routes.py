@@ -11,7 +11,7 @@ import httpx
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Header
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel, Field
 import sys
 from pathlib import Path
@@ -20,6 +20,7 @@ backend_dir = Path(__file__).resolve().parent.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
+from database.firestore_client import db
 from agent_registry.registry import agent_registry, AgentManifest
 from tool_registry.registry import tool_registry
 from model_gateway.provider import model_gateway
@@ -35,6 +36,11 @@ AUDIT_LOGS: List[Dict[str, Any]] = []
 IDEMPOTENCY_CACHE: Dict[str, Any] = {}
 IDEMPOTENCY_TIMESTAMPS: Dict[str, float] = {}
 
+ENTERPRISE_AGENT_IDS = {
+    "hr_agent", "finance_agent", "it_support_agent", "ops_agent", "productivity_agent",
+    "financial_benchmark", "swe_bench_agent", "a2a_benchmark", "human_benchmark", "math_agent"
+}
+
 def record_audit(event_type: str, severity: str, user: str, details: Dict[str, Any]):
     event = {
         "event_id": f"evt-{str(uuid.uuid4())[:8]}",
@@ -47,11 +53,18 @@ def record_audit(event_type: str, severity: str, user: str, details: Dict[str, A
     AUDIT_LOGS.append(event)
     return event
 
+class ContextDocument(BaseModel):
+    name: str
+    content: str
+    size: Optional[int] = 0
+
 class ChatRequest(BaseModel):
     prompt: str
     persona: str = "bob_ops"
     session_id: str = "default_session"
     model: Optional[str] = None
+    agent_id: Optional[str] = None
+    context_documents: Optional[List[ContextDocument]] = None
 
 class ConfirmActionRequest(BaseModel):
     confirmation_id: str
@@ -63,6 +76,39 @@ def handle_chat(req: ChatRequest):
     user = DEMO_PERSONAS.get(req.persona, DEMO_PERSONAS["bob_ops"])
     trace_id = f"trace-{str(uuid.uuid4())[:8]}"
     chosen_model = req.model or model_gateway.get_default_model()
+    session_id = req.session_id or f"session-{str(uuid.uuid4())[:8]}"
+
+    # Load session context from Firebase DB
+    session_ref = db.collection("chat_sessions").document(session_id)
+    session_doc = session_ref.get()
+    session_data = session_doc.to_dict() if session_doc.exists else {
+        "session_id": session_id,
+        "title": req.prompt.strip().replace("\n", " ")[:38] + ("..." if len(req.prompt.strip()) > 38 else ""),
+        "persona": user.sub,
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+        "messages": []
+    }
+
+    # Extract previous conversation history for Gemini multi-turn context
+    history_for_gemini = []
+    for m in session_data.get("messages", []):
+        m_role = "user" if m.get("role") in ["user", "human"] else "model"
+        m_text = m.get("content", "")
+        if m_text:
+            history_for_gemini.append({"role": m_role, "content": m_text})
+
+    # Integrate attached context documents into prompt
+    full_prompt = req.prompt
+    if req.context_documents:
+        doc_blocks = []
+        for doc in req.context_documents:
+            d_name = doc.name or "Document"
+            d_content = doc.content or ""
+            if len(d_content) > 25000:
+                d_content = d_content[:25000] + "\n...[truncated document content]..."
+            doc_blocks.append(f"📄 [ATTACHED CONTEXT DOCUMENT: {d_name}]\n{d_content}\n[END OF {d_name}]")
+        full_prompt = f"{req.prompt}\n\n=== User Uploaded Context Documents ===\n" + "\n\n".join(doc_blocks)
 
     # 1. Model Armor & ShieldGemma Safety Screen (Prompt Injection)
     guard_check = model_armor.screen_prompt(req.prompt)
@@ -75,14 +121,36 @@ def handle_chat(req: ChatRequest):
             "guardrail_engine": "ShieldGemma",
             "guardrail_model": guard_model
         })
+        blocked_reply = f"🛡️ **Security Alert - Model Armor Block**:\n\n{guard_check.details}\nYour request has been halted and logged by Google ShieldGemma."
+        
+        # Save to Firebase DB
+        session_data["messages"].append({
+            "id": f"msg-{str(uuid.uuid4())[:8]}",
+            "role": "user",
+            "content": req.prompt,
+            "timestamp": datetime.utcnow().isoformat(),
+            "documents": [{"name": d.name, "size": d.size} for d in (req.context_documents or [])]
+        })
+        session_data["messages"].append({
+            "id": f"msg-{str(uuid.uuid4())[:8]}",
+            "role": "assistant",
+            "content": blocked_reply,
+            "timestamp": datetime.utcnow().isoformat(),
+            "status": "BLOCKED_BY_GUARDRAIL"
+        })
+        session_data["updated_at"] = datetime.utcnow().isoformat()
+        session_ref.set(session_data)
+
         return {
-            "reply": f"🛡️ **Security Alert - Model Armor Block**:\n\n{guard_check.details}\nYour request has been halted and logged by Google ShieldGemma.",
+            "reply": blocked_reply,
             "trace_id": trace_id,
+            "session_id": session_id,
             "handled_by": {
                 "agent": "shieldgemma_guardrail",
                 "tool": None,
                 "reasoning": f"Adversarial {guard_check.threat_category} blocked by ShieldGemma.",
-                "model": guard_model
+                "model": guard_model,
+                "is_enterprise_agent": False
             },
             "status": "BLOCKED_BY_GUARDRAIL",
             "guardrail": {
@@ -93,21 +161,24 @@ def handle_chat(req: ChatRequest):
         }
 
     # 2. Router Intent Detection & Context Recognition
-    routing = router.route_query(req.prompt, user, req.session_id)
+    routing = router.route_query(full_prompt, user, session_id, target_agent_id=req.agent_id)
     if routing.requires_clarification:
         return {
             "reply": routing.clarification_question,
             "trace_id": trace_id,
+            "session_id": session_id,
             "handled_by": {
                 "agent": "router",
                 "tool": None,
                 "reasoning": routing.reasoning,
-                "model": chosen_model
+                "model": chosen_model,
+                "is_enterprise_agent": False
             },
             "status": "CLARIFICATION_REQUIRED"
         }
 
-    agent = agent_registry.get_agent(routing.selected_agent_id)
+    target_agent_id = req.agent_id if (req.agent_id and req.agent_id != "auto") else routing.selected_agent_id
+    agent = agent_registry.get_agent(target_agent_id)
     if not agent:
         from agent_registry.registry import AgentManifest
         agent = AgentManifest(
@@ -119,6 +190,8 @@ def handle_chat(req: ChatRequest):
         )
     tool_name = routing.suggested_tool
     tool_args = routing.suggested_args
+
+    is_enterprise_agent = (agent.id in ENTERPRISE_AGENT_IDS) or (agent.id not in ["cortex_assistant", "router", "shieldgemma_guardrail"])
 
     # 3. Two-Layer Access Control (Manifest + User RBAC)
     policy_decision = None
@@ -199,10 +272,11 @@ def handle_chat(req: ChatRequest):
     if tool_name == "generate_powerpoint_presentation":
         m365 = _get_m365()
         ppt_res = m365.generate_powerpoint_presentation(m365.PowerPointRequest(**tool_args))
+        download_url = f"/api/files/download/{ppt_res['file_name']}"
         download_card = {
             "file_name": ppt_res["file_name"],
             "file_type": "pptx",
-            "download_url": ppt_res["download_url"],
+            "download_url": download_url,
             "slide_count": ppt_res["slide_count"],
             "title": tool_args.get("deck_title", "PowerPoint Presentation")
         }
@@ -217,10 +291,11 @@ def handle_chat(req: ChatRequest):
     elif tool_name == "generate_word_document":
         m365 = _get_m365()
         doc_res = m365.generate_word_document(m365.WordDocRequest(**tool_args))
+        download_url = f"/api/files/download/{doc_res['file_name']}"
         download_card = {
             "file_name": doc_res["file_name"],
             "file_type": "docx",
-            "download_url": doc_res["download_url"],
+            "download_url": download_url,
             "title": tool_args.get("title", "Word Document")
         }
         tool_result = doc_res
@@ -247,11 +322,44 @@ def handle_chat(req: ChatRequest):
             f"**Body**:\n> {draft_res['body'].replace(chr(10), chr(10) + '> ')}\n\n"
             f"🔒 *In accordance with security policy, emails are never sent automatically. Click **Approve & Send** below to disburse.*"
         )
+        # Record draft action to Firebase DB session
+        session_data["messages"].append({
+            "id": f"msg-{str(uuid.uuid4())[:8]}",
+            "role": "user",
+            "content": req.prompt,
+            "timestamp": datetime.utcnow().isoformat(),
+            "documents": [{"name": d.name, "size": d.size} for d in (req.context_documents or [])]
+        })
+        session_data["messages"].append({
+            "id": f"msg-{str(uuid.uuid4())[:8]}",
+            "role": "assistant",
+            "content": reply,
+            "timestamp": datetime.utcnow().isoformat(),
+            "handled_by": {
+                "agent": agent.name,
+                "agent_id": agent.id,
+                "is_enterprise_agent": is_enterprise_agent,
+                "tool": "create_email_draft",
+                "reasoning": routing.reasoning,
+                "model": chosen_model
+            },
+            "status": "DRAFT_SAVED",
+            "email_draft": email_draft_card,
+            "pending_approval": pending.model_dump()
+        })
+        session_data["updated_at"] = datetime.utcnow().isoformat()
+        session_data["persona"] = user.sub
+        session_data["agent_id"] = agent.id
+        session_ref.set(session_data)
+
         return {
             "reply": reply,
             "trace_id": trace_id,
+            "session_id": session_id,
             "handled_by": {
                 "agent": agent.name,
+                "agent_id": agent.id,
+                "is_enterprise_agent": is_enterprise_agent,
                 "tool": "create_email_draft",
                 "reasoning": routing.reasoning,
                 "model": chosen_model
@@ -262,7 +370,6 @@ def handle_chat(req: ChatRequest):
         }
 
     elif tool_name == "get_leave_balance":
-        from database.firestore_client import db
         doc = db.collection("leave_balances").document(f"bal-{user.sub}").get()
         bal_data = doc.to_dict() if doc.exists else {"annual_pto_total": 20, "annual_pto_used": 6, "remaining_pto": 14}
         rem = bal_data.get("annual_pto_total", 20) - bal_data.get("annual_pto_used", 0)
@@ -276,7 +383,6 @@ def handle_chat(req: ChatRequest):
         tool_result = bal_data
 
     elif tool_name == "get_ticket":
-        from database.firestore_client import db
         ticket_key = tool_args.get("ticket_key", "PROJ-102")
         doc = db.collection("jira_tickets").document(ticket_key).get()
         t_data = doc.to_dict() if doc.exists else {"ticket_key": ticket_key, "title": "Payment webhook latency", "status": "IN_PROGRESS", "priority": "HIGH"}
@@ -291,7 +397,6 @@ def handle_chat(req: ChatRequest):
         tool_result = t_data
 
     elif tool_name == "get_employee_salary":
-        from database.firestore_client import db
         doc = db.collection("salaries").document(f"sal-{tool_args.get('employee_id', user.sub)}").get()
         sal_data = doc.to_dict() if doc.exists else {"base_salary": 165000.0, "currency": "USD", "bank_account_masked": "****4821"}
         reply = (
@@ -304,31 +409,73 @@ def handle_chat(req: ChatRequest):
         tool_result = sal_data
 
     else:
-        # Conversational generation using Model Gateway
+        # Conversational generation using Model Gateway with previous turn context
         system_inst = (
-            "You are cortex.ai, an intelligent enterprise AI assistant and digital workplace integration hub. "
-            "Answer general questions (weather, general knowledge, creative writing, explanations, code) "
-            "naturally, conversationally, and accurately. "
+            f"You are {agent.name} ({agent.owner_team}), an intelligent enterprise AI assistant on the cortex.ai platform. "
+            "Answer questions naturally, conversationally, and accurately. "
+            "When context documents are provided by the user, thoroughly analyze and directly reference their content. "
             "For organizational operations, you can also connect to HR, IT Jira, Finance, Ops, and Microsoft 365 tools."
         )
         model_res = model_gateway.generate(
-            prompt=req.prompt,
+            prompt=full_prompt,
             preferred_model=chosen_model,
             fallback_models=agent.fallback_models,
-            system_instruction=system_inst
+            system_instruction=system_inst,
+            history=history_for_gemini
         )
         reply = model_res.get("text") or f"Hello {user.name}! I am **{agent.name}** ({agent.owner_team}).\n\nHow can I help you today?"
         chosen_model = model_res.get("model", chosen_model)
 
+    # Clearly mention enterprise agent if used
+    if is_enterprise_agent:
+        mention_str = f"🤖 **Enterprise Agent Used:** `{agent.name}` ({agent.owner_team})"
+        if f"**{agent.name}**" not in reply and "Enterprise Agent" not in reply:
+            reply = f"{reply}\n\n{mention_str}"
+
     # Screen response through Model Armor for PII masking
     screened_reply = model_armor.screen_response(reply)
+
+    # Persist session conversation in Firebase DB
+    session_data["messages"].append({
+        "id": f"msg-{str(uuid.uuid4())[:8]}",
+        "role": "user",
+        "content": req.prompt,
+        "timestamp": datetime.utcnow().isoformat(),
+        "documents": [{"name": d.name, "size": d.size} for d in (req.context_documents or [])]
+    })
+    session_data["messages"].append({
+        "id": f"msg-{str(uuid.uuid4())[:8]}",
+        "role": "assistant",
+        "content": screened_reply,
+        "timestamp": datetime.utcnow().isoformat(),
+        "handled_by": {
+            "agent": agent.name,
+            "agent_id": agent.id,
+            "is_enterprise_agent": is_enterprise_agent,
+            "tool": tool_name,
+            "reasoning": routing.reasoning,
+            "model": chosen_model
+        },
+        "download_card": download_card,
+        "email_draft": email_draft_card,
+        "status": "SUCCESS"
+    })
+    session_data["updated_at"] = datetime.utcnow().isoformat()
+    session_data["persona"] = user.sub
+    session_data["agent_id"] = agent.id
+    if not session_data.get("title") or session_data.get("title") in ["New Chat", "default_session"] or len(session_data["messages"]) <= 2:
+        clean_t = req.prompt.strip().replace("\n", " ")
+        session_data["title"] = clean_t[:38] + ("..." if len(clean_t) > 38 else "")
+    session_ref.set(session_data)
 
     return {
         "reply": screened_reply,
         "trace_id": trace_id,
+        "session_id": session_id,
         "handled_by": {
             "agent": agent.name,
             "agent_id": agent.id,
+            "is_enterprise_agent": is_enterprise_agent,
             "tool": tool_name,
             "reasoning": routing.reasoning,
             "model": chosen_model
@@ -339,6 +486,55 @@ def handle_chat(req: ChatRequest):
         "email_draft": email_draft_card,
         "policy_decision": policy_decision.model_dump() if policy_decision else None
     }
+
+@router_api.get("/files/download/{file_name}", tags=["Files"])
+@router_api.get("/v1/files/download/{file_name}", tags=["Files"])
+def download_chat_file(file_name: str):
+    root_dir = Path(__file__).resolve().parent.parent.parent.parent
+    safe_name = Path(file_name).name
+    file_path = root_dir / "integrations" / "m365-connector" / "generated_files" / safe_name
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"File {safe_name} not found")
+    media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation" if safe_name.endswith(".pptx") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return FileResponse(path=file_path, filename=safe_name, media_type=media_type)
+
+@router_api.get("/chat/history", tags=["Chat"])
+def get_chat_history(persona: Optional[str] = "bob_ops"):
+    """Lists previous chat contexts from Firebase DB."""
+    sessions_ref = db.collection("chat_sessions")
+    results = []
+    for doc in sessions_ref.stream():
+        data = doc.to_dict()
+        if persona and data.get("persona") and data.get("persona") != persona:
+            continue
+        msg_count = len(data.get("messages", []))
+        last_msg = data.get("messages", [])[-1]["content"] if msg_count > 0 else ""
+        results.append({
+            "session_id": data.get("session_id", doc.id),
+            "title": data.get("title", "Chat Session"),
+            "persona": data.get("persona", persona),
+            "agent_id": data.get("agent_id", "auto"),
+            "created_at": data.get("created_at"),
+            "updated_at": data.get("updated_at"),
+            "message_count": msg_count,
+            "last_message": last_msg[:60] + ("..." if len(last_msg) > 60 else "")
+        })
+    results.sort(key=lambda x: x.get("updated_at") or "", reverse=True)
+    return {"sessions": results}
+
+@router_api.get("/chat/sessions/{session_id}", tags=["Chat"])
+def get_chat_session(session_id: str):
+    """Retrieves all messages for a specific chat context from Firebase DB."""
+    doc = db.collection("chat_sessions").document(session_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    return doc.to_dict()
+
+@router_api.delete("/chat/sessions/{session_id}", tags=["Chat"])
+def delete_chat_session(session_id: str):
+    """Deletes a chat context from Firebase DB."""
+    db.collection("chat_sessions").document(session_id).delete()
+    return {"status": "DELETED", "session_id": session_id}
 
 @router_api.post("/chat/confirm", tags=["Approvals"])
 def confirm_action(req: ConfirmActionRequest):

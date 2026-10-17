@@ -558,6 +558,20 @@
             <button onclick="switchTab('pods')" id="tab-pods" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition">🚀 Pods</button>
             <button onclick="switchTab('prompts')" id="tab-prompts" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition">📚 Prompt Library (18)</button>
             <button onclick="switchTab('agents')" id="tab-agents" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition">🤖 Team Agents (5)</button>
+
+            <!-- Chat History below Team Agents -->
+            <div class="pt-3 mt-3 border-t border-slate-200 dark:border-slate-800">
+              <div class="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <span class="flex items-center gap-1.5">
+                  <span>🕒</span>
+                  <span>Chat History</span>
+                </span>
+                <button type="button" onclick="startNewChatSession()" class="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-mono cursor-pointer" title="Start new chat">+ New</button>
+              </div>
+              <div id="sidebarChatHistory" class="space-y-1 max-h-52 overflow-y-auto pr-1 text-xs mt-1">
+                <div class="text-[11px] text-slate-400 px-2 py-1.5 italic">Loading history...</div>
+              </div>
+            </div>
           </nav>
         </div>
 
@@ -788,7 +802,34 @@
         <div class="flex-1 overflow-y-auto p-6" id="mainContainer">
           <!-- Chat Panel -->
           <div id="chatView" class="h-full flex flex-col justify-between max-w-4xl mx-auto">
-            <div id="messagesContainer" class="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+            <!-- Chat Controls Bar: Agent Selector & Current Session -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-2 border-b border-slate-200 dark:border-slate-800 text-xs">
+              <div class="flex items-center gap-2">
+                <label for="chatAgentSelect" class="text-slate-500 dark:text-slate-400 font-medium text-xs flex items-center gap-1.5">
+                  <span>🤖</span>
+                  <span>Target Agent:</span>
+                </label>
+                <select id="chatAgentSelect" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-pointer shadow-sm transition">
+                  <option value="auto" selected>⚡ Auto-Route (Intelligent Orchestrator)</option>
+                  <option value="hr_agent">👥 HR Operations Agent</option>
+                  <option value="finance_agent">💼 Corporate Finance Agent</option>
+                  <option value="it_support_agent">🎫 IT Support Agent</option>
+                  <option value="ops_agent">☁️ Cloud Operations Agent</option>
+                  <option value="productivity_agent">📝 Productivity & Office Agent</option>
+                  <option value="financial_benchmark">📊 Financial Benchmark Agent</option>
+                  <option value="swe_bench_agent">💻 SWE-bench Agent</option>
+                </select>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="currentSessionBadge" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-[11px] border border-slate-200 dark:border-slate-700 truncate max-w-[220px]" title="Current Active Session">Session: New</span>
+                <button type="button" onclick="startNewChatSession()" class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-600/20 hover:bg-blue-100 dark:hover:bg-blue-600/30 text-blue-600 dark:text-blue-400 text-xs font-semibold border border-blue-200 dark:border-blue-500/30 flex items-center gap-1 transition cursor-pointer" title="Start a fresh chat context">
+                  <span>➕</span>
+                  <span>New Chat</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="messagesContainer" class="flex-1 overflow-y-auto space-y-4 mb-3 pr-2">
               <div class="flex gap-3">
                 <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
                 <div class="border border-slate-800 bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-2">
@@ -797,18 +838,34 @@
               </div>
             </div>
 
-            <form onsubmit="handleSend(event)" class="relative mt-2 flex items-center">
-              <input type="text" id="promptInput" placeholder="Ask cortex.ai anything across HR, IT, Finance, Operations, or Office documents..." class="w-full bg-slate-900 border border-slate-800 rounded-2xl py-3.5 pl-4 pr-64 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" />
-              <div class="absolute right-2 top-2 bottom-2 flex items-center gap-2">
-                <select id="modelSelect" class="bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-medium text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm cursor-pointer transition">
-                  <option value="google/gemini-3-flash-preview">Gemini 3 Flash (Active)</option>
-                  <option value="google/gemini-3.5-flash">Gemini 3.5 Flash</option>
-                  <option value="google/gemini-3.8-flash">Gemini 3.8 Flash</option>
-                  <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option>
-                  <option value="anthropic/claude-3-5-sonnet" disabled>Claude 3.5 Sonnet (No API Key)</option>
-                  <option value="anthropic/claude-3-opus" disabled>Claude 3 Opus (No API Key)</option>
-                </select>
-                <button type="submit" class="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white shadow-md shadow-blue-600/30 transition">➤</button>
+            <!-- Attached Context Documents Container -->
+            <div id="attachedDocsContainer" class="hidden flex-wrap items-center gap-2 mb-2 p-2 bg-slate-900/90 border border-slate-800 rounded-xl">
+              <span class="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                <span>📎</span>
+                <span>Context Documents:</span>
+              </span>
+              <div id="attachedDocsList" class="flex flex-wrap items-center gap-1.5"></div>
+            </div>
+
+            <!-- Chat Input Form -->
+            <form onsubmit="handleSend(event)" class="relative flex items-center gap-2">
+              <input type="file" id="chatDocInput" multiple onchange="handleChatDocUpload(event)" class="hidden" accept=".txt,.md,.json,.csv,.py,.js,.html,.pdf,.doc,.docx" />
+              <button type="button" onclick="document.getElementById('chatDocInput').click()" class="w-11 h-11 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 flex items-center justify-center shadow-inner hover:border-slate-700 transition cursor-pointer shrink-0" title="Upload context document (.txt, .md, .json, .csv, .pdf, .docx)">
+                📎
+              </button>
+              <div class="relative flex-1 flex items-center">
+                <input type="text" id="promptInput" placeholder="Ask cortex.ai anything across HR, IT, Finance, Operations, or Office documents..." class="w-full bg-slate-900 border border-slate-800 rounded-2xl py-3.5 pl-4 pr-64 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" />
+                <div class="absolute right-2 top-2 bottom-2 flex items-center gap-2">
+                  <select id="modelSelect" class="bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-medium text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm cursor-pointer transition">
+                    <option value="google/gemini-3-flash-preview">Gemini 3 Flash (Active)</option>
+                    <option value="google/gemini-3.5-flash">Gemini 3.5 Flash</option>
+                    <option value="google/gemini-3.8-flash">Gemini 3.8 Flash</option>
+                    <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option>
+                    <option value="anthropic/claude-3-5-sonnet" disabled>Claude 3.5 Sonnet (No API Key)</option>
+                    <option value="anthropic/claude-3-opus" disabled>Claude 3 Opus (No API Key)</option>
+                  </select>
+                  <button type="submit" class="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white shadow-md shadow-blue-600/30 transition cursor-pointer">➤</button>
+                </div>
               </div>
             </form>
           </div>
@@ -1235,6 +1292,12 @@
             loadPodsHub();
           }
         }
+        if (typeof loadChatHistory === 'function') {
+          loadChatHistory();
+        }
+        if (typeof startNewChatSession === 'function') {
+          startNewChatSession();
+        }
       });
 
       // Initialize theme and profile on load
@@ -1261,6 +1324,9 @@
         if (tab === 'chat') {
           chatView.classList.remove('hidden');
           dynamicView.classList.add('hidden');
+          if (typeof loadChatHistory === 'function') {
+            loadChatHistory();
+          }
         } else {
           chatView.classList.add('hidden');
           dynamicView.classList.remove('hidden');
@@ -1333,46 +1399,297 @@
         }
       }
 
+      window._activeChatSessionId = 'session-' + Date.now();
+      window._chatAttachedDocs = [];
+
+      async function handleChatDocUpload(event) {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            window._chatAttachedDocs.push({
+              name: file.name,
+              content: e.target.result || '',
+              size: file.size
+            });
+            renderAttachedDocsList();
+          };
+          reader.readAsText(file);
+        }
+        event.target.value = '';
+      }
+      window.handleChatDocUpload = handleChatDocUpload;
+
+      function removeChatDoc(idx) {
+        window._chatAttachedDocs.splice(idx, 1);
+        renderAttachedDocsList();
+      }
+      window.removeChatDoc = removeChatDoc;
+
+      function renderAttachedDocsList() {
+        const container = document.getElementById('attachedDocsContainer');
+        const list = document.getElementById('attachedDocsList');
+        if (!container || !list) return;
+        if (!window._chatAttachedDocs || window._chatAttachedDocs.length === 0) {
+          container.classList.add('hidden');
+          list.innerHTML = '';
+          return;
+        }
+        container.classList.remove('hidden');
+        list.innerHTML = window._chatAttachedDocs.map((doc, idx) => `
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 text-[11px] font-mono border border-slate-700">
+            <span>📄</span>
+            <span class="truncate max-w-[140px]" title="${doc.name}">${doc.name}</span>
+            <span class="text-slate-400 text-[10px]">(${Math.round(doc.size / 1024 * 10) / 10}KB)</span>
+            <button type="button" onclick="removeChatDoc(${idx})" class="text-slate-400 hover:text-red-400 ml-1 cursor-pointer font-bold">✕</button>
+          </span>
+        `).join('');
+      }
+      window.renderAttachedDocsList = renderAttachedDocsList;
+
+      async function loadChatHistory() {
+        const container = document.getElementById('sidebarChatHistory');
+        if (!container) return;
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        try {
+          const r = await fetch('/api/chat/history?persona=' + persona);
+          if (!r.ok) return;
+          const data = await r.json();
+          const sessions = data.sessions || [];
+          if (sessions.length === 0) {
+            container.innerHTML = '<div class="text-[11px] text-slate-400 px-2 py-1.5 italic">No previous chats</div>';
+            return;
+          }
+          container.innerHTML = sessions.map(s => {
+            const isActive = s.session_id === window._activeChatSessionId;
+            const activeBg = isActive ? 'bg-blue-600/10 text-blue-400 border border-blue-500/30' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent';
+            const displayTitle = s.title || ('Chat ' + s.session_id.slice(-6));
+            return `
+              <div class="flex items-center justify-between p-1.5 rounded-lg ${activeBg} transition group cursor-pointer" onclick="loadChatSession('${s.session_id}')">
+                <div class="flex items-center gap-1.5 truncate flex-1 pr-1">
+                  <span class="text-xs">💬</span>
+                  <span class="truncate text-xs" title="${displayTitle}">${displayTitle}</span>
+                </div>
+                <button type="button" onclick="deleteChatSession('${s.session_id}', event)" class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400 px-1 text-xs cursor-pointer transition" title="Delete chat">✕</button>
+              </div>
+            `;
+          }).join('');
+        } catch(e) {
+          console.warn('Failed to load chat history:', e);
+        }
+      }
+      window.loadChatHistory = loadChatHistory;
+
+      async function loadChatSession(sessionId) {
+        window._activeChatSessionId = sessionId;
+        switchTab('chat');
+        const badge = document.getElementById('currentSessionBadge');
+        if (badge) badge.innerText = 'Session: ' + sessionId.slice(-8);
+
+        const mc = document.getElementById('messagesContainer');
+        if (!mc) return;
+        mc.innerHTML = '<div class="text-slate-400 text-xs p-3 font-mono">Loading conversation history...</div>';
+
+        try {
+          const r = await fetch('/api/chat/sessions/' + sessionId);
+          if (!r.ok) throw new Error('Session not found');
+          const data = await r.json();
+          if (badge && data.title) badge.innerText = data.title.slice(0, 22) + (data.title.length > 22 ? '...' : '');
+
+          const messages = data.messages || [];
+          if (messages.length === 0) {
+            mc.innerHTML = `
+              <div class="flex gap-3">
+                <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
+                <div class="border border-slate-800 bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-2">
+                  <div class="leading-relaxed">👋 Welcome to <strong>cortex.ai</strong>! Chat session loaded.</div>
+                </div>
+              </div>
+            `;
+            loadChatHistory();
+            return;
+          }
+
+          let html = '';
+          messages.forEach(m => {
+            if (m.role === 'user') {
+              let docsHtml = '';
+              if (m.documents && m.documents.length > 0) {
+                docsHtml = `<div class="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-blue-500/30 text-[10px] text-blue-200">
+                  ${m.documents.map(d => `<span class="px-1.5 py-0.5 rounded bg-blue-700/60 font-mono">📎 ${d.name}</span>`).join('')}
+                </div>`;
+              }
+              html += `<div class="flex gap-3 justify-end"><div class="bg-blue-600 p-4 rounded-2xl max-w-2xl text-sm shadow-sm leading-relaxed">${m.content}${docsHtml}</div></div>`;
+            } else {
+              let extra = '';
+              if (m.handled_by) {
+                const isEnt = m.handled_by.is_enterprise_agent || (m.handled_by.agent_id && m.handled_by.agent_id !== 'cortex_assistant');
+                const badgeClass = isEnt 
+                  ? 'bg-indigo-950/80 text-indigo-300 border-indigo-700/60 font-semibold shadow-sm' 
+                  : 'bg-slate-800 text-blue-400 border-slate-700';
+                const agentLabel = isEnt ? `🤖 Enterprise Agent: ${m.handled_by.agent}` : `⚡ Handled by: ${m.handled_by.agent}`;
+                extra += `<div class="pt-2 border-t border-slate-800 flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
+                  <span class="px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${badgeClass}">${agentLabel}</span>
+                  ${m.handled_by.tool ? `<span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">Tool: ${m.handled_by.tool}</span>` : ''}
+                  <span class="px-2 py-0.5 rounded bg-slate-800 text-amber-400 border border-slate-700">Model: ${m.handled_by.model || 'Gemini'}</span>
+                </div>`;
+              }
+              if (m.download_card) {
+                let downUrl = m.download_card.download_url || '';
+                downUrl = downUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, '');
+                if (!downUrl.startsWith('/') && !downUrl.startsWith('http')) downUrl = '/' + downUrl;
+                extra += `<div class="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-3">
+                    <span class="text-2xl">${m.download_card.file_type === 'pptx' ? '📊' : '📝'}</span>
+                    <div>
+                      <div class="font-semibold text-xs text-slate-200">${m.download_card.title}</div>
+                      <div class="text-[11px] text-slate-400 font-mono">${m.download_card.file_name}</div>
+                    </div>
+                  </div>
+                  <a href="${downUrl}" download="${m.download_card.file_name}" class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <span>⬇️</span>
+                    <span>Download</span>
+                  </a>
+                </div>`;
+              }
+              html += `<div class="flex gap-3">
+                <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
+                <div class="border border-slate-800 bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-3">
+                  <div class="whitespace-pre-wrap leading-relaxed">${m.content}</div>
+                  ${extra}
+                </div>
+              </div>`;
+            }
+          });
+          mc.innerHTML = html;
+          mc.scrollTop = mc.scrollHeight;
+          loadChatHistory();
+        } catch(e) {
+          mc.innerHTML = `<div class="text-red-400 text-xs p-3">Failed to load chat session: ${e.message}</div>`;
+        }
+      }
+      window.loadChatSession = loadChatSession;
+
+      function startNewChatSession() {
+        window._activeChatSessionId = 'session-' + Date.now();
+        window._chatAttachedDocs = [];
+        renderAttachedDocsList();
+        const badge = document.getElementById('currentSessionBadge');
+        if (badge) badge.innerText = 'Session: New';
+
+        const mc = document.getElementById('messagesContainer');
+        if (mc) {
+          mc.innerHTML = `
+            <div class="flex gap-3">
+              <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
+              <div class="border border-slate-800 bg-slate-900 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-2">
+                <div class="leading-relaxed">👋 Welcome to <strong>cortex.ai</strong>! I am your enterprise orchestration hub. Ask me about HR, IT Support, Finance, Cloud Ops, or Microsoft 365 office documents.</div>
+              </div>
+            </div>
+          `;
+        }
+        const promptInput = document.getElementById('promptInput');
+        if (promptInput) promptInput.focus();
+        loadChatHistory();
+      }
+      window.startNewChatSession = startNewChatSession;
+
+      async function deleteChatSession(sessionId, event) {
+        if (event) event.stopPropagation();
+        try {
+          await fetch('/api/chat/sessions/' + sessionId, { method: 'DELETE' });
+          Toast.show('Chat context deleted', 'info');
+          if (window._activeChatSessionId === sessionId) {
+            startNewChatSession();
+          } else {
+            loadChatHistory();
+          }
+        } catch(e) {
+          Toast.show('Failed to delete chat: ' + e.message, 'error');
+        }
+      }
+      window.deleteChatSession = deleteChatSession;
+
       async function handleSend(e) {
         if (e) e.preventDefault();
         const input = document.getElementById('promptInput');
         const text = input.value.trim();
-        if (!text) return;
+        if (!text && (!window._chatAttachedDocs || window._chatAttachedDocs.length === 0)) return;
         input.value = '';
 
+        const docsToSend = Array.from(window._chatAttachedDocs || []);
+        window._chatAttachedDocs = [];
+        renderAttachedDocsList();
+
+        let userDocsHtml = '';
+        if (docsToSend.length > 0) {
+          userDocsHtml = `<div class="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-blue-500/30 text-[10px] text-blue-200">
+            ${docsToSend.map(d => `<span class="px-1.5 py-0.5 rounded bg-blue-700/60 font-mono">📎 ${d.name}</span>`).join('')}
+          </div>`;
+        }
+
         const mc = document.getElementById('messagesContainer');
-        mc.innerHTML += `<div class="flex gap-3 justify-end"><div class="bg-blue-600 p-4 rounded-2xl max-w-2xl text-sm shadow-sm leading-relaxed">${text}</div></div>`;
+        mc.innerHTML += `<div class="flex gap-3 justify-end"><div class="bg-blue-600 p-4 rounded-2xl max-w-2xl text-sm shadow-sm leading-relaxed">${text || '(Attached document context)'}${userDocsHtml}</div></div>`;
         mc.scrollTop = mc.scrollHeight;
 
         try {
           const persona = document.getElementById('personaSelect').value;
           const model = document.getElementById('modelSelect') ? document.getElementById('modelSelect').value : null;
+          const targetAgent = document.getElementById('chatAgentSelect') ? document.getElementById('chatAgentSelect').value : 'auto';
+          const sessionId = window._activeChatSessionId || ('session-' + Date.now());
+
           const r = await fetch('/api/chat', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ prompt: text, persona: persona, model: model })
+            body: JSON.stringify({
+              prompt: text || 'Please review and summarize the attached document.',
+              persona: persona,
+              model: model,
+              session_id: sessionId,
+              agent_id: targetAgent,
+              context_documents: docsToSend
+            })
           });
           const data = await r.json();
 
+          if (data.session_id) {
+            window._activeChatSessionId = data.session_id;
+            const badge = document.getElementById('currentSessionBadge');
+            if (badge) badge.innerText = 'Session: ' + data.session_id.slice(-8);
+          }
+
           let extra = '';
           if (data.handled_by) {
+            const isEnt = data.handled_by.is_enterprise_agent || (data.handled_by.agent_id && data.handled_by.agent_id !== 'cortex_assistant');
+            const badgeClass = isEnt 
+              ? 'bg-indigo-950/80 text-indigo-300 border-indigo-700/60 font-semibold shadow-sm' 
+              : 'bg-slate-800 text-blue-400 border-slate-700';
+            const agentLabel = isEnt ? `🤖 Enterprise Agent: ${data.handled_by.agent}` : `⚡ Handled by: ${data.handled_by.agent}`;
             extra += `<div class="pt-2 border-t border-slate-800 flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
-              <span class="px-2 py-0.5 rounded bg-slate-800 text-blue-400 border border-slate-700">Handled by: ${data.handled_by.agent}</span>
+              <span class="px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${badgeClass}">${agentLabel}</span>
               ${data.handled_by.tool ? `<span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">Tool: ${data.handled_by.tool}</span>` : ''}
               <span class="px-2 py-0.5 rounded bg-slate-800 text-amber-400 border border-slate-700">Model: ${data.handled_by.model || 'Gemini'}</span>
             </div>`;
           }
 
           if (data.download_card) {
-            extra += `<div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-between">
+            let downUrl = data.download_card.download_url || '';
+            downUrl = downUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, '');
+            if (!downUrl.startsWith('/') && !downUrl.startsWith('http')) downUrl = '/' + downUrl;
+            extra += `<div class="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-between gap-3">
               <div class="flex items-center gap-3">
                 <span class="text-2xl">${data.download_card.file_type === 'pptx' ? '📊' : '📝'}</span>
                 <div>
                   <div class="font-semibold text-xs text-slate-200">${data.download_card.title}</div>
-                  <div class="text-[11px] text-slate-400 font-mono">${data.download_card.file_name} (${data.download_card.slide_count || 1} slides)</div>
+                  <div class="text-[11px] text-slate-400 font-mono">${data.download_card.file_name} ${data.download_card.slide_count ? `(${data.download_card.slide_count} slides)` : ''}</div>
                 </div>
               </div>
-              <a href="${data.download_card.download_url}" target="_blank" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition flex items-center gap-1.5">⬇️ Download</a>
+              <a href="${downUrl}" download="${data.download_card.file_name}" class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer">
+                <span>⬇️</span>
+                <span>Download</span>
+              </a>
             </div>`;
           }
 
@@ -1403,6 +1720,7 @@
             </div>
           </div>`;
           mc.scrollTop = mc.scrollHeight;
+          loadChatHistory();
         } catch(err) {
           mc.innerHTML += `<div class="text-red-400 text-xs p-2">Error communicating with cortex.ai hub (:8000).</div>`;
         }
@@ -5312,6 +5630,9 @@ Would you like to download the full application bundle (.ZIP) to your machine no
         }
       }
       loadModels();
+      if (typeof loadChatHistory === 'function') {
+        loadChatHistory();
+      }
     </script>
     
 </body>

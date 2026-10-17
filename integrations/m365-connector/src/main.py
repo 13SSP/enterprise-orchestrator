@@ -145,7 +145,7 @@ def generate_word_document(req: WordDocRequest):
         output_path=file_path,
         author=req.author
     )
-    download_url = f"/api/v1/files/download/{doc_id}"
+    download_url = f"/api/files/download/{doc_id}"
     return {
         "status": "DOCUMENT_CREATED",
         "file_name": doc_id,
@@ -167,7 +167,7 @@ def generate_powerpoint_presentation(req: PowerPointRequest):
         slides=req.slides,
         output_path=file_path
     )
-    download_url = f"/api/v1/files/download/{deck_id}"
+    download_url = f"/api/files/download/{deck_id}"
     return {
         "status": "PRESENTATION_CREATED",
         "file_name": deck_id,

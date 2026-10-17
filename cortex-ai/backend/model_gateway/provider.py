@@ -24,7 +24,8 @@ class BaseModelProvider(ABC):
         self,
         prompt: str,
         system_instruction: Optional[str] = None,
-        response_mime_type: Optional[str] = None
+        response_mime_type: Optional[str] = None,
+        history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         pass
 
@@ -48,7 +49,8 @@ class VertexGeminiProvider(BaseModelProvider):
         self,
         prompt: str,
         system_instruction: Optional[str] = None,
-        response_mime_type: Optional[str] = None
+        response_mime_type: Optional[str] = None,
+        history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         if not self._client:
             raise RuntimeError(f"Gemini client not initialized for {self.model_name}; missing or invalid API key.")
@@ -58,6 +60,19 @@ class VertexGeminiProvider(BaseModelProvider):
             config["system_instruction"] = system_instruction
         if response_mime_type:
             config["response_mime_type"] = response_mime_type
+
+        # Multi-turn conversation context
+        if history:
+            from google.genai import types
+            contents_payload = []
+            for h in history:
+                role = "user" if h.get("role") in ["user", "human"] else "model"
+                text = h.get("content", "")
+                if text:
+                    contents_payload.append(types.Content(role=role, parts=[types.Part.from_text(text=text)]))
+            contents_payload.append(types.Content(role="user", parts=[types.Part.from_text(text=prompt)]))
+        else:
+            contents_payload = prompt
 
         # Candidate models to try in order of availability and stability
         candidate_models = [self.model_name]
@@ -70,7 +85,7 @@ class VertexGeminiProvider(BaseModelProvider):
             try:
                 res = self._client.models.generate_content(
                     model=m,
-                    contents=prompt,
+                    contents=contents_payload,
                     config=config
                 )
                 if res and res.text:
@@ -108,7 +123,8 @@ class AnthropicClaudeProvider(BaseModelProvider):
         self,
         prompt: str,
         system_instruction: Optional[str] = None,
-        response_mime_type: Optional[str] = None
+        response_mime_type: Optional[str] = None,
+        history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         if not self.is_available():
             raise RuntimeError(f"Anthropic model {self.model_name} is disabled because no ANTHROPIC_API_KEY was provided.")
@@ -117,10 +133,19 @@ class AnthropicClaudeProvider(BaseModelProvider):
             import anthropic
             self._client = anthropic.Anthropic(api_key=self.api_key)
 
+        messages = []
+        if history:
+            for h in history:
+                role = "user" if h.get("role") in ["user", "human"] else "assistant"
+                text = h.get("content", "")
+                if text:
+                    messages.append({"role": role, "content": text})
+        messages.append({"role": "user", "content": prompt})
+
         kwargs: Dict[str, Any] = {
             "model": self.model_name,
             "max_tokens": 1024,
-            "messages": [{"role": "user", "content": prompt}]
+            "messages": messages
         }
         if system_instruction:
             kwargs["system"] = system_instruction
@@ -145,7 +170,8 @@ class VertexModelGardenProvider(BaseModelProvider):
         self,
         prompt: str,
         system_instruction: Optional[str] = None,
-        response_mime_type: Optional[str] = None
+        response_mime_type: Optional[str] = None,
+        history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         if not self.is_available():
             raise RuntimeError("Vertex Model Garden endpoint not configured.")
@@ -171,7 +197,8 @@ class OfflineStubProvider(BaseModelProvider):
         self,
         prompt: str,
         system_instruction: Optional[str] = None,
-        response_mime_type: Optional[str] = None
+        response_mime_type: Optional[str] = None,
+        history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         p_lower = prompt.lower()
         if response_mime_type == "application/json":
@@ -349,7 +376,8 @@ class ModelGateway:
         preferred_model: Optional[str] = None,
         fallback_models: Optional[List[str]] = None,
         system_instruction: Optional[str] = None,
-        response_mime_type: Optional[str] = None
+        response_mime_type: Optional[str] = None,
+        history: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         candidates = []
         if preferred_model:
@@ -381,7 +409,8 @@ class ModelGateway:
                 res = provider.generate_content(
                     prompt=prompt,
                     system_instruction=system_instruction,
-                    response_mime_type=response_mime_type
+                    response_mime_type=response_mime_type,
+                    history=history
                 )
                 if res and res.get("text"):
                     return res
@@ -391,7 +420,8 @@ class ModelGateway:
         res = self.stub_provider.generate_content(
             prompt=prompt,
             system_instruction=system_instruction,
-            response_mime_type=response_mime_type
+            response_mime_type=response_mime_type,
+            history=history
         )
         res["model"] = "offline/stub (Offline Fallback)"
         return res
