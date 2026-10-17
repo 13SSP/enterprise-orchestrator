@@ -3,7 +3,7 @@ cortex.ai - Unified Database Models
 Pydantic model definitions for enterprise Firestore collections.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field
 from datetime import datetime
 import uuid
@@ -179,11 +179,59 @@ class SDDConfig(BaseModel):
     approval_status: str = Field("approved")
 
 
+
+SpecLifecycleState = Literal["draft", "in_review", "approved", "deprecated"]
+StorageMode = Literal["local", "cloud"]
+
+
+class SpecVersion(BaseModel):
+    version_id: str = Field(default_factory=lambda: f"v{datetime.utcnow().strftime('%Y%m%d%H%M%S')}")
+    version_tag: str = Field("v1.0", description="Semantic version tag, e.g. v1.0, v1.1")
+    raw_markdown: str = Field("", description="Authoritative specification markdown content")
+    requirements: List[Dict[str, Any]] = Field(default_factory=list)
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_by: str = Field("system", description="Author who created this revision")
+    change_summary: str = Field("", description="Summary of changes in this version")
+
+
+class FeatureSpec(BaseModel):
+    feature_id: str = Field(default_factory=lambda: f"feat-{str(uuid.uuid4())[:8]}")
+    title: str = Field(..., description="Feature title")
+    description: str = Field("", description="Overview of feature scope")
+    lifecycle_state: SpecLifecycleState = Field("draft")
+    active_version: str = Field("v1.0")
+    source_type: Literal["ai", "doc", "manual"] = Field("manual")
+    raw_markdown: str = Field("", description="Current active specification markdown")
+    requirements: List[Dict[str, Any]] = Field(default_factory=list)
+    versions: List[SpecVersion] = Field(default_factory=list)
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_by: str = Field("bob_ops")
+    updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+
+class PrototypeApp(BaseModel):
+    prototype_id: str = Field(default_factory=lambda: f"proto-{str(uuid.uuid4())[:8]}")
+    pod_id: str = Field(..., description="ID of the parent POD")
+    title: str = Field(..., description="Application or Prototype title")
+    description: str = Field("", description="Prototype summary")
+    linked_feature_id: Optional[str] = Field(None, description="Linked FeatureSpec ID")
+    linked_spec_version: Optional[str] = Field("v1.0", description="Linked spec version")
+    storage_mode: StorageMode = Field("local", description="Where the prototype is stored: 'local' machine or 'cloud'")
+    local_path: Optional[str] = Field(None, description="Local machine directory path (visible ONLY to creator)")
+    creator_id: str = Field(..., description="Authenticated user ID who created this prototype")
+    creator_name: str = Field("Bob Martinez")
+    status: Literal["building", "ready", "test_passed", "test_failed"] = Field("ready")
+    test_output: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    files: List[str] = Field(default_factory=list, description="Relative file paths in prototype")
+
+
 class Workspace(BaseModel):
     workspace_id: str = Field(..., description="Unique workspace ID, e.g. ws-my-app")
     name: str = Field(..., description="Workspace title")
     description: str = Field("", description="Purpose or scope of workspace")
     workspace_type: str = Field("chat", description="'chat' or 'sdd'")
+    pod_type: str = Field("chat", description="Canonical pod type: 'chat' or 'sdd'")
     visibility: str = Field("private", description="'public' or 'private'")
     owner_id: str = Field(..., description="Employee ID of owner who created it")
     owner_name: str = Field(..., description="Full name of owner")
@@ -195,10 +243,13 @@ class Workspace(BaseModel):
     spec: Optional[SDDSpec] = None
     plan: Optional[SDDPlan] = None
     tasks: List[SDDTask] = Field(default_factory=list)
+    features: List[FeatureSpec] = Field(default_factory=list)
+    prototypes: List[PrototypeApp] = Field(default_factory=list)
     documents: List[Dict[str, Any]] = Field(default_factory=list)
     prompts: List[Dict[str, Any]] = Field(default_factory=list)
     chat_messages: List[ChatMessage] = Field(default_factory=list)
     chat_sessions: List[str] = Field(default_factory=list)
     execution_logs: List[Dict[str, Any]] = Field(default_factory=list)
+
 
 

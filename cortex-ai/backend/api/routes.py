@@ -5,10 +5,11 @@ Provides endpoints for Chat, Human Approvals, Agent Registry, Tool Catalog, Mode
 
 import uuid
 import json
+import time
 import httpx
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel, Field
 import sys
 from pathlib import Path
@@ -29,6 +30,8 @@ from router.agent_router import router, SESSION_HISTORY
 router_api = APIRouter(prefix="/api")
 
 AUDIT_LOGS: List[Dict[str, Any]] = []
+IDEMPOTENCY_CACHE: Dict[str, Any] = {}
+IDEMPOTENCY_TIMESTAMPS: Dict[str, float] = {}
 
 def record_audit(event_type: str, severity: str, user: str, details: Dict[str, Any]):
     event = {
@@ -506,11 +509,15 @@ class CreateWorkspaceRequest(BaseModel):
     name: str
     description: Optional[str] = ""
     workspace_type: str = Field("chat", description="'chat' or 'sdd'")
+    pod_type: Optional[str] = None
     visibility: str = Field("public", description="'public' or 'private'")
     invited_employee_ids: List[str] = Field(default_factory=list)
     system_instructions: Optional[str] = None
     sdd_config: Optional[Dict[str, Any]] = None
     initial_prompt: Optional[str] = None
+    client_request_id: Optional[str] = None
+    requirement_doc_name: Optional[str] = None
+    requirement_doc_content: Optional[str] = None
 
 
 class WorkspaceInviteRequest(BaseModel):
@@ -529,6 +536,47 @@ class WorkspaceInstructionsRequest(BaseModel):
 class WorkspaceChatRequest(BaseModel):
     prompt: str
     persona: str = "bob_ops"
+    feature_id: Optional[str] = None
+    client_request_id: Optional[str] = None
+
+
+class CreateFeatureRequest(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    source_type: Optional[str] = "manual"  # "ai", "doc", "manual"
+    source_content: Optional[str] = ""
+    creation_mode: Optional[str] = None
+    source_doc_text: Optional[str] = ""
+    raw_markdown: Optional[str] = ""
+    requirements: List[Dict[str, Any]] = Field(default_factory=list)
+    acceptance_criteria: List[str] = Field(default_factory=list)
+    lifecycle_state: Optional[str] = "draft"
+
+
+class UpdateFeatureRequest(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    lifecycle_state: Optional[str] = None
+    raw_markdown: Optional[str] = None
+    requirements: Optional[List[Dict[str, Any]]] = None
+    acceptance_criteria: Optional[List[str]] = None
+    bump_version: Optional[bool] = False
+    change_summary: Optional[str] = None
+
+
+class BuildPrototypeRequest(BaseModel):
+    name: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = ""
+    feature_id: Optional[str] = None
+    linked_feature_id: Optional[str] = None
+    linked_spec_version: Optional[str] = "v1.0"
+    storage_mode: Optional[str] = "local"
+    tech_stack: Optional[str] = "Python 3.11 / FastAPI / Pytest"
+    initial_prompt: Optional[str] = ""
+    task_id: Optional[str] = "TSK-101"
+    local_path: Optional[str] = None
+    client_request_id: Optional[str] = None
 
 
 class UpdateSpecRequest(BaseModel):
@@ -577,7 +625,28 @@ def list_workspaces(filter: str = "public", persona: str = "bob_ops", search: st
 
 @router_api.post("/workspaces", tags=["Workspaces"])
 @router_api.post("/pods", tags=["Pods"])
-def create_workspace(req: CreateWorkspaceRequest, persona: str = "bob_ops"):
+def create_workspace(
+    req: CreateWorkspaceRequest,
+    persona: str = "bob_ops",
+    x_client_request_id: Optional[str] = Header(None, alias="x-client-request-id")
+):
+    now = time.time()
+    req_id = req.client_request_id or x_client_request_id
+
+    # 1. Idempotency check via client_request_id
+    if req_id:
+        if req_id in IDEMPOTENCY_CACHE and (now - IDEMPOTENCY_TIMESTAMPS.get(req_id, 0) < 60):
+            cached = dict(IDEMPOTENCY_CACHE[req_id])
+            cached["idempotent_replay"] = True
+            return cached
+
+    # 2. In-flight / Rapid duplicate creation guard
+    dedup_key = f"{persona}:{req.name.strip().lower()}:{req.workspace_type}"
+    if dedup_key in IDEMPOTENCY_CACHE and (now - IDEMPOTENCY_TIMESTAMPS.get(dedup_key, 0) < 4):
+        cached = dict(IDEMPOTENCY_CACHE[dedup_key])
+        cached["idempotent_replay"] = True
+        return cached
+
     payload = req.model_dump()
     new_ws = workspace_manager.create_workspace(payload, current_user_id=persona)
     record_audit(
@@ -586,13 +655,22 @@ def create_workspace(req: CreateWorkspaceRequest, persona: str = "bob_ops"):
         user=persona,
         details={"workspace_id": new_ws["workspace_id"], "name": new_ws["name"], "type": new_ws["workspace_type"]}
     )
-    return {"status": "created", "workspace": new_ws}
+    result = {"status": "created", "workspace": new_ws}
+
+    # Cache for idempotency
+    if req_id:
+        IDEMPOTENCY_CACHE[req_id] = result
+        IDEMPOTENCY_TIMESTAMPS[req_id] = now
+    IDEMPOTENCY_CACHE[dedup_key] = result
+    IDEMPOTENCY_TIMESTAMPS[dedup_key] = now
+
+    return result
 
 
 @router_api.get("/workspaces/{workspace_id}", tags=["Workspaces"])
 @router_api.get("/pods/{workspace_id}", tags=["Pods"])
-def get_workspace_details(workspace_id: str):
-    ws = workspace_manager.get_workspace(workspace_id)
+def get_workspace_details(workspace_id: str, persona: str = "bob_ops"):
+    ws = workspace_manager.get_workspace(workspace_id, current_user=persona)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found")
     return ws
@@ -774,10 +852,127 @@ def run_sdd_tests(workspace_id: str, persona: str = "bob_ops"):
 @router_api.post("/pods/{workspace_id}/chat", tags=["Pods"])
 def chat_in_workspace(workspace_id: str, req: WorkspaceChatRequest):
     try:
-        res = workspace_manager.send_chat_message(workspace_id, prompt=req.prompt, persona=req.persona)
+        res = workspace_manager.send_chat_message(
+            workspace_id,
+            prompt=req.prompt,
+            persona=req.persona,
+            feature_id=req.feature_id
+        )
         return res
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==========================================
+# SPACE 1: SPEC-DRIVEN DEVELOPMENT FEATURES ROUTES
+# ==========================================
+
+@router_api.get("/workspaces/{workspace_id}/features", tags=["Workspaces"])
+@router_api.get("/pods/{workspace_id}/features", tags=["Pods"])
+def list_pod_features(workspace_id: str, persona: str = "bob_ops"):
+    try:
+        features = workspace_manager.list_features(workspace_id, current_user=persona)
+        return {"features": features, "count": len(features)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.post("/workspaces/{workspace_id}/features", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/features", tags=["Pods"])
+def create_pod_feature(workspace_id: str, req: CreateFeatureRequest, persona: str = "bob_ops"):
+    try:
+        feat = workspace_manager.create_feature(workspace_id, req.model_dump(), current_user=persona)
+        record_audit(
+            event_type="POD_FEATURE_CREATED",
+            severity="INFO",
+            user=persona,
+            details={"workspace_id": workspace_id, "feature_id": feat["feature_id"], "title": feat["title"]}
+        )
+        return {"status": "created", "feature": feat}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.put("/workspaces/{workspace_id}/features/{feature_id}", tags=["Workspaces"])
+@router_api.put("/pods/{workspace_id}/features/{feature_id}", tags=["Pods"])
+def update_pod_feature(workspace_id: str, feature_id: str, req: UpdateFeatureRequest, persona: str = "bob_ops"):
+    try:
+        feat = workspace_manager.update_feature(
+            workspace_id,
+            feature_id,
+            req.model_dump(exclude_unset=True),
+            current_user=persona
+        )
+        record_audit(
+            event_type="POD_FEATURE_UPDATED",
+            severity="INFO",
+            user=persona,
+            details={"workspace_id": workspace_id, "feature_id": feature_id, "version": feat.get("active_version")}
+        )
+        return {"status": "updated", "feature": feat}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.delete("/workspaces/{workspace_id}/features/{feature_id}", tags=["Workspaces"])
+@router_api.delete("/pods/{workspace_id}/features/{feature_id}", tags=["Pods"])
+def delete_pod_feature(workspace_id: str, feature_id: str, persona: str = "bob_ops"):
+    try:
+        workspace_manager.delete_feature(workspace_id, feature_id, current_user=persona)
+        return {"status": "deleted", "feature_id": feature_id}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==========================================
+# SPACE 3: PROTOTYPE HUB ROUTES
+# ==========================================
+
+@router_api.get("/workspaces/{workspace_id}/prototypes", tags=["Workspaces"])
+@router_api.get("/pods/{workspace_id}/prototypes", tags=["Pods"])
+def list_pod_prototypes(workspace_id: str, persona: str = "bob_ops"):
+    try:
+        prototypes = workspace_manager.list_prototypes(workspace_id, current_user=persona)
+        return {"prototypes": prototypes, "count": len(prototypes)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.post("/workspaces/{workspace_id}/prototypes/build", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/prototypes/build", tags=["Pods"])
+def build_pod_prototype(workspace_id: str, req: BuildPrototypeRequest, persona: str = "bob_ops"):
+    try:
+        res = workspace_manager.create_prototype(workspace_id, req.model_dump(), current_user=persona)
+        record_audit(
+            event_type="PROTOTYPE_BUILT",
+            severity="INFO",
+            user=persona,
+            details={
+                "workspace_id": workspace_id,
+                "prototype_id": res["prototype"]["prototype_id"],
+                "storage_mode": res["prototype"]["storage_mode"]
+            }
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.delete("/workspaces/{workspace_id}/prototypes/{prototype_id}", tags=["Workspaces"])
+@router_api.delete("/pods/{workspace_id}/prototypes/{prototype_id}", tags=["Pods"])
+def delete_pod_prototype(workspace_id: str, prototype_id: str, persona: str = "bob_ops"):
+    try:
+        workspace_manager.delete_prototype(workspace_id, prototype_id, current_user=persona)
+        return {"status": "deleted", "prototype_id": prototype_id}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 
 # ==========================================

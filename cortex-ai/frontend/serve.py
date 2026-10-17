@@ -303,11 +303,229 @@ def build_dist_html():
           <div id="dynamicView" class="hidden max-w-5xl mx-auto space-y-4"></div>
           <!-- Modal Backdrop -->
           <div id="modalBackdrop" onclick="if (event.target === this) closeModal(event)" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4"></div>
+          <!-- Toast Notification Container -->
+          <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
         </div>
       </main>
     </div>
 
     <script>
+      // ==========================================
+      // TOAST NOTIFICATIONS (NON-BLOCKING FEEDBACK)
+      // ==========================================
+      const Toast = {
+        show(message, type = 'info', duration = 3500) {
+          let container = document.getElementById('toastContainer');
+          if (!container) {
+            container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.className = 'fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none';
+            document.body.appendChild(container);
+          }
+          const toast = document.createElement('div');
+          toast.className = 'pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl text-xs font-medium transition-all transform duration-300 ease-out translate-y-2 opacity-0 max-w-sm border backdrop-blur-md';
+          let icon = 'ℹ️';
+          let colorClasses = 'bg-slate-900/95 text-slate-100 border-slate-700';
+          if (type === 'success') {
+            icon = '✅';
+            colorClasses = 'bg-emerald-950/95 text-emerald-100 border-emerald-800 shadow-emerald-900/20';
+          } else if (type === 'error') {
+            icon = '❌';
+            colorClasses = 'bg-rose-950/95 text-rose-100 border-rose-800 shadow-rose-900/20';
+          } else if (type === 'warning') {
+            icon = '⚠️';
+            colorClasses = 'bg-amber-950/95 text-amber-100 border-amber-800 shadow-amber-900/20';
+          }
+          toast.className += ' ' + colorClasses;
+          toast.innerHTML = `
+            <span class="text-sm shrink-0">${icon}</span>
+            <span class="flex-1 leading-snug break-words">${message}</span>
+            <button type="button" class="text-slate-400 hover:text-white ml-2 text-xs font-bold leading-none shrink-0" onclick="this.parentElement.remove()">✕</button>
+          `;
+          container.appendChild(toast);
+          requestAnimationFrame(() => {
+            toast.classList.remove('translate-y-2', 'opacity-0');
+          });
+          setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-y-2');
+            setTimeout(() => toast.remove(), 300);
+          }, duration);
+        }
+      };
+      window.Toast = Toast;
+
+      // ==========================================
+      // ASYNC ACTION IN-FLIGHT GUARD & SPINNER HELPER
+      // ==========================================
+      const AsyncAction = {
+        _busyKeys: new Set(),
+        isBusy(key) {
+          return this._busyKeys.has(key);
+        },
+        async execute(actionKey, buttonEl, asyncCallback, options = {}) {
+          if (this._busyKeys.has(actionKey)) {
+            console.warn(`[AsyncAction] Action '${actionKey}' is already in flight. Suppressing duplicate trigger.`);
+            return null;
+          }
+          this._busyKeys.add(actionKey);
+          let originalHtml = '';
+          let originalPointerEvents = '';
+
+          if (buttonEl) {
+            buttonEl.disabled = true;
+            buttonEl.setAttribute('aria-busy', 'true');
+            originalPointerEvents = buttonEl.style.pointerEvents;
+            buttonEl.style.pointerEvents = 'none';
+            originalHtml = buttonEl.innerHTML;
+            const loadingLabel = options.loadingText || 'Processing...';
+            buttonEl.innerHTML = `
+              <svg class="animate-spin -ml-1 mr-2 h-3.5 w-3.5 inline text-current shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+              <span>${loadingLabel}</span>
+            `;
+          }
+
+          try {
+            const result = await asyncCallback();
+            if (options.successMessage) {
+              Toast.show(options.successMessage, 'success');
+            }
+            return result;
+          } catch (err) {
+            console.error(`[AsyncAction Error: ${actionKey}]`, err);
+            const errMsg = err.message || 'An error occurred';
+            Toast.show(errMsg, 'error');
+            throw err;
+          } finally {
+            this._busyKeys.delete(actionKey);
+            if (buttonEl) {
+              buttonEl.disabled = false;
+              buttonEl.removeAttribute('aria-busy');
+              buttonEl.style.pointerEvents = originalPointerEvents;
+              buttonEl.innerHTML = originalHtml;
+            }
+          }
+        }
+      };
+      window.AsyncAction = AsyncAction;
+
+      // ==========================================
+      // ZERO-CLS SKELETON SCREENS
+      // ==========================================
+      function renderDirectorySkeleton() {
+        const dv = document.getElementById('dynamicView');
+        if (!dv) return;
+        let cards = '';
+        for (let i = 0; i < 6; i++) {
+          cards += `
+            <div class="animate-pulse bg-slate-900/60 border border-slate-800 rounded-2xl p-5 h-52 flex flex-col justify-between">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="h-4 bg-slate-800 rounded w-24"></div>
+                  <div class="h-4 bg-slate-800 rounded-full w-14"></div>
+                </div>
+                <div class="h-5 bg-slate-800 rounded w-44"></div>
+                <div class="h-3 bg-slate-800 rounded w-64"></div>
+              </div>
+              <div class="h-4 bg-slate-800 rounded w-32"></div>
+            </div>
+          `;
+        }
+        dv.innerHTML = `
+          <div class="space-y-6">
+            <div class="animate-pulse flex items-center justify-between pb-2">
+              <div class="space-y-2">
+                <div class="h-6 bg-slate-800 rounded w-32"></div>
+                <div class="h-3 bg-slate-800 rounded w-72"></div>
+              </div>
+              <div class="h-8 bg-slate-800 rounded-xl w-28"></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              ${cards}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderDetailSkeleton() {
+        const dv = document.getElementById('dynamicView');
+        if (!dv) return;
+        dv.innerHTML = `
+          <div class="space-y-5 animate-pulse">
+            <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="space-y-2">
+                  <div class="h-6 bg-slate-800 rounded w-48"></div>
+                  <div class="h-3 bg-slate-800 rounded w-72"></div>
+                </div>
+                <div class="flex gap-2">
+                  <div class="h-8 bg-slate-800 rounded-xl w-24"></div>
+                  <div class="h-8 bg-slate-800 rounded-xl w-20"></div>
+                </div>
+              </div>
+              <div class="h-8 bg-slate-800/40 rounded-xl w-72"></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 h-[580px]"></div>
+              <div class="md:col-span-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-4 h-[580px]"></div>
+            </div>
+          </div>
+        `;
+      }
+
+      // ==========================================
+      // LOCAL PROTOTYPE STORAGE & VISIBILITY CONTROLLER
+      // ==========================================
+      const LocalPrototypeManager = {
+        purgeMemoryOnUserSwitch() {
+          window._activeLocalHandles = {};
+          window._cachedLocalPrototypes = [];
+        },
+
+        async saveFilesToLocalDirectory(files) {
+          if ('showDirectoryPicker' in window) {
+            try {
+              const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+              for (const [filename, content] of Object.entries(files)) {
+                const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(content);
+                await writable.close();
+              }
+              Toast.show('Successfully saved application files directly to your chosen local folder!', 'success');
+              return dirHandle.name;
+            } catch (err) {
+              if (err.name !== 'AbortError') {
+                console.warn('File System Access API failed or unsupported, triggering download:', err);
+                this.downloadFilesAsZip(files, 'prototype_app.zip');
+              }
+              return null;
+            }
+          } else {
+            this.downloadFilesAsZip(files, 'prototype_app.zip');
+            return 'Downloaded (Local Bundle)';
+          }
+        },
+
+        downloadFilesAsZip(files, zipName = 'prototype_app.zip') {
+          for (const [name, content] of Object.entries(files)) {
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }
+          Toast.show('Prototype files downloaded directly to your machine!', 'success');
+        }
+      };
+      window.LocalPrototypeManager = LocalPrototypeManager;
+
       let currentTab = 'chat';
       const roleMap = {
         bob_ops: 'DevOps Admin',
@@ -493,10 +711,15 @@ def build_dist_html():
       // Synchronize changes to personaSelect
       document.getElementById('personaSelect').addEventListener('change', (e) => {
         const val = e.target.value;
+        LocalPrototypeManager.purgeMemoryOnUserSwitch();
         document.getElementById('roleBadge').innerText = 'Role: ' + (roleMap[val] || 'Employee');
         updateUserProfileDisplay(val);
         if (currentTab === 'pods' || currentTab === 'workspaces') {
-          loadPodsHub();
+          if (window._activePodData) {
+            openPodDetail(window._activePodData.workspace_id);
+          } else {
+            loadPodsHub();
+          }
         }
       });
 
@@ -831,17 +1054,19 @@ def build_dist_html():
       window._allWorkspacesList = [];
       window._activePodData = null;
       window._activeWorkspaceData = null;
-      window._activeWsTab = 'chats';
+      window._activeWsTab = 'specs';
       window._activeSDDStage = 'principles';
 
       async function loadPodsHub(filterType) {
+        window._activePodData = null;
+        window._activeWorkspaceData = null;
         if (filterType) {
           window._currentPodFilter = filterType;
           window._currentWorkspaceFilter = filterType;
         }
         const dv = document.getElementById('dynamicView');
         if (!dv) return;
-        dv.innerHTML = '<div class="text-slate-500 font-mono text-xs p-8 text-center">Loading pods...</div>';
+        renderDirectorySkeleton();
 
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
         
@@ -995,21 +1220,24 @@ def build_dist_html():
       async function openPodDetail(wsId, defaultTab) {
         const dv = document.getElementById('dynamicView');
         if (!dv) return;
-        dv.innerHTML = '<div class="text-slate-500 font-mono text-xs p-8 text-center">Loading pod details...</div>';
+        renderDetailSkeleton();
+
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
 
         try {
-          const r = await fetch(`/api/pods/${wsId}`);
+          const r = await fetch(`/api/pods/${wsId}?persona=${persona}`);
           if (!r.ok) throw new Error('Pod not found');
           const ws = await r.json();
           window._activePodData = ws;
           window._activeWorkspaceData = ws;
           
-          const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
           const isOwner = (ws.owner_id === persona);
-          const isSDD = (ws.workspace_type === 'sdd');
+          const isSDD = (ws.workspace_type === 'sdd' || ws.pod_type === 'sdd');
 
-          // Strict separation: General Chat pods only have 'chats'
-          window._activeWsTab = isSDD ? (defaultTab || 'sdd') : 'chats';
+          // Strict separation: General Chat pods only have 'chats', SDD pods have 'specs', 'chats', 'prototypes'
+          let activeTab = defaultTab || window._activeWsTab || 'specs';
+          if (activeTab === 'sdd') activeTab = 'specs';
+          window._activeWsTab = isSDD ? activeTab : 'chats';
 
           renderPodDetailView(ws, isOwner, isSDD);
         } catch(err) {
@@ -1046,9 +1274,9 @@ def build_dist_html():
           : '';
 
         const chatMessages = ws.chat_messages || [];
-        const spec = ws.spec || { title: ws.name + ' Specification', requirements: [], raw_markdown: '' };
-        const plan = ws.plan || { title: ws.name + ' Architecture Plan', data_models: [], api_endpoints: [], decisions: [], raw_markdown: '' };
-        const tasks = ws.tasks || [];
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        const features = ws.features || [];
+        const visiblePrototypes = (ws.prototypes || []).filter(p => p.storage_mode !== 'local' || p.creator_id === persona);
 
         let html = `
           <div class="space-y-5">
@@ -1090,7 +1318,7 @@ def build_dist_html():
                   </button>
 
                   ${isOwner ? `
-                    <button onclick="deletePod('${ws.workspace_id}')" class="pod-delete-btn px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 text-xs font-medium border border-red-900 flex items-center gap-1.5 transition cursor-pointer">
+                    <button onclick="deletePod('${ws.workspace_id}', this)" class="pod-delete-btn px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 text-xs font-medium border border-red-900 flex items-center gap-1.5 transition cursor-pointer">
                       <span>🗑️</span>
                       <span>Delete</span>
                     </button>
@@ -1098,18 +1326,23 @@ def build_dist_html():
                 </div>
               </div>
 
-              <!-- SDD TABS BAR (ONLY VISIBLE FOR SDD PODS) -->
+              <!-- SDD 3 SPACES TABS BAR (ONLY VISIBLE FOR SDD PODS) -->
               ${isSDD ? `
-                <div class="pod-tabs-bar flex items-center space-x-8 border-b border-slate-800 pt-2 -mb-2">
-                  <button onclick="switchPodSubTab('sdd')" id="subtab-sdd" class="pod-subtab pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer ${window._activeWsTab === 'sdd' ? 'subtab-active-sdd text-indigo-400 border-b-2 border-indigo-500' : 'subtab-inactive text-slate-400 hover:text-slate-200'}">
-                    <span>📐</span>
-                    <span>Spec-Driven Development (SDD)</span>
-                    <span class="subtab-badge-sdd text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold">Autonomous Engine</span>
+                <div class="pod-tabs-bar flex items-center space-x-6 border-b border-slate-800 pt-2 -mb-2">
+                  <button onclick="switchPodSubTab('specs')" id="subtab-specs" class="pod-subtab pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer ${window._activeWsTab === 'specs' ? 'subtab-active-specs text-indigo-400 border-b-2 border-indigo-500' : 'subtab-inactive text-slate-400 hover:text-slate-200'}">
+                    <span>📋</span>
+                    <span>1. Specs</span>
+                    <span class="subtab-badge-specs text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-bold">${features.length} Features</span>
                   </button>
                   <button onclick="switchPodSubTab('chats')" id="subtab-chats" class="pod-subtab pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer ${window._activeWsTab === 'chats' ? 'subtab-active-chats text-blue-400 border-b-2 border-blue-500' : 'subtab-inactive text-slate-400 hover:text-slate-200'}">
                     <span>💬</span>
-                    <span>Pod Chat</span>
+                    <span>2. Pod Chat</span>
                     <span class="subtab-badge-chats text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Spec Grounding</span>
+                  </button>
+                  <button onclick="switchPodSubTab('prototypes')" id="subtab-prototypes" class="pod-subtab pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer ${window._activeWsTab === 'prototypes' ? 'subtab-active-prototypes text-emerald-400 border-b-2 border-emerald-500' : 'subtab-inactive text-slate-400 hover:text-slate-200'}">
+                    <span>⚡</span>
+                    <span>3. Prototype Hub</span>
+                    <span class="subtab-badge-prototypes text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">${visiblePrototypes.length} Apps</span>
                   </button>
                 </div>
               ` : `
@@ -1118,32 +1351,138 @@ def build_dist_html():
               `}
             </div>
 
-            <!-- CHAT VIEW (PERSISTED IN FIRESTORE) -->
+            <!-- SPACE 1: SPECS TAB (FEATURE SPECIFICATIONS) -->
+            ${isSDD ? `
+              <div id="wsSpecsTabContent" class="${window._activeWsTab === 'specs' ? '' : 'hidden'} space-y-5">
+                <!-- Action Bar -->
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+                      <span>📋</span>
+                      <span>Feature Specifications (${features.length})</span>
+                    </h4>
+                    <p class="text-xs text-slate-400">Spec-driven requirements, acceptance criteria, and version tracking. Owner approval required for release.</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button onclick="openNewFeatureModal('${ws.workspace_id}')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition cursor-pointer">
+                      <span>+</span>
+                      <span>New Feature Spec</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Feature Specs Grid -->
+                <div class="grid grid-cols-1 gap-4">
+                  ${features.length === 0 ? `
+                    <div class="p-10 bg-slate-900/60 border border-dashed border-slate-800 rounded-2xl text-center space-y-2">
+                      <span class="text-3xl block mb-1">📋</span>
+                      <div class="text-sm font-semibold text-slate-300">No feature specs created yet</div>
+                      <p class="text-xs text-slate-500">Create an AI-synthesized specification or import from a requirement document.</p>
+                      <button onclick="openNewFeatureModal('${ws.workspace_id}')" class="mt-3 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold cursor-pointer">
+                        + Create First Feature Spec
+                      </button>
+                    </div>
+                  ` : features.map(f => {
+                    const isApproved = f.lifecycle_state === 'approved';
+                    const stateBadge = f.lifecycle_state === 'approved'
+                      ? '<span class="px-2 py-0.5 rounded-full bg-emerald-950/40 text-emerald-400 border border-emerald-900 text-[10px] font-bold uppercase">Approved</span>'
+                      : (f.lifecycle_state === 'in_review'
+                          ? '<span class="px-2 py-0.5 rounded-full bg-blue-950/40 text-blue-400 border border-blue-900 text-[10px] font-bold uppercase">In Review</span>'
+                          : (f.lifecycle_state === 'deprecated'
+                              ? '<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-bold uppercase">Deprecated</span>'
+                              : '<span class="px-2 py-0.5 rounded-full bg-amber-950/40 text-amber-400 border border-amber-900 text-[10px] font-bold uppercase">Draft</span>'));
+
+                    const modeBadge = f.creation_mode === 'ai_generated'
+                      ? '<span class="text-[10px] text-indigo-400 font-mono">✨ AI Synthesized</span>'
+                      : (f.creation_mode === 'requirement_doc'
+                          ? '<span class="text-[10px] text-cyan-400 font-mono">📄 From Doc</span>'
+                          : '<span class="text-[10px] text-slate-400 font-mono">✍️ Manual</span>');
+
+                    return `
+                      <div class="p-5 bg-slate-900 border border-slate-800 hover:border-indigo-500/40 rounded-2xl space-y-3.5 transition shadow-sm">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+                          <div class="flex items-center gap-2.5 flex-wrap">
+                            <span class="px-2.5 py-0.5 rounded-lg bg-indigo-950 text-indigo-400 font-mono text-xs font-bold border border-indigo-900">${f.feature_id}</span>
+                            <strong class="text-sm font-bold text-slate-100">${f.title}</strong>
+                            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">${f.active_version || 'v1.0'}</span>
+                            ${stateBadge}
+                            ${modeBadge}
+                          </div>
+                          <div class="flex items-center gap-2 flex-wrap">
+                            <button onclick="openFeatureDetailModal('${ws.workspace_id}', '${f.feature_id}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer">
+                              ✏️ View / Edit Spec
+                            </button>
+                            ${(isOwner && !isApproved) ? `
+                              <button onclick="quickApproveFeature('${ws.workspace_id}', '${f.feature_id}', this)" class="px-3 py-1.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 text-xs font-bold border border-emerald-800 transition cursor-pointer">
+                                ✓ Approve
+                              </button>
+                            ` : ''}
+                            <button onclick="quickLaunchPrototypeForFeature('${ws.workspace_id}', '${f.feature_id}')" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white text-xs font-bold transition cursor-pointer">
+                              ⚡ Try in Prototype Hub
+                            </button>
+                            ${isOwner ? `
+                              <button onclick="deleteFeatureSpec('${ws.workspace_id}', '${f.feature_id}', this)" class="px-2.5 py-1.5 rounded-xl bg-red-950/30 hover:bg-red-900/50 text-red-400 text-xs font-medium border border-red-900/60 transition cursor-pointer" title="Delete Feature">
+                                🗑️
+                              </button>
+                            ` : ''}
+                          </div>
+                        </div>
+
+                        <p class="text-xs text-slate-300 leading-relaxed">${f.description || 'No description provided.'}</p>
+
+                        ${(f.acceptance_criteria && f.acceptance_criteria.length > 0) ? `
+                          <div class="p-3 bg-slate-950 border border-slate-800/80 rounded-xl space-y-1.5 text-xs">
+                            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Acceptance Criteria</div>
+                            <ul class="list-disc pl-4 space-y-1 text-slate-300 text-[11px] font-mono">
+                              ${f.acceptance_criteria.map(c => `<li>${c}</li>`).join('')}
+                            </ul>
+                          </div>
+                        ` : ''}
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- SPACE 2: POD CHAT VIEW -->
             <div id="wsChatsTabContent" class="${(!isSDD || window._activeWsTab === 'chats') ? '' : 'hidden'} grid grid-cols-1 md:grid-cols-3 gap-5">
               <!-- Left Sidebar: Context & Metadata -->
               <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 h-[580px] flex flex-col justify-between">
                 <div class="space-y-4 overflow-y-auto">
                   <div class="p-3 rounded-xl bg-blue-950/40 border border-blue-900 text-xs text-blue-300 space-y-1">
-                    <strong class="flex items-center gap-1.5">${isSDD ? '🔒 Scoped Grounding in Firestore' : '💬 Team Pod Hub'}</strong>
+                    <strong class="flex items-center gap-1.5">${isSDD ? '🔒 Spec-Grounded Chat' : '💬 Team Pod Hub'}</strong>
                     <p class="text-[11px] text-blue-400 leading-relaxed">
                       ${isSDD
-                        ? `Every turn is grounded strictly in <strong>${ws.name}</strong> approved specification and architecture tenets.`
+                        ? `Turns are strictly grounded in <strong>${ws.name}</strong> approved specifications and owner tenets.`
                         : `Shared context container for <strong>${ws.name}</strong>. Team answers are grounded in pod instructions and history.`}
                     </p>
                   </div>
 
                   ${isSDD ? `
+                    <!-- Feature Context Selector -->
                     <div>
-                      <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Grounding Source</div>
-                      <div class="space-y-1.5 text-xs">
-                        <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                          <span class="text-slate-300 font-medium truncate">📄 ${spec.title || 'System Specification'}</span>
-                          <span class="text-[10px] text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-900">Approved</span>
-                        </div>
-                        <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                          <span class="text-slate-300 font-medium truncate">📐 ${plan.title || 'Architecture Plan'}</span>
-                          <span class="text-[10px] text-indigo-400 bg-indigo-950/50 px-1.5 py-0.5 rounded border border-indigo-900">Active</span>
-                        </div>
+                      <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Feature Grounding Context</label>
+                      <select id="chatFeatureContext" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        <option value="">-- All Features / Pod Scope --</option>
+                        ${features.map(f => `
+                          <option value="${f.feature_id}">
+                            ${f.feature_id}: ${f.title} (${f.active_version} - ${f.lifecycle_state})
+                          </option>
+                        `).join('')}
+                      </select>
+                      <span class="text-[10px] text-slate-500 mt-1 block">Injects selected feature spec as grounding prompt.</span>
+                    </div>
+
+                    <div>
+                      <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Available Feature Specs (${features.length})</div>
+                      <div class="space-y-1.5 text-xs max-h-48 overflow-y-auto">
+                        ${features.map(f => `
+                          <div class="p-2 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-300 font-medium truncate text-xs">📋 ${f.title}</span>
+                            <span class="text-[10px] ${f.lifecycle_state === 'approved' ? 'text-emerald-400 bg-emerald-950/50' : 'text-amber-400 bg-amber-950/50'} px-1.5 py-0.5 rounded font-mono">${f.lifecycle_state}</span>
+                          </div>
+                        `).join('')}
                       </div>
                     </div>
                   ` : `
@@ -1182,7 +1521,7 @@ def build_dist_html():
                     <div class="p-8 text-center text-slate-500 text-xs space-y-1">
                       <span class="text-2xl block mb-2">💬</span>
                       <p>Start a conversation in <strong>${ws.name}</strong>.</p>
-                      <p class="text-[11px] text-slate-600">Answers are grounded in shared context and instructions.</p>
+                      <p class="text-[11px] text-slate-600">Answers are grounded in shared context and specifications.</p>
                     </div>
                   ` : chatMessages.map(m => `
                     ${m.role === 'user' ? `
@@ -1208,342 +1547,136 @@ def build_dist_html():
 
                 <!-- Input form -->
                 <form onsubmit="sendPodChatMessage('${ws.workspace_id}', event)" class="relative flex items-center">
-                  <input type="text" id="wsChatInput" placeholder="${isSDD ? `Ask anything against ${ws.name} specification...` : `Chat with team in ${ws.name}...`}" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-4 pr-24 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-inner" />
-                  <button type="submit" class="absolute right-2 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer">
-                    Send
+                  <input type="text" id="wsChatInput" placeholder="${isSDD ? `Ask anything against ${ws.name} specifications...` : `Chat with team in ${ws.name}...`}" class="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-4 pr-24 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-inner" />
+                  <button type="submit" id="wsChatSubmitBtn" class="absolute right-2 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer flex items-center gap-1.5">
+                    <span>Send</span>
                   </button>
                 </form>
               </div>
             </div>
 
-            <!-- SDD TAB CONTENT (STRICTLY ONLY RENDERED IF isSDD) -->
+            <!-- SPACE 3: PROTOTYPE HUB TAB -->
             ${isSDD ? `
-              <div id="wsSDDTabContent" class="${window._activeWsTab === 'sdd' ? '' : 'hidden'} space-y-5">
-                <!-- SDD 6-Stage Stepper -->
-                <div class="sdd-stepper-container bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div class="flex items-center space-x-2 text-xs overflow-x-auto py-1">
-                    <button onclick="setSDDStageUI('principles')" id="stepBtn-principles" class="sdd-step-btn sdd-step-active flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-semibold cursor-pointer">
-                      <span class="sdd-step-num w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">1</span>
-                      <span>Principles</span>
-                    </button>
-                    <span class="sdd-step-arrow text-slate-600">→</span>
-
-                    <button onclick="setSDDStageUI('specify')" id="stepBtn-specify" class="sdd-step-btn sdd-step-inactive flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
-                      <span class="sdd-step-num w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">2</span>
-                      <span>Specify (${(spec.requirements || []).length} reqs)</span>
-                    </button>
-                    <span class="sdd-step-arrow text-slate-600">→</span>
-
-                    <button onclick="setSDDStageUI('plan')" id="stepBtn-plan" class="sdd-step-btn sdd-step-inactive flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
-                      <span class="sdd-step-num w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">3</span>
-                      <span>Plan (${(plan.data_models || []).length} models)</span>
-                    </button>
-                    <span class="sdd-step-arrow text-slate-600">→</span>
-
-                    <button onclick="setSDDStageUI('tasks')" id="stepBtn-tasks" class="sdd-step-btn sdd-step-inactive flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
-                      <span class="sdd-step-num w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">4</span>
-                      <span>Tasks (${tasks.length})</span>
-                    </button>
-                    <span class="sdd-step-arrow text-slate-600">→</span>
-
-                    <button onclick="setSDDStageUI('implement')" id="stepBtn-implement" class="sdd-step-btn sdd-step-inactive flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
-                      <span class="sdd-step-num w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">5</span>
-                      <span>Implement</span>
-                    </button>
-                    <span class="sdd-step-arrow text-slate-600">→</span>
-
-                    <button onclick="setSDDStageUI('verify')" id="stepBtn-verify" class="sdd-step-btn sdd-step-inactive flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:bg-slate-800 font-medium cursor-pointer">
-                      <span class="sdd-step-num w-4 h-4 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center text-[10px]">6</span>
-                      <span>Verify</span>
-                    </button>
+              <div id="wsPrototypesTabContent" class="${window._activeWsTab === 'prototypes' ? '' : 'hidden'} space-y-5">
+                <!-- Action Bar -->
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+                      <span>⚡</span>
+                      <span>Prototype Hub (Autonomous Engine)</span>
+                    </h4>
+                    <p class="text-xs text-slate-400">Build, try, and test working applications linkable to your feature specs.</p>
                   </div>
-
                   <div class="flex items-center gap-2">
-                    <button onclick="setSDDStageUI('implement')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 flex items-center gap-1.5 transition cursor-pointer">
+                    <button onclick="openBuildPrototypeModal('${ws.workspace_id}')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 flex items-center gap-1.5 transition cursor-pointer">
                       <span>🚀</span>
-                      <span>Autonomous Engine</span>
-                    </button>
-                    <button onclick="showTraceabilityModal()" class="pod-traceability-btn px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 cursor-pointer">
-                      <span>📊</span>
-                      <span>Traceability Matrix</span>
+                      <span>Build Prototype App</span>
                     </button>
                   </div>
                 </div>
 
-                <!-- SDD STAGE PANELS -->
-                <div class="space-y-4">
-                  <!-- STAGE 1: PRINCIPLES -->
-                  <div id="stagePanel-principles" class="space-y-4">
-                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between">
-                      <div>
-                        <h4 class="text-sm font-bold text-slate-100">Stage 1: Architecture Principles & Coding Standards</h4>
-                        <p class="text-xs text-slate-400">Owner-enforced tenets stored in Firestore.</p>
-                      </div>
-                      ${isOwner ? `<button onclick="openOwnerRulesModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer">Edit Rules (Owner)</button>` : ''}
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-                        <div class="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
-                          <span>📐</span>
-                          <span>Architecture Principles</span>
-                        </div>
-                        <ul class="text-xs text-slate-300 space-y-1.5 list-disc pl-4">
-                          ${(ws.sdd_config && ws.sdd_config.architecture_principles && ws.sdd_config.architecture_principles.length > 0) ? ws.sdd_config.architecture_principles.map(p => `<li>${p}</li>`).join('') : `
-                            <li>Clean Architecture with explicit domain boundaries</li>
-                            <li>Pydantic v2 validation on all data mutations</li>
-                            <li>Stateless service design</li>
-                          `}
-                        </ul>
-                      </div>
-
-                      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-                        <div class="text-xs font-bold text-blue-400 flex items-center gap-1.5">
-                          <span>⚙️</span>
-                          <span>Coding Standards</span>
-                        </div>
-                        <ul class="text-xs text-slate-300 space-y-1.5 list-disc pl-4">
-                          ${(ws.sdd_config && ws.sdd_config.coding_standards && ws.sdd_config.coding_standards.length > 0) ? ws.sdd_config.coding_standards.map(c => `<li>${c}</li>`).join('') : `
-                            <li>100% Type Annotations with PEP 8</li>
-                            <li>Pytest Coverage > 85%</li>
-                          `}
-                        </ul>
-                      </div>
-
-                      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-                        <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                          <span>🛡️</span>
-                          <span>Tech Stack & Status</span>
-                        </div>
-                        <div class="text-xs text-slate-300 space-y-1">
-                          <div><strong>Stack:</strong> ${(ws.sdd_config && ws.sdd_config.tech_stack) || 'Python 3.11 / FastAPI / Pytest'}</div>
-                          <div><strong>Spec Version:</strong> ${(ws.sdd_config && ws.sdd_config.active_spec_version) || 'v1.0'}</div>
-                          <div><strong>Approval:</strong> <span class="text-emerald-400 font-bold uppercase">${(ws.sdd_config && ws.sdd_config.approval_status) || 'Approved'}</span></div>
-                        </div>
-                      </div>
-                    </div>
+                <!-- Strict Local Storage Visibility Callout -->
+                <div class="p-3.5 bg-amber-950/20 border border-amber-900/60 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div class="flex items-center gap-2 text-amber-300">
+                    <span class="text-base">🔒</span>
+                    <span>
+                      <strong>Strict Privacy Isolation Active:</strong> Local prototype apps are stored on your personal machine and visible <strong>ONLY to you (${(userProfiles[persona] && userProfiles[persona].name) || persona || 'Bob Martinez'})</strong>. Other pod members cannot see them.
+                    </span>
                   </div>
+                  <span class="text-[10px] text-amber-400 font-mono shrink-0">Backend & Client Enforced</span>
+                </div>
 
-                  <!-- STAGE 2: SPECIFY -->
-                  <div id="stagePanel-specify" class="hidden space-y-4">
-                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between flex-wrap gap-2">
-                      <div>
-                        <h4 class="text-sm font-bold text-slate-100">${spec.title || 'Application Specification'}</h4>
-                        <p class="text-xs text-slate-400">Authoritative requirements and acceptance criteria saved in Firestore.</p>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <button onclick="openEditSpecModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 cursor-pointer">
-                          ✏️ Edit Spec
-                        </button>
-                        <button onclick="openAIGenerateSpecModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer">
-                          ✨ AI Generate / Refine
-                        </button>
-                      </div>
+                <!-- Prototypes Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  ${visiblePrototypes.length === 0 ? `
+                    <div class="col-span-full p-10 bg-slate-900/60 border border-dashed border-slate-800 rounded-2xl text-center space-y-2">
+                      <span class="text-3xl block mb-1">⚡</span>
+                      <div class="text-sm font-semibold text-slate-300">No prototype applications yet</div>
+                      <p class="text-xs text-slate-500">Generate an application from a feature spec using the Autonomous Engine.</p>
+                      <button onclick="openBuildPrototypeModal('${ws.workspace_id}')" class="mt-3 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-semibold cursor-pointer">
+                        + Build Prototype App
+                      </button>
                     </div>
+                  ` : visiblePrototypes.map(p => {
+                    const isLocal = p.storage_mode === 'local';
+                    const storageBadge = isLocal
+                      ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1"><span>💻</span><span>Local Machine (Creator Only)</span></span>'
+                      : '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1"><span>☁️</span><span>Cloud Pod</span></span>';
 
-                    ${spec.raw_markdown ? `
-                      <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 max-h-56 overflow-y-auto whitespace-pre-line leading-relaxed">
-                        ${spec.raw_markdown}
-                      </div>
-                    ` : ''}
+                    const linkedFeature = (ws.features || []).find(f => f.feature_id === p.feature_id);
+                    const linkedPill = linkedFeature
+                      ? `<span class="px-2 py-0.5 rounded bg-indigo-950/60 border border-indigo-900 text-indigo-300 text-[10px] font-mono">Linked Spec: ${linkedFeature.feature_id} (${linkedFeature.title})</span>`
+                      : '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px] font-mono">Pod Baseline</span>';
 
-                    <div class="space-y-3">
-                      <div class="text-xs font-bold text-slate-300 uppercase tracking-wider">Requirements Breakdown (${(spec.requirements || []).length})</div>
-                      ${(spec.requirements && spec.requirements.length > 0) ? spec.requirements.map(req => `
-                        <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-2 text-xs">
-                          <div class="flex items-center justify-between">
-                            <span class="font-bold text-indigo-300">${req.id}: ${req.title}</span>
-                            <span class="px-2 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-900 text-[10px] font-mono">Approved</span>
+                    return `
+                      <div class="p-5 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col justify-between space-y-4 shadow-sm hover:border-slate-700 transition">
+                        <div class="space-y-2.5">
+                          <div class="flex items-center justify-between flex-wrap gap-2">
+                            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">${p.prototype_id}</span>
+                            ${storageBadge}
                           </div>
-                          <p class="text-slate-400">${req.description || ''}</p>
-                          ${req.acceptance_criteria ? `
-                            <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl font-mono text-[11px] text-slate-300 space-y-1">
-                              <div><strong>Acceptance Criteria:</strong></div>
-                              <div>${req.acceptance_criteria}</div>
+                          <h4 class="text-base font-bold text-slate-100">${p.name}</h4>
+                          <p class="text-xs text-slate-400 line-clamp-2 leading-relaxed">${p.description || 'Prototype application generated by autonomous engine.'}</p>
+                          <div class="flex items-center gap-2 flex-wrap">
+                            ${linkedPill}
+                            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[10px]">${p.tech_stack || 'Python 3.11'}</span>
+                          </div>
+                          ${p.local_path ? `
+                            <div class="text-[11px] font-mono text-slate-400 truncate flex items-center justify-between">
+                              <span class="truncate cursor-pointer hover:text-blue-300 transition" onclick="openPodPrototypeFolder('${p.prototype_id}')" title="Click to open folder in Windows File Explorer">
+                                Folder: <code class="text-slate-300 underline decoration-slate-600">${p.local_path}</code>
+                              </span>
+                              <button type="button" onclick="openPodPrototypeFolder('${p.prototype_id}')" class="px-1.5 py-0.5 hover:bg-slate-800 rounded text-slate-400 hover:text-blue-400 text-[11px] shrink-0 transition" title="Open in Windows File Explorer">
+                                ↗
+                              </button>
                             </div>
                           ` : ''}
                         </div>
-                      `).join('') : `
-                        <div class="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center text-xs text-slate-400">
-                          No requirements defined yet. Click <strong>"AI Generate / Refine"</strong> to synthesize full specifications.
-                        </div>
-                      `}
-                    </div>
-                  </div>
 
-                  <!-- STAGE 3: PLAN -->
-                  <div id="stagePanel-plan" class="hidden space-y-4">
-                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between flex-wrap gap-2">
-                      <div>
-                        <h4 class="text-sm font-bold text-slate-100">${plan.title || 'Technical Architecture & Plan'}</h4>
-                        <p class="text-xs text-slate-400">Entity data models, API route contracts, and architecture decisions.</p>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <button onclick="openEditPlanModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 cursor-pointer">
-                          ✏️ Edit Plan
-                        </button>
-                        <button onclick="openAIGeneratePlanModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer">
-                          ✨ AI Generate Plan
-                        </button>
-                      </div>
-                    </div>
-
-                    ${plan.raw_markdown ? `
-                      <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 max-h-56 overflow-y-auto whitespace-pre-line leading-relaxed">
-                        ${plan.raw_markdown}
-                      </div>
-                    ` : ''}
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-                        <div class="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
-                          <span>📦</span>
-                          <span>Data Models (${(plan.data_models || []).length})</span>
-                        </div>
-                        <div class="space-y-2 text-xs">
-                          ${(plan.data_models && plan.data_models.length > 0) ? plan.data_models.map(m => `
-                            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                              <strong class="text-slate-200">${m.name}</strong>
-                              <div class="text-[11px] font-mono text-slate-400">${(m.fields || []).join(', ')}</div>
-                            </div>
-                          `).join('') : '<div class="text-slate-500 text-xs">No data models defined.</div>'}
-                        </div>
-                      </div>
-
-                      <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-                        <div class="text-xs font-bold text-blue-400 flex items-center gap-1.5">
-                          <span>⚡</span>
-                          <span>API Endpoints (${(plan.api_endpoints || []).length})</span>
-                        </div>
-                        <div class="space-y-2 text-xs">
-                          ${(plan.api_endpoints && plan.api_endpoints.length > 0) ? plan.api_endpoints.map(ep => `
-                            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                              <div class="flex items-center gap-2">
-                                <span class="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${ep.method === 'POST' ? 'bg-blue-950 text-blue-400' : 'bg-emerald-950 text-emerald-400'}">${ep.method || 'GET'}</span>
-                                <code class="text-slate-200 text-xs">${ep.path}</code>
-                              </div>
-                              <span class="text-[11px] text-slate-400">${ep.summary || ''}</span>
-                            </div>
-                          `).join('') : '<div class="text-slate-500 text-xs">No endpoints defined.</div>'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- STAGE 4: TASKS -->
-                  <div id="stagePanel-tasks" class="hidden space-y-4">
-                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between flex-wrap gap-2">
-                      <div>
-                        <h4 class="text-sm font-bold text-slate-100">Stage 4: Implementation Task Breakdown</h4>
-                        <p class="text-xs text-slate-400">Executable unit tasks linked to specification sections.</p>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <button onclick="openAddTaskModal('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 cursor-pointer">
-                          + Add Task
-                        </button>
-                        <button onclick="triggerAIBreakdownTasks('${ws.workspace_id}')" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer">
-                          ✨ AI Auto-Breakdown
-                        </button>
-                      </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 gap-3">
-                      ${tasks.length > 0 ? tasks.map(t => `
-                        <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
-                          <div class="space-y-1.5 flex-1">
-                            <div class="flex items-center gap-2 flex-wrap">
-                              <span class="px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 font-mono font-bold text-[10px] border border-indigo-900">${t.task_id}</span>
-                              <strong class="text-slate-100 text-sm">${t.title}</strong>
-                              ${t.linked_req_id ? `<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[10px]">${t.linked_req_id}</span>` : ''}
-                              ${t.status === 'completed'
-                                ? `<span class="px-2 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-900 text-[10px] font-bold">Completed & Committed (${t.last_commit_hash || 'main'})</span>`
-                                : (t.status === 'failed'
-                                    ? `<span class="px-2 py-0.5 rounded bg-red-950/40 text-red-400 border border-red-900 text-[10px] font-bold">Failed</span>`
-                                    : `<span class="px-2 py-0.5 rounded bg-amber-950/40 text-amber-400 border border-amber-900 text-[10px] font-bold">Pending</span>`)}
-                            </div>
-                            <p class="text-slate-400">${t.description || ''}</p>
-                            <div class="flex items-center gap-3 font-mono text-[11px] text-slate-500 flex-wrap">
-                              <span>Code: <code class="text-slate-300">${(t.target_files || []).join(', ') || 'src/module.py'}</code></span>
-                              <span>Test: <code class="text-slate-300">${t.test_file || 'tests/test_module.py'}</code></span>
-                            </div>
-                          </div>
-
-                          <div class="flex items-center gap-2">
-                            <button onclick="startSingleTaskImplementation('${ws.workspace_id}', '${t.task_id}')" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer">
-                              <span>⚡</span>
-                              <span>Implement Task</span>
+                        <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap text-xs">
+                          <div class="flex items-center gap-1.5 flex-wrap">
+                            <button onclick="openPodPrototypeFolder('${p.prototype_id}')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1 cursor-pointer" title="Open in Windows File Explorer">
+                              <span>📂</span>
+                              <span>Open Folder</span>
+                            </button>
+                            <button onclick="downloadPrototypeZip('${p.prototype_id}')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center gap-1 cursor-pointer" title="Download ZIP bundle directly">
+                              <span>💾</span>
+                              <span>Download</span>
+                            </button>
+                            <button onclick="runPytestSuite('${ws.workspace_id}')" class="px-2.5 py-1.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 text-xs font-medium border border-emerald-900/60 flex items-center gap-1 cursor-pointer">
+                              <span>🧪</span>
+                              <span>Pytest</span>
                             </button>
                           </div>
+                          ${(isOwner || p.creator_id === persona) ? `
+                            <button onclick="deletePodPrototype('${ws.workspace_id}', '${p.prototype_id}', this)" class="px-2 py-1.5 rounded-xl bg-red-950/30 hover:bg-red-900/50 text-red-400 text-xs font-medium border border-red-900/60 cursor-pointer" title="Delete Prototype">
+                              🗑️
+                            </button>
+                          ` : ''}
                         </div>
-                      `).join('') : `
-                        <div class="p-8 bg-slate-900 border border-slate-800 rounded-2xl text-center text-xs text-slate-400 space-y-2">
-                          <p>No tasks configured yet.</p>
-                          <button onclick="triggerAIBreakdownTasks('${ws.workspace_id}')" class="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold cursor-pointer">✨ Auto-Generate Tasks from Spec</button>
-                        </div>
-                      `}
-                    </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+
+                <!-- Live Terminal Console -->
+                <div id="sddTerminalContainer" class="terminal-card bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2 font-mono text-xs">
+                  <div class="terminal-header flex items-center justify-between pb-2 border-b border-slate-800/80">
+                    <span class="terminal-title text-indigo-400 font-bold flex items-center gap-2">
+                      <span>💻</span>
+                      <span>Prototype Hub Execution Terminal (Autonomous Engine)</span>
+                    </span>
+                    <span class="text-slate-500 text-[11px]">Subprocess Runner</span>
                   </div>
-
-                  <!-- STAGE 5: IMPLEMENT (AUTONOMOUS ANTIGRAVITY ENGINE) -->
-                  <div id="stagePanel-implement" class="hidden space-y-4">
-                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div>
-                        <h4 class="text-sm font-bold text-slate-100 flex items-center gap-2">
-                          <span>🚀</span>
-                          <span>Stage 5: Autonomous Antigravity Implementation Engine</span>
-                        </h4>
-                        <p class="text-xs text-slate-400">Directly scaffolds repository, writes code, runs pytest, and commits to git in local workspace directory.</p>
-                      </div>
-
-                      <div class="flex items-center gap-2 flex-wrap">
-                        <select id="sddTaskSelector" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none">
-                          ${tasks.map(t => `<option value="${t.task_id}">${t.task_id}: ${t.title} [${t.status}]</option>`).join('')}
-                        </select>
-
-                        <button onclick="startAutonomousSDDImplementation('${ws.workspace_id}')" id="btnRunSDD" class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 flex items-center gap-2 cursor-pointer transition">
-                          <span id="sddSpinner" class="hidden animate-spin">🌀</span>
-                          <span id="sddBtnText">Run Implementation & Tests</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <!-- Live Terminal Console -->
-                    <div id="sddTerminalContainer" class="terminal-card bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-2 font-mono text-xs">
-                      <div class="terminal-header flex items-center justify-between pb-2 border-b border-slate-800/80">
-                        <span class="terminal-title text-indigo-400 font-bold flex items-center gap-2">
-                          <span>💻</span>
-                          <span>Autonomous Execution Terminal (Antigravity Engine)</span>
-                        </span>
-                        <span class="text-slate-500 text-[11px]">Subprocess Runner</span>
-                      </div>
-                      <div id="sddTerminalOutput" class="h-56 overflow-y-auto space-y-1 text-slate-400 text-[11px] pr-2">
-                        <div>$ Antigravity SDD agent initialized. Select a task above and click 'Run Implementation & Tests'.</div>
-                      </div>
-                    </div>
+                  <div id="sddTerminalOutput" class="h-44 overflow-y-auto space-y-1 text-slate-400 text-[11px] pr-2">
+                    <div>$ Prototype Hub ready. Click 'Build Prototype App' to generate working applications from feature specs.</div>
                   </div>
+                </div>
 
-                  <!-- STAGE 6: VERIFY (PYTEST RUNNER) -->
-                  <div id="stagePanel-verify" class="hidden space-y-4">
-                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div>
-                        <h4 class="text-sm font-bold text-slate-100 flex items-center gap-2">
-                          <span>🧪</span>
-                          <span>Stage 6: Specification Verification & Pytest Suite</span>
-                        </h4>
-                        <p class="text-xs text-slate-400">Executes pytest against the user local space workspace repository.</p>
-                      </div>
-
-                      <button onclick="runPytestSuite('${ws.workspace_id}')" id="btnRunPytest" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 flex items-center gap-2 cursor-pointer transition">
-                        <span>▶</span>
-                        <span>Run Full Pytest Suite</span>
-                      </button>
-                    </div>
-
-                    <div id="pytestResultBox" class="hidden p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 font-mono text-xs">
-                      <div class="text-slate-300 font-bold">Pytest Execution Output:</div>
-                      <pre id="pytestOutputText" class="text-slate-400 text-[11px] max-h-60 overflow-y-auto whitespace-pre-wrap leading-relaxed"></pre>
-                    </div>
-                  </div>
+                <!-- Pytest Result Box -->
+                <div id="pytestResultBox" class="hidden p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 font-mono text-xs">
+                  <div class="text-slate-300 font-bold">Pytest Execution Output:</div>
+                  <pre id="pytestOutputText" class="text-slate-400 text-[11px] max-h-60 overflow-y-auto whitespace-pre-wrap leading-relaxed"></pre>
                 </div>
               </div>
             ` : ''}
@@ -1556,30 +1689,39 @@ def build_dist_html():
       window.renderPodDetailView = renderPodDetailView;
 
       function switchPodSubTab(tab) {
+        if (tab === 'sdd') tab = 'specs';
         window._activeWsTab = tab;
+        const cSpecs = document.getElementById('wsSpecsTabContent');
         const cChats = document.getElementById('wsChatsTabContent');
-        const cSDD = document.getElementById('wsSDDTabContent');
+        const cProto = document.getElementById('wsPrototypesTabContent');
+        const bSpecs = document.getElementById('subtab-specs');
         const bChats = document.getElementById('subtab-chats');
-        const bSDD = document.getElementById('subtab-sdd');
+        const bProto = document.getElementById('subtab-prototypes');
 
-        if (tab === 'chats') {
-          if (cChats) cChats.classList.remove('hidden');
-          if (cSDD) cSDD.classList.add('hidden');
-          if (bChats) {
-            bChats.className = 'pod-subtab subtab-active-chats pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-blue-400 border-b-2 border-blue-500';
-          }
-          if (bSDD) {
-            bSDD.className = 'pod-subtab subtab-inactive pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200';
-          }
-        } else {
-          if (cChats) cChats.classList.add('hidden');
-          if (cSDD) cSDD.classList.remove('hidden');
-          if (bChats) {
-            bChats.className = 'pod-subtab subtab-inactive pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200';
-          }
-          if (bSDD) {
-            bSDD.className = 'pod-subtab subtab-active-sdd pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-indigo-400 border-b-2 border-indigo-500';
-          }
+        if (cSpecs) {
+          if (tab === 'specs') cSpecs.classList.remove('hidden');
+          else cSpecs.classList.add('hidden');
+        }
+        if (cChats) {
+          if (tab === 'chats') cChats.classList.remove('hidden');
+          else cChats.classList.add('hidden');
+        }
+        if (cProto) {
+          if (tab === 'prototypes') cProto.classList.remove('hidden');
+          else cProto.classList.add('hidden');
+        }
+
+        if (bSpecs) {
+          if (tab === 'specs') bSpecs.className = 'pod-subtab subtab-active-specs pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-indigo-400 border-b-2 border-indigo-500';
+          else bSpecs.className = 'pod-subtab subtab-inactive pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200';
+        }
+        if (bChats) {
+          if (tab === 'chats') bChats.className = 'pod-subtab subtab-active-chats pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-blue-400 border-b-2 border-blue-500';
+          else bChats.className = 'pod-subtab subtab-inactive pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200';
+        }
+        if (bProto) {
+          if (tab === 'prototypes') bProto.className = 'pod-subtab subtab-active-prototypes pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-emerald-400 border-b-2 border-emerald-500';
+          else bProto.className = 'pod-subtab subtab-inactive pb-3 text-sm font-semibold flex items-center gap-2 transition cursor-pointer text-slate-400 hover:text-slate-200';
         }
       }
       window.switchWorkspaceSubTab = switchPodSubTab;
@@ -1714,10 +1856,14 @@ ${d.output || 'No output recorded.'}`;
       async function sendPodChatMessage(wsId, event) {
         if (event) event.preventDefault();
         const input = document.getElementById('wsChatInput');
+        const sendBtn = document.getElementById('wsChatSubmitBtn');
         if (!input) return;
         const text = input.value.trim();
         if (!text) return;
         input.value = '';
+
+        const featureSel = document.getElementById('chatFeatureContext');
+        const featureId = featureSel ? featureSel.value : null;
 
         const mc = document.getElementById('wsMessagesContainer');
         if (mc) {
@@ -1725,53 +1871,68 @@ ${d.output || 'No output recorded.'}`;
             <div class="flex gap-3 justify-end">
               <div class="bg-blue-600 p-3.5 rounded-2xl max-w-xl text-xs text-white shadow-sm leading-relaxed">${text}</div>
             </div>
+            <div id="chatTypingIndicator" class="flex gap-3 items-center">
+              <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
+              <div class="p-3 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-slate-400 animate-pulse flex items-center gap-2">
+                <span class="inline-block w-2 h-2 rounded-full bg-blue-400 animate-bounce"></span>
+                <span>Grounding against ${featureId ? 'selected specification' : 'pod context'}...</span>
+              </div>
+            </div>
           `;
           mc.scrollTop = mc.scrollHeight;
         }
 
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
 
-        try {
-          const r = await fetch(`/api/pods/${wsId}/chat`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ prompt: text, persona: persona })
-          });
-          const d = await r.json();
+        await AsyncAction.execute('pod-chat-send', sendBtn, async () => {
+          try {
+            const r = await fetch(`/api/pods/${wsId}/chat`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ prompt: text, persona: persona, feature_id: featureId || null })
+            });
+            const d = await r.json();
 
-          if (mc) {
-            mc.innerHTML += `
-              <div class="flex gap-3">
-                <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
-                <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs max-w-xl space-y-2.5 leading-relaxed text-slate-200">
-                  <p class="whitespace-pre-line">${d.reply || d.text}</p>
-                  ${(d.citations && d.citations.length > 0) ? `
-                    <div class="pt-2 border-t border-slate-800/80 flex items-center gap-2 text-[11px] font-mono text-slate-400 flex-wrap">
-                      <span>Grounding:</span>
-                      ${d.citations.map(c => `<span class="px-2 py-0.5 rounded bg-blue-950/40 text-blue-400 border border-blue-900">📄 ${c}</span>`).join('')}
-                    </div>
-                  ` : ''}
+            const typingInd = document.getElementById('chatTypingIndicator');
+            if (typingInd) typingInd.remove();
+
+            if (mc) {
+              mc.innerHTML += `
+                <div class="flex gap-3">
+                  <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
+                  <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs max-w-xl space-y-2.5 leading-relaxed text-slate-200">
+                    <p class="whitespace-pre-line">${d.reply || d.text}</p>
+                    ${(d.citations && d.citations.length > 0) ? `
+                      <div class="pt-2 border-t border-slate-800/80 flex items-center gap-2 text-[11px] font-mono text-slate-400 flex-wrap">
+                        <span>Grounding:</span>
+                        ${d.citations.map(c => `<span class="px-2 py-0.5 rounded bg-blue-950/40 text-blue-400 border border-blue-900">📄 ${c}</span>`).join('')}
+                      </div>
+                    ` : ''}
+                  </div>
                 </div>
-              </div>
-            `;
-            mc.scrollTop = mc.scrollHeight;
+              `;
+              mc.scrollTop = mc.scrollHeight;
+            }
+          } catch(err) {
+            const typingInd = document.getElementById('chatTypingIndicator');
+            if (typingInd) typingInd.remove();
+            Toast.show('Error querying pod: ' + err.message, 'error');
+            if (mc) {
+              mc.innerHTML += `
+                <div class="flex gap-3">
+                  <div class="w-8 h-8 rounded-xl bg-red-600 flex items-center justify-center font-bold text-sm shrink-0">⚠️</div>
+                  <div class="p-3 rounded-2xl bg-slate-950 border border-red-900 text-xs text-red-400">Error querying pod: ${err.message}</div>
+                </div>
+              `;
+            }
           }
-        } catch(err) {
-          if (mc) {
-            mc.innerHTML += `
-              <div class="flex gap-3">
-                <div class="w-8 h-8 rounded-xl bg-red-600 flex items-center justify-center font-bold text-sm shrink-0">⚠️</div>
-                <div class="p-3 rounded-2xl bg-slate-950 border border-red-900 text-xs text-red-400">Error querying pod: ${err.message}</div>
-              </div>
-            `;
-          }
-        }
+        });
       }
       window.sendWorkspaceChatMessage = sendPodChatMessage;
       window.sendPodChatMessage = sendPodChatMessage;
 
       // ==========================================
-      // MODALS: NEW POD, SPEC, PLAN, TASKS, RULES
+      // MODALS: NEW POD, SPECS, PROTOTYPE HUB
       // ==========================================
 
       async function openNewPodModal() {
@@ -1859,6 +2020,50 @@ ${d.output || 'No output recorded.'}`;
                 </div>
                 <span class="text-[11px] text-slate-400 mt-1 block">Click Browse Folder to choose from your device file explorer, or type a custom path.</span>
               </div>
+
+              <!-- Requirement Document Selection & Analysis -->
+              <div class="pt-3 border-t border-indigo-900/60 space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="block font-bold text-indigo-200 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <span>📄</span>
+                    <span>Requirement Document</span>
+                  </label>
+                  <span class="text-[10px] text-indigo-400 font-medium">Auto-decomposed into Specs & Features</span>
+                </div>
+
+                <div class="border border-dashed border-indigo-700/50 hover:border-indigo-500 rounded-xl p-3 bg-slate-950/60 transition space-y-2.5">
+                  <div class="flex items-center gap-2.5 flex-wrap">
+                    <input type="file" id="inputRequirementDocFile" accept=".md,.txt,.json,.doc,.docx,.pdf" onchange="onRequirementDocFileSelected(event)" class="hidden" />
+                    <button type="button" onclick="document.getElementById('inputRequirementDocFile').click()" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm shrink-0">
+                      <span>📁</span>
+                      <span>Select Requirement File</span>
+                    </button>
+                    <span id="selectedReqDocFileName" class="text-xs text-slate-400 truncate italic">No file selected yet</span>
+                    <button type="button" id="btnClearReqDoc" onclick="clearSelectedRequirementDoc()" class="hidden text-xs text-red-400 hover:text-red-300 font-semibold px-1.5 py-0.5 rounded cursor-pointer ml-auto">
+                      ✕ Clear
+                    </button>
+                  </div>
+
+                  <!-- Quick sample template buttons -->
+                  <div class="flex items-center gap-2 flex-wrap pt-1">
+                    <span class="text-[10px] text-slate-500">Or load sample spec:</span>
+                    <button type="button" onclick="loadSampleRequirementDoc('calc')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-indigo-300 text-[10px] border border-indigo-900/60 cursor-pointer">
+                      🧮 Calculator Spec
+                    </button>
+                    <button type="button" onclick="loadSampleRequirementDoc('order')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-indigo-300 text-[10px] border border-indigo-900/60 cursor-pointer">
+                      🛒 E-Commerce Spec
+                    </button>
+                    <button type="button" onclick="loadSampleRequirementDoc('auth')" class="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-indigo-300 text-[10px] border border-indigo-900/60 cursor-pointer">
+                      🔐 Auth & RBAC Spec
+                    </button>
+                  </div>
+
+                  <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">Requirement Document Content (editable markdown):</label>
+                    <textarea id="inputRequirementDocContent" rows="4" placeholder="# Requirements Document&#10;Paste or select your requirement document markdown/text here. The SDD engine will analyze it, decompose it into modular features, and generate spec files..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Employee Directory Invitation -->
@@ -1888,7 +2093,7 @@ ${d.output || 'No output recorded.'}`;
               <span class="text-xs text-slate-400">Owner role held by You</span>
               <div class="flex items-center gap-2">
                 <button type="button" onclick="closeModal()" class="px-4 py-2 text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">Cancel</button>
-                <button type="button" onclick="submitCreatePod()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md transition cursor-pointer">
+                <button type="button" id="btnSubmitCreatePod" onclick="submitCreatePod()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md transition cursor-pointer flex items-center gap-1.5">
                   Create Application Pod
                 </button>
               </div>
@@ -1898,6 +2103,134 @@ ${d.output || 'No output recorded.'}`;
       }
       window.openNewWorkspaceModal = openNewPodModal;
       window.openNewPodModal = openNewPodModal;
+
+      function onRequirementDocFileSelected(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        window._selectedReqDocName = file.name;
+        const nameBadge = document.getElementById('selectedReqDocFileName');
+        const clearBtn = document.getElementById('btnClearReqDoc');
+        if (nameBadge) {
+          nameBadge.textContent = '📄 ' + file.name + ' (' + (file.size < 1024 ? file.size + ' B' : Math.round(file.size / 1024) + ' KB') + ')';
+          nameBadge.className = 'text-xs text-indigo-300 font-semibold truncate';
+        }
+        if (clearBtn) clearBtn.classList.remove('hidden');
+
+        // If pod name is empty, auto-suggest from file name
+        const nameInput = document.getElementById('inputNewWsName');
+        if (nameInput && !nameInput.value.trim()) {
+          const suggested = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+          nameInput.value = suggested.charAt(0).toUpperCase() + suggested.slice(1);
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const content = e.target.result;
+          const textarea = document.getElementById('inputRequirementDocContent');
+          if (textarea) textarea.value = content;
+        };
+        reader.readAsText(file);
+      }
+      window.onRequirementDocFileSelected = onRequirementDocFileSelected;
+
+      function clearSelectedRequirementDoc() {
+        window._selectedReqDocName = null;
+        const fileInput = document.getElementById('inputRequirementDocFile');
+        if (fileInput) fileInput.value = '';
+        const nameBadge = document.getElementById('selectedReqDocFileName');
+        if (nameBadge) {
+          nameBadge.textContent = 'No file selected yet';
+          nameBadge.className = 'text-xs text-slate-400 truncate italic';
+        }
+        const clearBtn = document.getElementById('btnClearReqDoc');
+        if (clearBtn) clearBtn.classList.add('hidden');
+        const textarea = document.getElementById('inputRequirementDocContent');
+        if (textarea) textarea.value = '';
+      }
+      window.clearSelectedRequirementDoc = clearSelectedRequirementDoc;
+
+      function loadSampleRequirementDoc(type) {
+        const textarea = document.getElementById('inputRequirementDocContent');
+        const nameInput = document.getElementById('inputNewWsName');
+        const descInput = document.getElementById('inputNewWsDesc');
+        const nameBadge = document.getElementById('selectedReqDocFileName');
+        const clearBtn = document.getElementById('btnClearReqDoc');
+        if (clearBtn) clearBtn.classList.remove('hidden');
+
+        if (type === 'calc') {
+          window._selectedReqDocName = 'DivisionCalculator_Spec.md';
+          if (nameBadge) {
+            nameBadge.textContent = '📄 DivisionCalculator_Spec.md (Sample)';
+            nameBadge.className = 'text-xs text-indigo-300 font-semibold truncate';
+          }
+          if (nameInput && !nameInput.value.trim()) nameInput.value = 'DivisionCalculator Microservice';
+          if (descInput && !descInput.value.trim()) descInput.value = 'Specialized high-precision division microservice with Pydantic V2 validation and zero-division guard.';
+          if (textarea) {
+            textarea.value = `# DivisionCalculator Requirements
+
+## Overview
+The DivisionCalculator is a specialized microservice designed to perform division operations between two numbers. It ensures precision, validates inputs, and provides clear error reporting for mathematical edge cases like division by zero.
+
+## Functional Requirements
+1. The system must accept a numerator and a denominator as input.
+2. The system must return the quotient as a floating-point number.
+3. The system must handle division by zero by returning a specific error message and status code.
+4. The system must support negative numbers and decimals.
+
+## Non-Functional Requirements
+1. **Validation**: All inputs must be validated using Pydantic V2.
+2. **Performance**: Stateless execution with sub-50ms response time.
+3. **Reliability**: 100% test coverage for the calculation logic.`;
+          }
+        } else if (type === 'order') {
+          window._selectedReqDocName = 'OrderInventory_Spec.md';
+          if (nameBadge) {
+            nameBadge.textContent = '📄 OrderInventory_Spec.md (Sample)';
+            nameBadge.className = 'text-xs text-indigo-300 font-semibold truncate';
+          }
+          if (nameInput && !nameInput.value.trim()) nameInput.value = 'Order & Inventory Service';
+          if (descInput && !descInput.value.trim()) descInput.value = 'Cart checkout, stock inventory management, and discount calculation service.';
+          if (textarea) {
+            textarea.value = `# Order & Inventory Service Requirements
+
+## Overview
+Enterprise microservice managing customer shopping carts, checkout order validation, promotional discounts, and stock reservation.
+
+## Feature 1: Inventory & Catalog Management
+1. The system must maintain product catalog with SKU, price, and available stock count.
+2. The system must prevent order placement for items exceeding current inventory.
+
+## Feature 2: Shopping Cart & Checkout Calculation
+1. The system must calculate order subtotal, promotional discount percentage, and final total.
+2. The system must support multi-item orders with quantity validation.
+
+## Feature 3: Order Status & Idempotency
+1. The system must enforce unique idempotency keys per checkout request.
+2. The system must record order lifecycle status (pending, confirmed, fulfilled).`;
+          }
+        } else if (type === 'auth') {
+          window._selectedReqDocName = 'AuthSecurity_Spec.md';
+          if (nameBadge) {
+            nameBadge.textContent = '📄 AuthSecurity_Spec.md (Sample)';
+            nameBadge.className = 'text-xs text-indigo-300 font-semibold truncate';
+          }
+          if (nameInput && !nameInput.value.trim()) nameInput.value = 'Identity & RBAC Service';
+          if (descInput && !descInput.value.trim()) descInput.value = 'User authentication, token verification, and role-based access control.';
+          if (textarea) {
+            textarea.value = `# Identity & Authentication Service Requirements
+
+## Overview
+Identity and access management microservice providing user registration, password hashing, and token issuance.
+
+## Functional Requirements
+1. The system must register users with email, password, and enterprise role.
+2. The system must verify credentials and reject duplicate email registrations.
+3. The system must issue session tokens for authenticated sessions.
+4. The system must enforce role-based access control (admin, member, contributor).`;
+          }
+        }
+      }
+      window.loadSampleRequirementDoc = loadSampleRequirementDoc;
 
       function selectModalType(type) {
         window._selectedModalType = type;
@@ -1918,20 +2251,22 @@ ${d.output || 'No output recorded.'}`;
       window.selectModalType = selectModalType;
 
       async function submitCreatePod() {
+        const btn = document.getElementById('btnSubmitCreatePod');
         const name = document.getElementById('inputNewWsName').value.trim();
         const desc = document.getElementById('inputNewWsDesc').value.trim();
         const prompt = document.getElementById('inputNewWsInitialPrompt') ? document.getElementById('inputNewWsInitialPrompt').value.trim() : '';
         const type = window._selectedModalType || 'sdd';
 
         if (!name) {
-          alert('Please enter a pod or application name');
+          Toast.show('Please enter a pod or application name', 'error');
           return;
         }
 
         const invitedCheckboxes = document.querySelectorAll('input[name="invitedEmployee"]:checked');
         const invited = Array.from(invitedCheckboxes).map(c => c.value);
-
         const localPath = document.getElementById('inputNewWsLocalPath') ? document.getElementById('inputNewWsLocalPath').value.trim() : '';
+        const reqDocContent = document.getElementById('inputRequirementDocContent') ? document.getElementById('inputRequirementDocContent').value.trim() : '';
+        const reqDocName = window._selectedReqDocName || (reqDocContent ? 'Requirement_Document.md' : null);
 
         const payload = {
           name: name,
@@ -1939,7 +2274,9 @@ ${d.output || 'No output recorded.'}`;
           workspace_type: type,
           visibility: type === 'sdd' ? 'private' : 'public',
           invited_employee_ids: invited,
-          initial_prompt: prompt,
+          initial_prompt: prompt || (reqDocContent ? reqDocContent.slice(0, 1000) : ''),
+          requirement_doc_name: reqDocName,
+          requirement_doc_content: reqDocContent,
           sdd_config: type === 'sdd' ? {
             local_space_path: localPath || ('d:/AI Orchestrator/workspace-projects/' + name.toLowerCase().replace(/\s+/g, '-')),
             git_action: 'init'
@@ -1947,11 +2284,15 @@ ${d.output || 'No output recorded.'}`;
         };
 
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        const clientRequestId = 'req_create_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
 
-        try {
+        await AsyncAction.execute('create-pod', btn, async () => {
           const r = await fetch(`/api/pods?persona=${persona}`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              'x-client-request-id': clientRequestId
+            },
             body: JSON.stringify(payload)
           });
           if (!r.ok) {
@@ -1960,25 +2301,674 @@ ${d.output || 'No output recorded.'}`;
           }
           const d = await r.json();
           closeModal();
+          Toast.show(`Pod "${name}" created successfully!`, 'success');
           openPodDetail(d.workspace.workspace_id);
-        } catch(e) {
-          alert('Failed to create pod: ' + e.message);
-        }
+        });
       }
       window.submitCreateWorkspace = submitCreatePod;
       window.submitCreatePod = submitCreatePod;
 
-      async function deletePod(wsId) {
-        if (!confirm('Are you sure you want to delete this pod? This will remove all spec, plan, tasks, and chat history from Firestore.')) return;
+      async function deletePod(wsId, btnEl) {
+        if (!confirm('Are you sure you want to delete this pod? This will remove all features, prototypes, and chat history.')) return;
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
-        try {
+        await AsyncAction.execute('delete-pod-' + wsId, btnEl, async () => {
           const r = await fetch(`/api/pods/${wsId}?persona=${persona}`, { method: 'DELETE' });
-          if (!r.ok) throw new Error('Deletion failed');
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || 'Deletion failed');
+          }
+          Toast.show('Pod deleted successfully', 'success');
           loadPodsHub(window._currentPodFilter);
-        } catch(e) {
-          alert('Error deleting pod: ' + e.message);
+        });
+      }
+      window.deleteWorkspace = deletePod;
+      window.deletePod = deletePod;
+
+      // ==========================================
+      // SPACE 1: FEATURE SPECS MODALS & CONTROLLERS
+      // ==========================================
+
+      function openNewFeatureModal(wsId) {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+        window._activeFeatureCreateMode = 'ai';
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <span>📋</span>
+                  <span>Create Feature Specification</span>
+                </h4>
+                <p class="text-xs text-slate-400">Add an authoritative feature spec with versioning and lifecycle tracking.</p>
+              </div>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <!-- Creation Mode Selector -->
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">Creation Source</label>
+              <div class="grid grid-cols-2 gap-4">
+                <div onclick="setFeatureCreationMode('ai')" id="cardFeatModeAI" class="p-4 rounded-xl border-2 border-indigo-600 bg-indigo-950/20 cursor-pointer space-y-1.5 transition">
+                  <div class="flex items-center gap-2">
+                    <span class="text-lg">✨</span>
+                    <strong class="text-xs text-indigo-300">AI-Generated Spec</strong>
+                  </div>
+                  <p class="text-[11px] text-slate-400">Synthesize structured requirements, criteria, and models from a goal prompt.</p>
+                </div>
+
+                <div onclick="setFeatureCreationMode('doc')" id="cardFeatModeDoc" class="p-4 rounded-xl border-2 border-slate-800 hover:border-slate-700 bg-slate-950 cursor-pointer space-y-1.5 transition">
+                  <div class="flex items-center gap-2">
+                    <span class="text-lg">📄</span>
+                    <strong class="text-xs text-slate-300">From Requirement Document</strong>
+                  </div>
+                  <p class="text-[11px] text-slate-400">Parse and structure requirements directly from user PRD or design doc.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Inputs -->
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Feature Title</label>
+                <input type="text" id="inputNewFeatTitle" placeholder="e.g. Order State Machine & Stock Reservation" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Summary / Scope Description</label>
+                <textarea id="inputNewFeatDesc" rows="2" placeholder="Brief explanation of feature deliverables..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+              </div>
+
+              <!-- AI Mode Container -->
+              <div id="featModeAIContainer" class="space-y-1">
+                <label class="block text-xs font-semibold text-indigo-300 mb-1">✨ AI Prompt / Goals</label>
+                <textarea id="inputNewFeatPrompt" rows="3" placeholder="Describe the feature capabilities, business rules, endpoints, and validation requirements..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+              </div>
+
+              <!-- Doc Mode Container -->
+              <div id="featModeDocContainer" class="hidden space-y-1">
+                <label class="block text-xs font-semibold text-cyan-300 mb-1">📄 Paste Requirement Document (PRD / Specs)</label>
+                <textarea id="inputNewFeatDoc" rows="5" placeholder="Paste requirements, acceptance criteria, user stories, or data contracts..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500"></textarea>
+              </div>
+            </div>
+
+            <!-- Lifecycle State -->
+            <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
+              <span class="text-slate-400">Initial Lifecycle State:</span>
+              <span class="px-2 py-0.5 rounded bg-amber-950/40 text-amber-400 border border-amber-900 font-bold uppercase font-mono text-[10px]">Draft (v1.0)</span>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button type="button" onclick="closeModal()" class="px-4 py-2 text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">Cancel</button>
+              <button type="button" id="btnSubmitCreateFeature" onclick="submitCreateFeature('${wsId}')" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md transition cursor-pointer flex items-center gap-1.5">
+                Create Feature Spec
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      window.openNewFeatureModal = openNewFeatureModal;
+
+      function setFeatureCreationMode(mode) {
+        window._activeFeatureCreateMode = mode;
+        const cAI = document.getElementById('cardFeatModeAI');
+        const cDoc = document.getElementById('cardFeatModeDoc');
+        const boxAI = document.getElementById('featModeAIContainer');
+        const boxDoc = document.getElementById('featModeDocContainer');
+        if (mode === 'ai') {
+          if (cAI) cAI.className = 'p-4 rounded-xl border-2 border-indigo-600 bg-indigo-950/20 cursor-pointer space-y-1.5 transition';
+          if (cDoc) cDoc.className = 'p-4 rounded-xl border-2 border-slate-800 hover:border-slate-700 bg-slate-950 cursor-pointer space-y-1.5 transition';
+          if (boxAI) boxAI.classList.remove('hidden');
+          if (boxDoc) boxDoc.classList.add('hidden');
+        } else {
+          if (cAI) cAI.className = 'p-4 rounded-xl border-2 border-slate-800 hover:border-slate-700 bg-slate-950 cursor-pointer space-y-1.5 transition';
+          if (cDoc) cDoc.className = 'p-4 rounded-xl border-2 border-cyan-600 bg-cyan-950/20 cursor-pointer space-y-1.5 transition';
+          if (boxAI) boxAI.classList.add('hidden');
+          if (boxDoc) boxDoc.classList.remove('hidden');
         }
       }
+      window.setFeatureCreationMode = setFeatureCreationMode;
+
+      async function submitCreateFeature(wsId) {
+        const btn = document.getElementById('btnSubmitCreateFeature');
+        const title = document.getElementById('inputNewFeatTitle').value.trim();
+        const desc = document.getElementById('inputNewFeatDesc').value.trim();
+        const mode = window._activeFeatureCreateMode || 'ai';
+        const prompt = document.getElementById('inputNewFeatPrompt') ? document.getElementById('inputNewFeatPrompt').value.trim() : '';
+        const docText = document.getElementById('inputNewFeatDoc') ? document.getElementById('inputNewFeatDoc').value.trim() : '';
+
+        if (!title) {
+          Toast.show('Please enter a feature title', 'error');
+          return;
+        }
+
+        const payload = {
+          title: title,
+          description: desc,
+          creation_mode: mode === 'ai' ? 'ai_generated' : 'requirement_doc',
+          source_doc_text: mode === 'ai' ? prompt : docText,
+          raw_markdown: mode === 'ai'
+            ? [
+                `# Feature: ${title}`,
+                '',
+                '## Overview',
+                desc || prompt,
+                '',
+                '## Specification',
+                prompt
+              ].join(String.fromCharCode(10))
+            : [
+                `# Feature: ${title}`,
+                '',
+                '## Requirements Document',
+                docText
+              ].join(String.fromCharCode(10)),
+          lifecycle_state: 'draft'
+        };
+
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+
+        await AsyncAction.execute('create-feature', btn, async () => {
+          const r = await fetch(`/api/pods/${wsId}/features?persona=${persona}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
+          closeModal();
+          Toast.show(`Feature "${title}" created successfully!`, 'success');
+          openPodDetail(wsId, 'specs');
+        });
+      }
+      window.submitCreateFeature = submitCreateFeature;
+
+      function openFeatureDetailModal(wsId, featId) {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        const ws = window._activePodData || window._activeWorkspaceData || {};
+        const feat = (ws.features || []).find(f => f.feature_id === featId) || {};
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        const isOwner = (ws.owner_id === persona);
+
+        const versions = feat.versions || [];
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 font-mono text-xs font-bold border border-indigo-900">${feat.feature_id || featId}</span>
+                  <h4 class="text-base font-bold text-slate-100">${feat.title || 'Feature Specification'}</h4>
+                  <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">${feat.active_version || 'v1.0'}</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">${feat.description || 'Feature specification in SDD pod.'}</p>
+              </div>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <!-- Version History Pills -->
+            ${versions.length > 0 ? `
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Version History (${versions.length})</label>
+                <div class="flex items-center gap-2 flex-wrap">
+                  ${versions.map(v => `
+                    <span class="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 flex items-center gap-1.5">
+                      <span>🏷️ ${v.version}</span>
+                      <span class="text-[10px] text-slate-500">by ${v.created_by}</span>
+                    </span>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Lifecycle State & Approval Controls -->
+            <div class="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">Lifecycle State</label>
+                  <p class="text-[11px] text-slate-500">
+                    ${isOwner ? 'You are Pod Owner: You can transition to Approved.' : 'Note: Only Pod Owner can approve specifications.'}
+                  </p>
+                </div>
+                <select id="featDetailLifecycle" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-200">
+                  <option value="draft" ${feat.lifecycle_state === 'draft' ? 'selected' : ''}>Draft</option>
+                  <option value="in_review" ${feat.lifecycle_state === 'in_review' ? 'selected' : ''}>In Review</option>
+                  <option value="approved" ${feat.lifecycle_state === 'approved' ? 'selected' : ''} ${!isOwner ? 'disabled' : ''}>Approved ${!isOwner ? '(Owner Only)' : ''}</option>
+                  <option value="deprecated" ${feat.lifecycle_state === 'deprecated' ? 'selected' : ''}>Deprecated</option>
+                </select>
+              </div>
+
+              <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer pt-2 border-t border-slate-800">
+                <input type="checkbox" id="featBumpVersion" class="rounded" />
+                <span>Increment Version (archive current as historical version and bump to next minor release)</span>
+              </label>
+            </div>
+
+            <!-- Markdown spec -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Specification Content (Markdown)</label>
+              <textarea id="featDetailMarkdown" rows="9" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">${feat.raw_markdown || ''}</textarea>
+            </div>
+
+            <!-- Acceptance Criteria -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Acceptance Criteria (One per line)</label>
+              <textarea id="featDetailCriteria" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">${(feat.acceptance_criteria || []).join(String.fromCharCode(10))}</textarea>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+              <button type="button" onclick="quickLaunchPrototypeForFeature('${wsId}', '${feat.feature_id}')" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs font-medium border border-slate-700 flex items-center gap-1.5 cursor-pointer">
+                <span>⚡</span>
+                <span>Try in Prototype Hub</span>
+              </button>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="closeModal()" class="px-4 py-2 text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">Cancel</button>
+                <button type="button" id="btnSubmitUpdateFeature" onclick="submitUpdateFeature('${wsId}', '${feat.feature_id}')" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md transition cursor-pointer flex items-center gap-1.5">
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      window.openFeatureDetailModal = openFeatureDetailModal;
+
+      async function submitUpdateFeature(wsId, featId) {
+        const btn = document.getElementById('btnSubmitUpdateFeature');
+        const state = document.getElementById('featDetailLifecycle').value;
+        const bump = document.getElementById('featBumpVersion') ? document.getElementById('featBumpVersion').checked : false;
+        const md = document.getElementById('featDetailMarkdown').value;
+        const critText = document.getElementById('featDetailCriteria').value.trim();
+        const critList = critText ? critText.split(String.fromCharCode(10)).map(c => c.trim()).filter(Boolean) : [];
+
+        const payload = {
+          lifecycle_state: state,
+          raw_markdown: md,
+          acceptance_criteria: critList,
+          bump_version: bump
+        };
+
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+
+        await AsyncAction.execute('update-feature', btn, async () => {
+          const r = await fetch(`/api/pods/${wsId}/features/${featId}?persona=${persona}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
+          closeModal();
+          Toast.show(`Feature specification updated successfully!`, 'success');
+          openPodDetail(wsId, 'specs');
+        });
+      }
+      window.submitUpdateFeature = submitUpdateFeature;
+
+      async function quickApproveFeature(wsId, featId, btnEl) {
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        await AsyncAction.execute('approve-feature-' + featId, btnEl, async () => {
+          const r = await fetch(`/api/pods/${wsId}/features/${featId}?persona=${persona}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ lifecycle_state: 'approved' })
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || 'Approval failed');
+          }
+          Toast.show('Feature spec approved by Owner!', 'success');
+          openPodDetail(wsId, 'specs');
+        });
+      }
+      window.quickApproveFeature = quickApproveFeature;
+
+      async function deleteFeatureSpec(wsId, featId, btnEl) {
+        if (!confirm('Are you sure you want to delete this feature specification?')) return;
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        await AsyncAction.execute('delete-feature-' + featId, btnEl, async () => {
+          const r = await fetch(`/api/pods/${wsId}/features/${featId}?persona=${persona}`, {
+            method: 'DELETE'
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || 'Deletion failed');
+          }
+          Toast.show('Feature spec deleted', 'success');
+          openPodDetail(wsId, 'specs');
+        });
+      }
+      window.deleteFeatureSpec = deleteFeatureSpec;
+
+      // ==========================================
+      // SPACE 3: PROTOTYPE HUB MODALS & CONTROLLERS
+      // ==========================================
+
+      function quickLaunchPrototypeForFeature(wsId, featId) {
+        closeModal();
+        openBuildPrototypeModal(wsId, featId);
+      }
+      window.quickLaunchPrototypeForFeature = quickLaunchPrototypeForFeature;
+
+      function openBuildPrototypeModal(wsId, preselectedFeatureId) {
+        const mb = document.getElementById('modalBackdrop');
+        if (!mb) return;
+        mb.classList.remove('hidden');
+
+        const ws = window._activePodData || window._activeWorkspaceData || {};
+        const features = ws.features || [];
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        const userObj = userProfiles[persona] || { name: persona };
+
+        window._selectedStorageMode = 'local';
+        const targetFeat = preselectedFeatureId ? features.find(f => f.feature_id === preselectedFeatureId) : null;
+
+        mb.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h4 class="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <span>⚡</span>
+                  <span>Build Prototype Application (Prototype Hub)</span>
+                </h4>
+                <p class="text-xs text-slate-400">Autonomous engine generates working code linkable to your specification.</p>
+              </div>
+              <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            <!-- Linked Feature Selector -->
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1 uppercase tracking-wider">Link to Feature Specification</label>
+              <select id="protoLinkedFeature" onchange="onProtoLinkedFeatureChange()" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                <option value="">-- Standalone (Pod Baseline) --</option>
+                ${features.map(f => `
+                  <option value="${f.feature_id}" ${preselectedFeatureId === f.feature_id ? 'selected' : ''}>
+                    ${f.feature_id}: ${f.title} (${f.active_version} - ${f.lifecycle_state})
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+
+            <!-- Prototype Name -->
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Prototype Name</label>
+                <input type="text" id="inputNewProtoName" placeholder="e.g. Order Validation & Stock Prototype" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Prototype Description / Goal</label>
+                <textarea id="inputNewProtoDesc" rows="3" placeholder="Describe the application flow to implement..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"></textarea>
+              </div>
+            </div>
+
+            <!-- Storage Mode Selection (Requirement: Change 3) -->
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">Application Storage Mode</label>
+              <div class="grid grid-cols-2 gap-4">
+                <div onclick="selectPrototypeStorageMode('local')" id="cardStorageLocal" class="p-4 rounded-xl border-2 border-emerald-500 bg-emerald-950/20 cursor-pointer space-y-2 transition shadow-sm">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="text-xl">💻</span>
+                      <strong class="text-xs text-emerald-300">Local Machine (Recommended)</strong>
+                    </div>
+                    <span class="text-[9px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded font-mono border border-emerald-500/30">Private</span>
+                  </div>
+                  <p class="text-[11px] text-slate-400 leading-relaxed">
+                    Saved inside pod local directory <strong>${(ws.sdd_config && ws.sdd_config.local_space_path) ? ws.sdd_config.local_space_path + '/Prototype' : 'local space'}</strong>. Visible strictly to <strong>${userObj.name || 'you'}</strong>.
+                  </p>
+                </div>
+
+                <div onclick="selectPrototypeStorageMode('cloud')" id="cardStorageCloud" class="p-4 rounded-xl border-2 border-slate-800 hover:border-slate-700 bg-slate-950 cursor-pointer space-y-2 transition">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="text-xl">☁️</span>
+                      <strong class="text-xs text-slate-300">Cloud Pod Space</strong>
+                    </div>
+                    <span class="text-[9px] bg-blue-500/10 text-blue-400 font-bold px-1.5 py-0.5 rounded font-mono border border-blue-500/20">Shared</span>
+                  </div>
+                  <p class="text-[11px] text-slate-400 leading-relaxed">
+                    Stored in pod workspace repository and visible to invited pod contributors.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tech Stack & Generation Prompt -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label class="block font-semibold text-slate-300 mb-1">Target Tech Stack</label>
+                <select id="protoTechStack" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200">
+                  <option value="Python 3.11 / FastAPI / Pytest">Python 3.11 / FastAPI / Pytest</option>
+                  <option value="Node.js / Express / Jest">Node.js / Express / Jest</option>
+                  <option value="React / TypeScript">React / TypeScript</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-300 mb-1">Initial Task ID (Optional)</label>
+                <input type="text" id="protoTaskId" value="TSK-101" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-mono text-slate-200" />
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+              <span class="text-xs text-slate-400 font-mono">Autonomous Code Generation</span>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="closeModal()" class="px-4 py-2 text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">Cancel</button>
+                <button type="button" id="btnSubmitBuildPrototype" onclick="submitBuildPrototype('${wsId}')" class="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md transition cursor-pointer flex items-center gap-1.5">
+                  🚀 Build Prototype
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        if (targetFeat) {
+          const nameInput = document.getElementById('inputNewProtoName');
+          const descInput = document.getElementById('inputNewProtoDesc');
+          if (nameInput) nameInput.value = targetFeat.title || '';
+          if (descInput) descInput.value = targetFeat.description || targetFeat.raw_markdown || '';
+        }
+      }
+      window.openBuildPrototypeModal = openBuildPrototypeModal;
+
+      function onProtoLinkedFeatureChange() {
+        const select = document.getElementById('protoLinkedFeature');
+        if (!select) return;
+        const featId = select.value;
+        const ws = window._activePodData || window._activeWorkspaceData || {};
+        const feat = (ws.features || []).find(f => f.feature_id === featId);
+        const nameInput = document.getElementById('inputNewProtoName');
+        const descInput = document.getElementById('inputNewProtoDesc');
+        if (feat) {
+          if (nameInput) nameInput.value = feat.title || '';
+          if (descInput) descInput.value = feat.description || feat.raw_markdown || '';
+        }
+      }
+      window.onProtoLinkedFeatureChange = onProtoLinkedFeatureChange;
+
+      function selectPrototypeStorageMode(mode) {
+        window._selectedStorageMode = mode;
+        const cLocal = document.getElementById('cardStorageLocal');
+        const cCloud = document.getElementById('cardStorageCloud');
+        if (mode === 'local') {
+          if (cLocal) cLocal.className = 'p-4 rounded-xl border-2 border-emerald-500 bg-emerald-950/20 cursor-pointer space-y-2 transition shadow-sm';
+          if (cCloud) cCloud.className = 'p-4 rounded-xl border-2 border-slate-800 hover:border-slate-700 bg-slate-950 cursor-pointer space-y-2 transition';
+        } else {
+          if (cLocal) cLocal.className = 'p-4 rounded-xl border-2 border-slate-800 hover:border-slate-700 bg-slate-950 cursor-pointer space-y-2 transition';
+          if (cCloud) cCloud.className = 'p-4 rounded-xl border-2 border-blue-500 bg-blue-950/20 cursor-pointer space-y-2 transition shadow-sm';
+        }
+      }
+      window.selectPrototypeStorageMode = selectPrototypeStorageMode;
+
+      async function openPodPrototypeFolder(protoIdOrPath) {
+        if (!protoIdOrPath) {
+          Toast.show('No local directory path configured for this prototype.', 'warning');
+          return;
+        }
+        let targetPath = protoIdOrPath;
+        const ws = window._activePodData || window._activeWorkspaceData || {};
+        const proto = (ws.prototypes || []).find(p => p.prototype_id === protoIdOrPath);
+        if (proto && proto.local_path) {
+          targetPath = proto.local_path;
+        }
+        try {
+          const r = await fetch('/api/system/open-folder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({path: targetPath})
+          });
+          const d = await r.json();
+          if (d.status !== 'opened') {
+            Toast.show('Could not open folder: ' + (d.detail || 'Folder does not exist yet'), 'warning');
+          } else {
+            Toast.show('Opened in File Explorer: ' + targetPath, 'info');
+          }
+        } catch(e) {
+          Toast.show('Failed to launch File Explorer: ' + e.message, 'error');
+        }
+      }
+      window.openPodPrototypeFolder = openPodPrototypeFolder;
+      window.openPrototypeFolder = openPodPrototypeFolder;
+
+      async function submitBuildPrototype(wsId) {
+        const btn = document.getElementById('btnSubmitBuildPrototype');
+        const name = document.getElementById('inputNewProtoName').value.trim();
+        const desc = document.getElementById('inputNewProtoDesc').value.trim();
+        const featId = document.getElementById('protoLinkedFeature') ? document.getElementById('protoLinkedFeature').value : null;
+        const storageMode = window._selectedStorageMode || 'local';
+        const techStack = document.getElementById('protoTechStack') ? document.getElementById('protoTechStack').value : 'Python 3.11 / FastAPI / Pytest';
+        const taskId = document.getElementById('protoTaskId') ? document.getElementById('protoTaskId').value.trim() : 'TSK-101';
+
+        if (!name) {
+          Toast.show('Please enter a prototype name', 'error');
+          return;
+        }
+
+        const payload = {
+          name: name,
+          description: desc,
+          feature_id: featId || null,
+          storage_mode: storageMode,
+          tech_stack: techStack,
+          initial_prompt: desc || `Prototype for ${name}`,
+          task_id: taskId
+        };
+
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+
+        await AsyncAction.execute('build-prototype', btn, async () => {
+          const r = await fetch(`/api/pods/${wsId}/prototypes/build?persona=${persona}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || `HTTP ${r.status}`);
+          }
+          const data = await r.json();
+          closeModal();
+
+          // Store files in local handle cache
+          if (!window._activeLocalHandles) window._activeLocalHandles = {};
+          if (data.files && data.prototype) {
+            window._activeLocalHandles[data.prototype.prototype_id] = data.files;
+          }
+
+          if (storageMode === 'local') {
+            const destPath = (data.prototype && data.prototype.local_path) ? data.prototype.local_path : 'local storage';
+            Toast.show(`Prototype "${name}" saved to ${destPath}!`, 'success');
+          } else {
+            Toast.show(`Prototype "${name}" built in cloud pod!`, 'success');
+          }
+
+          // Reload pod and switch to prototype hub tab
+          await openPodDetail(wsId, 'prototypes');
+
+          // Log steps to terminal
+          const term = document.getElementById('sddTerminalOutput');
+          if (term && data.steps) {
+            term.innerHTML += `<div class="text-indigo-400 font-bold mt-2">&gt;&gt; [START] Autonomous Agent Prototype Build for ${name}...</div>`;
+            data.steps.forEach(st => {
+              const col = st.level === 'success' ? 'text-emerald-400' : (st.level === 'complete' ? 'text-emerald-400 font-bold' : (st.level === 'error' ? 'text-red-400 font-bold' : 'text-slate-300'));
+              term.innerHTML += `<div class="${col}">${st.msg}</div>`;
+            });
+            term.scrollTop = term.scrollHeight;
+          }
+        });
+      }
+      window.submitBuildPrototype = submitBuildPrototype;
+
+      async function savePrototypeToChosenLocalFolder(protoId) {
+        const defaultCode = [
+          '# Autonomous Prototype Code',
+          'from fastapi import FastAPI',
+          'app = FastAPI()',
+          '',
+          '@app.get("/")',
+          'def read_root():',
+          '    return {"status": "ok", "prototype": "' + protoId + '"}'
+        ].join(String.fromCharCode(10));
+        const defaultTest = [
+          'def test_prototype():',
+          '    assert True'
+        ].join(String.fromCharCode(10));
+        const files = (window._activeLocalHandles && window._activeLocalHandles[protoId]) || {
+          'main.py': defaultCode,
+          'test_main.py': defaultTest
+        };
+        await LocalPrototypeManager.saveFilesToLocalDirectory(files);
+      }
+      window.savePrototypeToChosenLocalFolder = savePrototypeToChosenLocalFolder;
+
+      function downloadPrototypeZip(protoId) {
+        const defaultCode = [
+          '# Autonomous Prototype Code',
+          'from fastapi import FastAPI',
+          'app = FastAPI()',
+          '',
+          '@app.get("/")',
+          'def read_root():',
+          '    return {"status": "ok", "prototype": "' + protoId + '"}'
+        ].join(String.fromCharCode(10));
+        const defaultTest = [
+          'def test_prototype():',
+          '    assert True'
+        ].join(String.fromCharCode(10));
+        const files = (window._activeLocalHandles && window._activeLocalHandles[protoId]) || {
+          'main.py': defaultCode,
+          'test_main.py': defaultTest
+        };
+        LocalPrototypeManager.downloadFilesAsZip(files, `${protoId}_app.zip`);
+      }
+      window.downloadPrototypeZip = downloadPrototypeZip;
+
+      async function deletePodPrototype(wsId, protoId, btnEl) {
+        if (!confirm('Are you sure you want to delete this prototype application?')) return;
+        const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+        await AsyncAction.execute('delete-prototype-' + protoId, btnEl, async () => {
+          const r = await fetch(`/api/pods/${wsId}/prototypes/${protoId}?persona=${persona}`, {
+            method: 'DELETE'
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || err.error || 'Deletion failed');
+          }
+          if (window._activeLocalHandles && window._activeLocalHandles[protoId]) {
+            delete window._activeLocalHandles[protoId];
+          }
+          Toast.show('Prototype deleted', 'success');
+          openPodDetail(wsId, 'prototypes');
+        });
+      }
+      window.deletePodPrototype = deletePodPrototype;
       window.deleteWorkspace = deletePod;
       window.deletePod = deletePod;
 
@@ -2318,7 +3308,7 @@ ${d.output || 'No output recorded.'}`;
 
             <div class="flex items-center justify-between pt-2 border-t border-slate-800">
               <span class="text-xs text-slate-400">All invitees gain Contributor role</span>
-              <button type="button" onclick="submitInviteContributors('${wsId}')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+              <button type="button" id="btnSubmitInviteContributors" onclick="submitInviteContributors('${wsId}')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer flex items-center gap-1.5">
                 Save Contributors
               </button>
             </div>
@@ -2328,11 +3318,12 @@ ${d.output || 'No output recorded.'}`;
       window.openInviteContributorsModal = openInviteContributorsModal;
 
       async function submitInviteContributors(wsId) {
+        const btn = document.getElementById('btnSubmitInviteContributors');
         const checkboxes = document.querySelectorAll('input[name="inviteMemberCheck"]:checked');
         const ids = Array.from(checkboxes).map(c => c.value);
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
 
-        try {
+        await AsyncAction.execute('invite-contrib', btn, async () => {
           const r = await fetch(`/api/pods/${wsId}/invite?persona=${persona}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -2343,10 +3334,9 @@ ${d.output || 'No output recorded.'}`;
             throw new Error(err.detail || err.error || `HTTP ${r.status}`);
           }
           closeModal();
+          Toast.show('Contributors updated successfully!', 'success');
           openPodDetail(wsId);
-        } catch(e) {
-          alert('Failed to update contributors: ' + e.message);
-        }
+        });
       }
       window.submitInviteContributors = submitInviteContributors;
 
@@ -2377,7 +3367,7 @@ ${d.output || 'No output recorded.'}`;
 
             <div class="flex items-center justify-between pt-2 border-t border-slate-800">
               <span class="text-xs text-slate-400">Enforced on all Contributors</span>
-              <button type="button" onclick="submitOwnerRules('${wsId}')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer">
+              <button type="button" id="btnSubmitOwnerRules" onclick="submitOwnerRules('${wsId}')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer flex items-center gap-1.5">
                 Save & Enforce Rules
               </button>
             </div>
@@ -2387,11 +3377,12 @@ ${d.output || 'No output recorded.'}`;
       window.openOwnerRulesModal = openOwnerRulesModal;
 
       async function submitOwnerRules(wsId) {
+        const btn = document.getElementById('btnSubmitOwnerRules');
         const text = document.getElementById('inputRulesPrinciples').value.trim();
         const list = text.split(String.fromCharCode(10)).map(p => p.trim()).filter(Boolean);
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
 
-        try {
+        await AsyncAction.execute('owner-rules', btn, async () => {
           const r = await fetch(`/api/pods/${wsId}/sdd/rules?persona=${persona}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
@@ -2402,10 +3393,9 @@ ${d.output || 'No output recorded.'}`;
             throw new Error(err.detail || err.error || `HTTP ${r.status}`);
           }
           closeModal();
+          Toast.show('Rules updated and enforced!', 'success');
           openPodDetail(wsId);
-        } catch(e) {
-          alert('Failed to save rules: ' + e.message);
-        }
+        });
       }
       window.submitOwnerRules = submitOwnerRules;
 
@@ -2432,7 +3422,7 @@ ${d.output || 'No output recorded.'}`;
             </div>
 
             <div class="flex justify-end pt-2 border-t border-slate-800">
-              <button type="button" onclick="submitPodInstructions('${wsId}')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer">
+              <button type="button" id="btnSubmitPodInstructions" onclick="submitPodInstructions('${wsId}')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer flex items-center gap-1.5">
                 Save Instructions
               </button>
             </div>
@@ -2442,10 +3432,11 @@ ${d.output || 'No output recorded.'}`;
       window.openInstructionsModal = openInstructionsModal;
 
       async function submitPodInstructions(wsId) {
+        const btn = document.getElementById('btnSubmitPodInstructions');
         const text = document.getElementById('inputInstructionsText').value.trim();
         const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
 
-        try {
+        await AsyncAction.execute('pod-instructions', btn, async () => {
           const r = await fetch(`/api/pods/${wsId}/instructions?persona=${persona}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
@@ -2456,10 +3447,9 @@ ${d.output || 'No output recorded.'}`;
             throw new Error(err.detail || err.error || `HTTP ${r.status}`);
           }
           closeModal();
+          Toast.show('Instructions saved!', 'success');
           openPodDetail(wsId);
-        } catch(e) {
-          alert('Failed to save instructions: ' + e.message);
-        }
+        });
       }
       window.submitWorkspaceInstructions = submitPodInstructions;
       window.submitPodInstructions = submitPodInstructions;

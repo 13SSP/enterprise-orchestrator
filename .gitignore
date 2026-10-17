@@ -25,6 +25,7 @@ env/
 *.log
 
 # Generated test output & local files
+workspace-projects/
 database/firestore_storage/
 integrations/m365-connector/generated_files/*.docx
 integrations/m365-connector/generated_files/*.pptx
