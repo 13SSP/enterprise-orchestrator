@@ -3,6 +3,7 @@ cortex.ai - ADK Tool Factory
 Inspects OpenAPI 3.0 specifications from microservices and generates executable ADK tool definitions.
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -14,11 +15,11 @@ if str(backend_dir) not in sys.path:
 from tool_registry.registry import tool_registry, ToolDefinition
 
 SERVICE_PORT_MAP = {
-    "hr-api": ("http://127.0.0.1:8001", "8001"),
-    "payroll-api": ("http://127.0.0.1:8002", "8002"),
-    "it-support-api": ("http://127.0.0.1:8003", "8003"),
-    "expense-api": ("http://127.0.0.1:8004", "8004"),
-    "m365-connector": ("http://127.0.0.1:8005", "8005")
+    "hr-api": (os.environ.get("HR_API_URL", "http://127.0.0.1:8001"), "8001"),
+    "payroll-api": (os.environ.get("PAYROLL_API_URL", "http://127.0.0.1:8002"), "8002"),
+    "it-support-api": (os.environ.get("IT_API_URL", "http://127.0.0.1:8003"), "8003"),
+    "expense-api": (os.environ.get("EXPENSE_API_URL", "http://127.0.0.1:8004"), "8004"),
+    "m365-connector": (os.environ.get("M365_API_URL", "http://127.0.0.1:8005"), "8005")
 }
 
 class ToolFactory:
@@ -67,7 +68,7 @@ class ToolFactory:
         author_id: str = "bob_ops",
         owner_team: str = "Operations",
         allowed_roles: Optional[List[str]] = None,
-        base_url: str = "http://127.0.0.1:8000"
+        base_url: str = ""
     ) -> Dict[str, Any]:
         from agent_registry.registry import agent_registry, AgentManifest
 

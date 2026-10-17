@@ -3,6 +3,7 @@ cortex.ai - Orchestration Gateway REST Routes
 Provides endpoints for Chat, Human Approvals, Agent Registry, Tool Catalog, Model Gateway, and Audit Logs.
 """
 
+import os
 import uuid
 import json
 import time
@@ -10,6 +11,7 @@ import httpx
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Header
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 import sys
 from pathlib import Path
@@ -372,7 +374,7 @@ class SwaggerGenerateRequest(BaseModel):
     author_id: Optional[str] = "bob_ops"
     owner_team: Optional[str] = "Operations"
     allowed_roles: Optional[List[str]] = None
-    base_url: Optional[str] = "http://127.0.0.1:8000"
+    base_url: Optional[str] = None
     swagger_json: Optional[str] = None
     url: Optional[str] = None
 
@@ -440,7 +442,7 @@ def generate_agent_from_swagger(req: SwaggerGenerateRequest):
         author_id=req.author_id or "bob_ops",
         owner_team=req.owner_team or "Operations",
         allowed_roles=req.allowed_roles or ["*"],
-        base_url=req.base_url or "http://127.0.0.1:8000"
+        base_url=req.base_url or os.environ.get("CORTEX_BASE_URL", "")
     )
     return res
 
@@ -968,6 +970,61 @@ def delete_pod_prototype(workspace_id: str, prototype_id: str, persona: str = "b
     try:
         workspace_manager.delete_prototype(workspace_id, prototype_id, current_user=persona)
         return {"status": "deleted", "prototype_id": prototype_id}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class ExecutePrototypeRequest(BaseModel):
+    method: str = "POST"
+    endpoint: str = "/"
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+
+@router_api.post("/workspaces/{workspace_id}/prototypes/{prototype_id}/execute", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/prototypes/{prototype_id}/execute", tags=["Pods"])
+def execute_pod_prototype(workspace_id: str, prototype_id: str, req: ExecutePrototypeRequest, persona: str = "bob_ops"):
+    try:
+        return workspace_manager.execute_prototype(workspace_id, prototype_id, req.model_dump(), current_user=persona)
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.post("/workspaces/{workspace_id}/prototypes/{prototype_id}/test", tags=["Workspaces"])
+@router_api.post("/pods/{workspace_id}/prototypes/{prototype_id}/test", tags=["Pods"])
+def test_pod_prototype(workspace_id: str, prototype_id: str, persona: str = "bob_ops"):
+    try:
+        return workspace_manager.test_prototype(workspace_id, prototype_id, current_user=persona)
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.get("/workspaces/{workspace_id}/prototypes/{prototype_id}/download", tags=["Workspaces"])
+@router_api.get("/pods/{workspace_id}/prototypes/{prototype_id}/download", tags=["Pods"])
+def download_pod_prototype(workspace_id: str, prototype_id: str, persona: str = "bob_ops"):
+    try:
+        buf, zip_name = workspace_manager.get_prototype_zip(workspace_id, prototype_id, current_user=persona)
+        return StreamingResponse(
+            buf,
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{zip_name}"'}
+        )
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router_api.get("/workspaces/{workspace_id}/prototypes/{prototype_id}/files", tags=["Workspaces"])
+@router_api.get("/pods/{workspace_id}/prototypes/{prototype_id}/files", tags=["Pods"])
+def get_pod_prototype_files(workspace_id: str, prototype_id: str, persona: str = "bob_ops"):
+    try:
+        return workspace_manager.get_prototype_files(workspace_id, prototype_id, current_user=persona)
     except PermissionError as pe:
         raise HTTPException(status_code=403, detail=str(pe))
     except Exception as e:

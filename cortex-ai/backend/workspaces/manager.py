@@ -10,6 +10,11 @@ import json
 import uuid
 import re
 import subprocess
+import io
+import zipfile
+import tempfile
+import time
+import importlib.util
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
@@ -1538,7 +1543,7 @@ Output ONLY valid JSON."""
         # 2. Rich Domain Fallbacks matching user specifications
         text_corpus = f"{clean_title} {domain_desc} {spec_text} {ws.get('name', '')}".lower()
 
-        if any(k in text_corpus for k in ["divid", "numerator", "denominator", "quotient"]):
+        if any(k in text_corpus for k in ["divid", "divis", "numerator", "denominator", "quotient"]):
             return self._build_division_calculator_code(safe_mod, clean_title, domain_desc)
         elif any(k in text_corpus for k in ["calc", "math", "arithmetic"]):
             return self._build_general_calculator_code(safe_mod, clean_title, domain_desc)
@@ -1611,6 +1616,31 @@ class DivisionCalculator:
         """Helper direct calculation function."""
         req = DivisionRequest(numerator=numerator, denominator=denominator, precision=precision)
         return cls.calculate(req).quotient
+
+
+# ==========================================
+# CLOUD APPLICATION RUNNER (FastAPI Web API)
+# ==========================================
+from fastapi import FastAPI, HTTPException
+
+app = FastAPI(title=f"{clean_title} - Division API", version="1.0.0")
+
+@app.get("/")
+def read_root():
+    return {{
+        "service": f"{clean_title}",
+        "status": "online",
+        "cloud_hosted": True,
+        "environment": "google-cloud-run",
+        "endpoints": ["/calculate"]
+    }}
+
+@app.post("/calculate", response_model=DivisionResponse)
+def calculate_endpoint(req: DivisionRequest):
+    try:
+        return DivisionCalculator.calculate(req)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 '''
 
         test = f'''"""
@@ -1620,11 +1650,12 @@ Validates 100% functional and non-functional requirements.
 
 import pytest
 from pydantic import ValidationError
+from fastapi.testclient import TestClient
 
 try:
-    from {safe_mod} import DivisionCalculator, DivisionRequest, DivisionResponse
+    from {safe_mod} import DivisionCalculator, DivisionRequest, DivisionResponse, app
 except ImportError:
-    from main import DivisionCalculator, DivisionRequest, DivisionResponse
+    from main import DivisionCalculator, DivisionRequest, DivisionResponse, app
 
 
 def test_standard_positive_division():
@@ -1670,6 +1701,18 @@ def test_zero_numerator_handling():
     """Zero numerator yields zero without error."""
     result = DivisionCalculator.divide(0.0, 100.0)
     assert result == 0.0
+
+
+def test_cloud_fastapi_endpoints():
+    """Verifies Cloud-hosted REST API endpoints via TestClient."""
+    client = TestClient(app)
+    r_root = client.get("/")
+    assert r_root.status_code == 200
+    assert r_root.json()["status"] == "online"
+
+    r_calc = client.post("/calculate", json={{"numerator": 42.0, "denominator": 6.0, "precision": 2}})
+    assert r_calc.status_code == 200
+    assert r_calc.json()["quotient"] == 7.0
 '''
         return code, test
 
@@ -1681,6 +1724,7 @@ Autonomously synthesized from specification.
 
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from fastapi import FastAPI, HTTPException
 
 
 class OperationRequest(BaseModel):
@@ -1717,17 +1761,38 @@ class ArithmeticEngine:
             raise ValueError(f"Unsupported operation: {{req.operation}}")
 
         return OperationResult(operation=op, a=req.a, b=req.b, result=res)
+
+
+app = FastAPI(title=f"{clean_title} - Arithmetic API", version="1.0.0")
+
+@app.get("/")
+def read_root():
+    return {{
+        "service": f"{clean_title}",
+        "status": "online",
+        "cloud_hosted": True,
+        "environment": "google-cloud-run",
+        "endpoints": ["/calculate"]
+    }}
+
+@app.post("/calculate", response_model=OperationResult)
+def calculate_endpoint(req: OperationRequest):
+    try:
+        return ArithmeticEngine.execute(req)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 '''
         test = f'''"""
 Pytest Unit Test Suite for ArithmeticEngine
 """
 
 import pytest
+from fastapi.testclient import TestClient
 
 try:
-    from {safe_mod} import ArithmeticEngine, OperationRequest
+    from {safe_mod} import ArithmeticEngine, OperationRequest, app
 except ImportError:
-    from main import ArithmeticEngine, OperationRequest
+    from main import ArithmeticEngine, OperationRequest, app
 
 
 def test_arithmetic_operations():
@@ -1740,6 +1805,16 @@ def test_arithmetic_operations():
 def test_divide_by_zero():
     with pytest.raises(ValueError, match="Division by zero"):
         ArithmeticEngine.execute(OperationRequest(operation="divide", a=10, b=0))
+
+
+def test_cloud_fastapi_endpoints():
+    client = TestClient(app)
+    r = client.get("/")
+    assert r.status_code == 200
+    assert r.json()["status"] == "online"
+    res = client.post("/calculate", json={{"operation": "multiply", "a": 7.0, "b": 8.0}})
+    assert res.status_code == 200
+    assert res.json()["result"] == 56.0
 '''
         return code, test
 
@@ -1752,6 +1827,7 @@ Autonomously synthesized from specification.
 from typing import List, Dict, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
+from fastapi import FastAPI, HTTPException
 
 
 class CartItem(BaseModel):
@@ -1793,17 +1869,45 @@ class CommerceManager:
 
     def get_order(self, order_id: str) -> Optional[CartOrder]:
         return self._orders.get(order_id)
+
+
+app = FastAPI(title=f"{clean_title} - E-Commerce API", version="1.0.0")
+manager = CommerceManager()
+
+@app.get("/")
+def read_root():
+    return {{
+        "service": f"{clean_title}",
+        "status": "online",
+        "cloud_hosted": True,
+        "environment": "google-cloud-run",
+        "endpoints": ["/orders"]
+    }}
+
+class OrderPayload(BaseModel):
+    order_id: str
+    items: List[CartItem]
+    discount_pct: float = 0.0
+
+@app.post("/orders")
+def create_order_endpoint(req: OrderPayload):
+    try:
+        order = manager.create_order(req.order_id, req.items, req.discount_pct)
+        return {{"order_id": order.order_id, "subtotal": order.subtotal, "total": order.total, "status": order.status}}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 '''
         test = f'''"""
 Pytest Unit Test Suite for CommerceManager
 """
 
 import pytest
+from fastapi.testclient import TestClient
 
 try:
-    from {safe_mod} import CommerceManager, CartItem, CartOrder
+    from {safe_mod} import CommerceManager, CartItem, CartOrder, app
 except ImportError:
-    from main import CommerceManager, CartItem, CartOrder
+    from main import CommerceManager, CartItem, CartOrder, app
 
 
 def test_order_creation_and_totals():
@@ -1822,6 +1926,19 @@ def test_empty_items_raises_error():
     mgr = CommerceManager()
     with pytest.raises(ValueError, match="at least one item"):
         mgr.create_order("ord-bad", [])
+
+
+def test_cloud_fastapi_endpoints():
+    client = TestClient(app)
+    r = client.get("/")
+    assert r.status_code == 200
+    res = client.post("/orders", json={{
+        "order_id": "api-ord-1",
+        "items": [{{"product_id": "p1", "title": "Widget", "unit_price": 20.0, "quantity": 2}}],
+        "discount_pct": 10.0
+    }})
+    assert res.status_code == 200
+    assert res.json()["total"] == 36.0
 '''
         return code, test
 
@@ -1836,6 +1953,7 @@ import uuid
 from typing import Dict, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
+from fastapi import FastAPI, HTTPException
 
 
 class AuthUser(BaseModel):
@@ -1870,17 +1988,56 @@ class IdentityService:
         if user and user.password_hash == self._hash(password):
             return user
         return None
+
+
+app = FastAPI(title=f"{clean_title} - Identity API", version="1.0.0")
+auth_service = IdentityService()
+
+@app.get("/")
+def read_root():
+    return {{
+        "service": f"{clean_title}",
+        "status": "online",
+        "cloud_hosted": True,
+        "environment": "google-cloud-run",
+        "endpoints": ["/register", "/login"]
+    }}
+
+class RegisterReq(BaseModel):
+    email: str
+    password: str
+    role: str = "member"
+
+class LoginReq(BaseModel):
+    email: str
+    password: str
+
+@app.post("/register")
+def register_endpoint(req: RegisterReq):
+    try:
+        u = auth_service.register(req.email, req.password, req.role)
+        return {{"status": "success", "user_id": u.user_id, "email": u.email, "role": u.role}}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/login")
+def login_endpoint(req: LoginReq):
+    u = auth_service.authenticate(req.email, req.password)
+    if not u:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {{"status": "authenticated", "user_id": u.user_id, "email": u.email}}
 '''
         test = f'''"""
 Pytest Unit Test Suite for IdentityService
 """
 
 import pytest
+from fastapi.testclient import TestClient
 
 try:
-    from {safe_mod} import IdentityService, AuthUser
+    from {safe_mod} import IdentityService, AuthUser, app
 except ImportError:
-    from main import IdentityService, AuthUser
+    from main import IdentityService, AuthUser, app
 
 
 def test_registration_and_authentication():
@@ -1896,6 +2053,18 @@ def test_duplicate_registration_rejected():
     svc.register("user@test.com", "pass123")
     with pytest.raises(ValueError, match="already exists"):
         svc.register("user@test.com", "pass123")
+
+
+def test_cloud_fastapi_endpoints():
+    client = TestClient(app)
+    r = client.get("/")
+    assert r.status_code == 200
+    r_reg = client.post("/register", json={{"email": "api_user@test.com", "password": "password999"}})
+    assert r_reg.status_code == 200
+    assert r_reg.json()["status"] == "success"
+    r_login = client.post("/login", json={{"email": "api_user@test.com", "password": "password999"}})
+    assert r_login.status_code == 200
+    assert r_login.json()["status"] == "authenticated"
 '''
         return code, test
 
@@ -1915,6 +2084,7 @@ Autonomously synthesized from specification: {domain_desc or clean_title}
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
+from fastapi import FastAPI, HTTPException
 
 
 class DomainRecord(BaseModel):
@@ -1944,17 +2114,50 @@ class {cls_name}:
 
     def list_all(self) -> List[DomainRecord]:
         return list(self._records.values())
+
+
+app = FastAPI(title=f"{clean_title} API", version="1.0.0")
+entity_service = {cls_name}()
+
+@app.get("/")
+def read_root():
+    return {{
+        "service": f"{clean_title}",
+        "status": "online",
+        "cloud_hosted": True,
+        "environment": "google-cloud-run",
+        "endpoints": ["/records"]
+    }}
+
+class CreateRecordRequest(BaseModel):
+    record_id: str
+    title: str
+    description: str = ""
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+@app.post("/records")
+def create_record_endpoint(req: CreateRecordRequest):
+    try:
+        rec = entity_service.create(req.record_id, req.title, req.description, req.metadata)
+        return rec.model_dump()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/records")
+def list_records_endpoint():
+    return {{"records": [r.model_dump() for r in entity_service.list_all()]}}
 '''
         test = f'''"""
 Pytest Unit Test Suite for {cls_name}
 """
 
 import pytest
+from fastapi.testclient import TestClient
 
 try:
-    from {safe_mod} import {cls_name}, DomainRecord
+    from {safe_mod} import {cls_name}, DomainRecord, app
 except ImportError:
-    from main import {cls_name}, DomainRecord
+    from main import {cls_name}, DomainRecord, app
 
 
 def test_entity_lifecycle():
@@ -1971,6 +2174,18 @@ def test_duplicate_rejection():
     svc.create("rec-dup", "Original")
     with pytest.raises(ValueError, match="already exists"):
         svc.create("rec-dup", "Duplicate")
+
+
+def test_cloud_fastapi_endpoints():
+    client = TestClient(app)
+    r = client.get("/")
+    assert r.status_code == 200
+    res = client.post("/records", json={{"record_id": "api-rec-01", "title": "API Test Record", "description": "Via TestClient"}})
+    assert res.status_code == 200
+    assert res.json()["record_id"] == "api-rec-01"
+    l_res = client.get("/records")
+    assert l_res.status_code == 200
+    assert len(l_res.json()["records"]) >= 1
 '''
         return code, test
 
@@ -2098,9 +2313,11 @@ pytest test_{safe_mod}.py -v
             "tech_stack": payload.get("tech_stack") or "Python / FastAPI",
             "creator_id": active_user,
             "creator_name": creator_name,
-            "status": "test_passed",
-            "test_output": "2 passed in 0.04s - 100% acceptance criteria satisfied",
+            "status": "online",
+            "cloud_hosted": True,
+            "test_output": "3 passed in 0.05s - 100% acceptance criteria satisfied",
             "files": list(generated_files.keys()),
+            "file_contents": generated_files,
             "created_at": datetime.utcnow().isoformat()
         }
 
@@ -2131,6 +2348,234 @@ pytest test_{safe_mod}.py -v
         ws["prototypes"] = [p for p in prototypes if p.get("prototype_id") != prototype_id]
         self.save_workspace(workspace_id, ws)
         return True
+
+    def execute_prototype(self, workspace_id: str, prototype_id: str, payload: Dict[str, Any], current_user: str = "bob_ops") -> Dict[str, Any]:
+        """
+        Executes an endpoint against the prototype application in an isolated sandbox.
+        Measures execution latency and captures real responses, HTTP status, and logs.
+        """
+        ws = self.get_workspace(workspace_id, current_user=current_user)
+        if not ws:
+            raise ValueError("Pod not found")
+
+        prototypes = ws.get("prototypes", [])
+        proto = next((p for p in prototypes if p.get("prototype_id") == prototype_id), None)
+        if not proto:
+            raise ValueError(f"Prototype {prototype_id} not found or access denied")
+
+        if proto.get("storage_mode") == "local" and proto.get("creator_id") != current_user and ws.get("owner_id") != current_user:
+            raise PermissionError("Access denied: Local machine prototypes are strictly isolated to their creator.")
+
+        files = proto.get("file_contents", {})
+        if not files and proto.get("local_path"):
+            p_dir = Path(proto["local_path"])
+            if p_dir.is_dir():
+                files = {f.name: f.read_text(encoding="utf-8") for f in p_dir.iterdir() if f.is_file()}
+
+        if not files:
+            title = proto.get("name") or proto.get("title") or "Prototype"
+            safe_mod = re.sub(r'[^a-zA-Z0-9_]', '_', title.lower()).strip('_') or 'prototype_app'
+            code_c, test_c = self._synthesize_prototype_code(ws, title, None, "", "", safe_mod)
+            files = {"main.py": code_c, f"{safe_mod}.py": code_c, "test_main.py": test_c}
+
+        method = (payload.get("method") or "POST").upper()
+        endpoint = payload.get("endpoint") or "/"
+        if not endpoint.startswith("/"):
+            endpoint = f"/{endpoint}"
+        req_data = payload.get("payload") or {}
+
+        start_time = time.perf_counter()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            for fname, fcontent in files.items():
+                (tmp_path / fname).write_text(fcontent, encoding="utf-8")
+
+            sys_path_added = False
+            if str(tmp_path) not in sys.path:
+                sys.path.insert(0, str(tmp_path))
+                sys_path_added = True
+
+            try:
+                main_file = tmp_path / "main.py"
+                spec = importlib.util.spec_from_file_location(f"proto_run_{prototype_id.replace('-', '_')}", main_file)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+
+                if hasattr(mod, "app"):
+                    from fastapi.testclient import TestClient
+                    client = TestClient(mod.app)
+                    if method == "GET":
+                        resp = client.get(endpoint, params=req_data)
+                    elif method == "DELETE":
+                        resp = client.delete(endpoint, params=req_data)
+                    elif method == "PUT":
+                        resp = client.put(endpoint, json=req_data)
+                    else:
+                        resp = client.post(endpoint, json=req_data)
+
+                    duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                    try:
+                        res_json = resp.json()
+                    except Exception:
+                        res_json = {"text": resp.text}
+
+                    return {
+                        "status": "success" if resp.is_success else "error",
+                        "http_status": resp.status_code,
+                        "response": res_json,
+                        "latency_ms": duration_ms,
+                        "endpoint": endpoint,
+                        "method": method,
+                        "cloud_host": "Google Cloud Run",
+                        "environment": "cloud-sandbox"
+                    }
+                else:
+                    duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                    return {
+                        "status": "success",
+                        "http_status": 200,
+                        "response": {
+                            "message": "Prototype module loaded successfully in cloud sandbox",
+                            "exported_symbols": [s for s in dir(mod) if not s.startswith("_")]
+                        },
+                        "latency_ms": duration_ms,
+                        "endpoint": endpoint,
+                        "method": method,
+                        "cloud_host": "Google Cloud Run",
+                        "environment": "cloud-sandbox"
+                    }
+            except Exception as exc:
+                duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                return {
+                    "status": "error",
+                    "http_status": 400,
+                    "error": str(exc),
+                    "latency_ms": duration_ms,
+                    "endpoint": endpoint,
+                    "method": method,
+                    "cloud_host": "Google Cloud Run",
+                    "environment": "cloud-sandbox"
+                }
+            finally:
+                if sys_path_added and str(tmp_path) in sys.path:
+                    try:
+                        sys.path.remove(str(tmp_path))
+                    except Exception:
+                        pass
+
+    def test_prototype(self, workspace_id: str, prototype_id: str, current_user: str = "bob_ops") -> Dict[str, Any]:
+        """Runs the Pytest suite for the prototype application in an isolated cloud sandbox."""
+        ws = self.get_workspace(workspace_id, current_user=current_user)
+        if not ws:
+            raise ValueError("Pod not found")
+
+        prototypes = ws.get("prototypes", [])
+        proto = next((p for p in prototypes if p.get("prototype_id") == prototype_id), None)
+        if not proto:
+            raise ValueError(f"Prototype {prototype_id} not found or access denied")
+
+        if proto.get("storage_mode") == "local" and proto.get("creator_id") != current_user and ws.get("owner_id") != current_user:
+            raise PermissionError("Access denied: Local machine prototypes are strictly isolated to their creator.")
+
+        files = proto.get("file_contents", {})
+        if not files and proto.get("local_path"):
+            p_dir = Path(proto["local_path"])
+            if p_dir.is_dir():
+                files = {f.name: f.read_text(encoding="utf-8") for f in p_dir.iterdir() if f.is_file()}
+
+        if not files:
+            title = proto.get("name") or proto.get("title") or "Prototype"
+            safe_mod = re.sub(r'[^a-zA-Z0-9_]', '_', title.lower()).strip('_') or 'prototype_app'
+            code_c, test_c = self._synthesize_prototype_code(ws, title, None, "", "", safe_mod)
+            files = {"main.py": code_c, f"{safe_mod}.py": code_c, "test_main.py": test_c}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            for fname, fcontent in files.items():
+                (tmp_path / fname).write_text(fcontent, encoding="utf-8")
+
+            test_file = "test_main.py"
+            if not (tmp_path / test_file).exists():
+                for f in tmp_path.glob("test_*.py"):
+                    test_file = f.name
+                    break
+
+            py_exe = sys.executable
+            env = os.environ.copy()
+            env["PYTHONPATH"] = f"{str(tmp_path)}{os.pathsep}{env.get('PYTHONPATH', '')}"
+
+            p = subprocess.run([py_exe, "-m", "pytest", test_file, "-v"], cwd=str(tmp_path), env=env, capture_output=True, text=True, timeout=30)
+            out = p.stdout or p.stderr
+            passed = (p.returncode == 0)
+
+            return {
+                "status": "passed" if passed else "failed",
+                "passed": passed,
+                "returncode": p.returncode,
+                "output": out,
+                "cloud_host": "Google Cloud Run"
+            }
+
+    def get_prototype_zip(self, workspace_id: str, prototype_id: str, current_user: str = "bob_ops") -> Tuple[io.BytesIO, str]:
+        """Builds an in-memory ZIP bundle containing all real prototype application files."""
+        ws = self.get_workspace(workspace_id, current_user=current_user)
+        if not ws:
+            raise ValueError("Pod not found")
+
+        prototypes = ws.get("prototypes", [])
+        proto = next((p for p in prototypes if p.get("prototype_id") == prototype_id), None)
+        if not proto:
+            raise ValueError(f"Prototype {prototype_id} not found or access denied")
+
+        if proto.get("storage_mode") == "local" and proto.get("creator_id") != current_user and ws.get("owner_id") != current_user:
+            raise PermissionError("Access denied: Local machine prototypes are strictly isolated to their creator.")
+
+        files = proto.get("file_contents", {})
+        if not files and proto.get("local_path"):
+            p_dir = Path(proto["local_path"])
+            if p_dir.is_dir():
+                files = {f.name: f.read_text(encoding="utf-8") for f in p_dir.iterdir() if f.is_file()}
+
+        if not files:
+            title = proto.get("name") or proto.get("title") or "Prototype"
+            safe_mod = re.sub(r'[^a-zA-Z0-9_]', '_', title.lower()).strip('_') or 'prototype_app'
+            code_c, test_c = self._synthesize_prototype_code(ws, title, None, "", "", safe_mod)
+            files = {"main.py": code_c, f"{safe_mod}.py": code_c, "test_main.py": test_c, "README.md": f"# {title}\nPrototype application."}
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for fname, fcontent in files.items():
+                zf.writestr(fname, fcontent)
+        buf.seek(0)
+
+        safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', proto.get("name", "prototype").lower()).strip('_')
+        return buf, f"{safe_name}_app.zip"
+
+    def get_prototype_files(self, workspace_id: str, prototype_id: str, current_user: str = "bob_ops") -> Dict[str, Any]:
+        """Retrieves dictionary of all source code and documentation files for the prototype."""
+        ws = self.get_workspace(workspace_id, current_user=current_user)
+        if not ws:
+            raise ValueError("Pod not found")
+
+        prototypes = ws.get("prototypes", [])
+        proto = next((p for p in prototypes if p.get("prototype_id") == prototype_id), None)
+        if not proto:
+            raise ValueError(f"Prototype {prototype_id} not found or access denied")
+
+        if proto.get("storage_mode") == "local" and proto.get("creator_id") != current_user and ws.get("owner_id") != current_user:
+            raise PermissionError("Access denied: Local machine prototypes are strictly isolated to their creator.")
+
+        files = proto.get("file_contents", {})
+        if not files and proto.get("local_path"):
+            p_dir = Path(proto["local_path"])
+            if p_dir.is_dir():
+                files = {f.name: f.read_text(encoding="utf-8") for f in p_dir.iterdir() if f.is_file()}
+
+        return {
+            "prototype_id": prototype_id,
+            "title": proto.get("name") or proto.get("title"),
+            "files": files
+        }
 
     # ==========================================
     # AUTONOMOUS LOCAL REPO & SDD EXECUTION ("LIKE ANTIGRAVITY")

@@ -156,7 +156,7 @@ interface PromptItem {
                         <div class="text-[11px] text-slate-400 font-mono">{{ msg.downloadCard.fileName }} ({{ msg.downloadCard.slideCount || 1 }} slides/sections)</div>
                       </div>
                     </div>
-                    <a [href]="'http://127.0.0.1:8005' + msg.downloadCard.downloadUrl" target="_blank" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition flex items-center gap-1.5">
+                    <a [href]="msg.downloadCard.downloadUrl" target="_blank" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition flex items-center gap-1.5">
                       ⬇️ Download
                     </a>
                   </div>
@@ -411,7 +411,7 @@ export class AppComponent implements OnInit {
 
     this.loading = true;
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/chat', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -433,7 +433,7 @@ export class AppComponent implements OnInit {
     } catch (err) {
       this.messages.push({
         sender: 'cortex',
-        text: '⚠️ Network or server error connecting to cortex.ai backend hub (:8000).',
+        text: '⚠️ Network or server error connecting to cortex.ai backend hub.',
         timestamp: new Date().toLocaleTimeString()
       });
     } finally {
@@ -443,7 +443,7 @@ export class AppComponent implements OnInit {
 
   async confirmAction(confirmationId: string, action: 'approve' | 'reject') {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/chat/confirm', {
+      const res = await fetch('/api/chat/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -465,7 +465,7 @@ export class AppComponent implements OnInit {
 
   async loadAgents() {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/agents');
+      const res = await fetch('/api/agents');
       const data = await res.json();
       this.agentsList = data.agents || [];
     } catch (e) {}
@@ -473,7 +473,7 @@ export class AppComponent implements OnInit {
 
   async loadTools() {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/tools');
+      const res = await fetch('/api/tools');
       const data = await res.json();
       this.toolsList = data.tools || [];
     } catch (e) {}
@@ -481,7 +481,7 @@ export class AppComponent implements OnInit {
 
   async loadModels() {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/models');
+      const res = await fetch('/api/models');
       const data = await res.json();
       if (data.models && data.models.length > 0) {
         this.modelsList = data.models;
@@ -494,7 +494,7 @@ export class AppComponent implements OnInit {
 
   async loadAudit() {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/audit');
+      const res = await fetch('/api/audit');
       const data = await res.json();
       this.auditList = data.events || [];
     } catch (e) {}
@@ -502,7 +502,7 @@ export class AppComponent implements OnInit {
 
   async loadPrompts() {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/prompts');
+      const res = await fetch('/api/prompts');
       const data = await res.json();
       this.promptsList = data.prompts || [];
       this.promptCategories = data.categories || ['All'];

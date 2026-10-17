@@ -13,9 +13,13 @@ def open_folder_in_os(folder_path: str) -> str:
     """
     Opens the directory in the OS file explorer (Windows Explorer, macOS Finder, Linux xdg-open).
     Creates directory if it does not exist yet so the explorer opens cleanly.
+    In headless cloud environments (e.g. Google Cloud Run), gracefully resolves path without blocking.
     """
     p = Path(folder_path).resolve()
-    p.mkdir(parents=True, exist_ok=True)
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
 
     if sys.platform == "win32":
         try:
@@ -24,11 +28,21 @@ def open_folder_in_os(folder_path: str) -> str:
             else:
                 subprocess.Popen(["explorer", str(p)])
         except Exception:
-            subprocess.Popen(["explorer", str(p)])
+            try:
+                subprocess.Popen(["explorer", str(p)])
+            except Exception:
+                pass
     elif sys.platform == "darwin":
-        subprocess.Popen(["open", str(p)])
+        try:
+            subprocess.Popen(["open", str(p)])
+        except Exception:
+            pass
     else:
-        subprocess.Popen(["xdg-open", str(p)])
+        if os.environ.get("DISPLAY"):
+            try:
+                subprocess.Popen(["xdg-open", str(p)])
+            except Exception:
+                pass
 
     return Path(p).as_posix()
 
@@ -37,7 +51,10 @@ def pick_folder_dialog(initial_dir: Optional[str] = None) -> str:
     """
     Launches a native OS folder picker dialog and returns the selected path as POSIX string.
     Runs in an isolated subprocess to keep FastAPI's async event loop unblocked.
+    In headless cloud environments without display or during tests, returns empty string immediately.
     """
+    if os.environ.get("CI") or os.environ.get("HEADLESS") or os.environ.get("TESTING") or (sys.platform != "win32" and not os.environ.get("DISPLAY")):
+        return ""
     resolved_init = ""
     if initial_dir and initial_dir.strip():
         try:
@@ -70,7 +87,7 @@ except Exception:
             [sys.executable, "-c", code_tk, resolved_init],
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=10
         )
         selected = res.stdout.strip()
         if selected:
@@ -99,7 +116,7 @@ if ($res -eq [System.Windows.Forms.DialogResult]::OK) {{
                 ["powershell", "-NoProfile", "-Command", ps_code],
                 capture_output=True,
                 text=True,
-                timeout=120
+                timeout=10
             )
             selected = res.stdout.strip()
             if selected:
