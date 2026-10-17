@@ -67,10 +67,18 @@ class WorkspaceManager:
         if d:
             d["id"] = d.get("workspace_id", workspace_id)
             d["workspace_id"] = d.get("workspace_id", workspace_id)
-            # Ensure features and prototypes lists exist
+            # Ensure features, prototypes, and members lists exist
             d.setdefault("features", [])
             d.setdefault("prototypes", [])
+            d.setdefault("members", [])
             d.setdefault("pod_type", d.get("workspace_type", "chat"))
+            
+            # Populate user_role for active user
+            if current_user:
+                is_owner = (d.get("owner_id") == current_user)
+                is_contrib = any(m.get("user_id") == current_user for m in d.get("members", []) if isinstance(m, dict))
+                d["user_role"] = "owner" if is_owner else ("contributor" if is_contrib else "none")
+
             # Strict Visibility Enforcement: local prototypes visible ONLY to creator
             if current_user and "prototypes" in d and isinstance(d["prototypes"], list):
                 d["prototypes"] = [
@@ -1126,7 +1134,7 @@ Output ONLY valid JSON."""
         return self.save_workspace(workspace_id, ws)
 
     def invite_contributors(self, workspace_id: str, new_user_ids: List[str], requester_id: str) -> Dict[str, Any]:
-        """Saves invited contributors to Firestore."""
+        """Saves and synchronizes invited contributors to Firestore, preserving Owner and existing member history."""
         ws = self.get_workspace(workspace_id)
         if not ws:
             raise ValueError("Workspace not found")
@@ -1135,18 +1143,47 @@ Output ONLY valid JSON."""
 
         employees = {e["employee_id"]: e["name"] for e in self.list_employees()}
         current_members = ws.get("members", [])
-        existing_ids = {m["user_id"] for m in current_members}
+        owner_id = ws.get("owner_id") or requester_id
+        owner_name = ws.get("owner_name") or employees.get(owner_id, owner_id)
 
+        # Preserve existing joined_at timestamps
+        joined_map = {m["user_id"]: m.get("joined_at") for m in current_members if isinstance(m, dict) and "user_id" in m}
+
+        # Build clean synchronized list: Owner is always retained as Owner
+        updated_members = [
+            {
+                "user_id": owner_id,
+                "user_name": owner_name,
+                "role": "owner",
+                "joined_at": joined_map.get(owner_id) or ws.get("created_at") or datetime.utcnow().isoformat()
+            }
+        ]
+
+        # Sync contributors (exclude owner if accidentally passed in list)
         for uid in new_user_ids:
-            if uid not in existing_ids:
-                current_members.append({
+            if uid and uid != owner_id and not any(m["user_id"] == uid for m in updated_members):
+                updated_members.append({
                     "user_id": uid,
                     "user_name": employees.get(uid, uid),
                     "role": "contributor",
-                    "joined_at": datetime.utcnow().isoformat()
+                    "joined_at": joined_map.get(uid) or datetime.utcnow().isoformat()
                 })
 
-        ws["members"] = current_members
+        ws["members"] = updated_members
+        return self.save_workspace(workspace_id, ws)
+
+    def remove_contributor(self, workspace_id: str, user_id_to_remove: str, requester_id: str) -> Dict[str, Any]:
+        """Removes a contributor from the workspace."""
+        ws = self.get_workspace(workspace_id)
+        if not ws:
+            raise ValueError("Workspace not found")
+        if ws.get("owner_id") != requester_id:
+            raise PermissionError("Only the workspace Owner can remove contributors")
+        if user_id_to_remove == ws.get("owner_id"):
+            raise ValueError("Cannot remove the Pod Owner from contributors")
+
+        current_members = ws.get("members", [])
+        ws["members"] = [m for m in current_members if isinstance(m, dict) and m.get("user_id") != user_id_to_remove]
         return self.save_workspace(workspace_id, ws)
 
     # ==========================================

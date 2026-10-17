@@ -103,13 +103,28 @@ def test_owner_invite_contributors(client):
     ws_id = res.json()["workspace"]["workspace_id"]
 
     try:
+        # 1. Invite Priya and Maya
         res_invite = client.post(f"/api/workspaces/{ws_id}/invite?persona=bob_ops", json={
             "employee_ids": ["priya_sharma", "maya_lin"]
         })
         assert res_invite.status_code == 200
-        updated_members = [m["user_id"] for m in res_invite.json()["workspace"]["members"]]
-        assert "priya_sharma" in updated_members
-        assert "maya_lin" in updated_members
+        members = res_invite.json()["workspace"]["members"]
+        m_ids = [m["user_id"] for m in members]
+        assert "bob_ops" in m_ids  # Owner preserved
+        assert "priya_sharma" in m_ids
+        assert "maya_lin" in m_ids
+
+        # 2. Non-owner cannot remove contributor
+        del_fail = client.delete(f"/api/pods/{ws_id}/contributors/maya_lin?persona=alice_hr")
+        assert del_fail.status_code == 403
+
+        # 3. Owner removes Maya
+        del_res = client.delete(f"/api/pods/{ws_id}/contributors/maya_lin?persona=bob_ops")
+        assert del_res.status_code == 200
+        rem_members = [m["user_id"] for m in del_res.json()["workspace"]["members"]]
+        assert "maya_lin" not in rem_members
+        assert "priya_sharma" in rem_members
+        assert "bob_ops" in rem_members
     finally:
         client.delete(f"/api/workspaces/{ws_id}?persona=bob_ops")
 

@@ -702,6 +702,18 @@ def invite_workspace_contributors(workspace_id: str, req: WorkspaceInviteRequest
         raise HTTPException(status_code=404, detail=str(ve))
 
 
+@router_api.delete("/workspaces/{workspace_id}/contributors/{user_id}", tags=["Workspaces"])
+@router_api.delete("/pods/{workspace_id}/contributors/{user_id}", tags=["Pods"])
+def remove_workspace_contributor(workspace_id: str, user_id: str, persona: str = "bob_ops"):
+    try:
+        updated_ws = workspace_manager.remove_contributor(workspace_id, user_id, requester_id=persona)
+        return {"status": "removed", "workspace": updated_ws}
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+
 @router_api.put("/workspaces/{workspace_id}/instructions", tags=["Workspaces"])
 @router_api.put("/pods/{workspace_id}/instructions", tags=["Pods"])
 def update_workspace_instructions(workspace_id: str, req: WorkspaceInstructionsRequest, persona: str = "bob_ops"):
