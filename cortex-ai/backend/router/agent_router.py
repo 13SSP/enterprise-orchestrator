@@ -45,8 +45,15 @@ class OrchestratorRouter:
         p_lower = prompt.lower().strip()
         history = SESSION_HISTORY.get(session_id, [])
 
+        # ----------------- Smart Orchestrator Intent Check -----------------
+        # Real-time internet, weather, external search, and general queries are handled autonomously by cortex_assistant
+        is_general_or_web = any(k in p_lower for k in [
+            "weather", "forecast", "temperature", "climate", "who is", "search for", "latest on",
+            "what is the weather", "current weather", "tell me about", "explain", "analogy"
+        ])
+
         # ----------------- 0. User Selected Target Agent -----------------
-        if target_agent_id and target_agent_id not in ["auto", "cortex_assistant"]:
+        if target_agent_id and target_agent_id not in ["auto", "cortex_assistant"] and not is_general_or_web:
             if target_agent_id == "hr_agent":
                 if any(k in p_lower for k in ["pto", "leave", "vacation", "holiday", "sick day", "balance"]):
                     return RoutingResult(

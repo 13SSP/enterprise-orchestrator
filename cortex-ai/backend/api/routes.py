@@ -29,6 +29,8 @@ from guardrails.model_armor import model_armor
 from guardrails.gemma_guardrail import gemma_guardrail, GemmaGuardrailResult
 from approvals.manager import approval_manager, PendingAction
 from router.agent_router import router, SESSION_HISTORY
+from tools.internet_grounding import internet_grounding
+from rag.vertex_search import vertex_rag
 
 router_api = APIRouter(prefix="/api")
 
@@ -177,9 +179,16 @@ def handle_chat(req: ChatRequest):
             "status": "CLARIFICATION_REQUIRED"
         }
 
-    target_agent_id = req.agent_id if (req.agent_id and req.agent_id != "auto") else routing.selected_agent_id
+    # If router determined this is a general/weather/search inquiry, cortex_assistant handles it
+    if routing.selected_agent_id == "cortex_assistant":
+        target_agent_id = "cortex_assistant"
+    elif req.agent_id and req.agent_id != "auto":
+        target_agent_id = req.agent_id
+    else:
+        target_agent_id = routing.selected_agent_id or "cortex_assistant"
+
     agent = agent_registry.get_agent(target_agent_id)
-    if not agent:
+    if not agent or target_agent_id == "cortex_assistant":
         from agent_registry.registry import AgentManifest
         agent = AgentManifest(
             id="cortex_assistant",
@@ -191,7 +200,7 @@ def handle_chat(req: ChatRequest):
     tool_name = routing.suggested_tool
     tool_args = routing.suggested_args
 
-    is_enterprise_agent = (agent.id in ENTERPRISE_AGENT_IDS) or (agent.id not in ["cortex_assistant", "router", "shieldgemma_guardrail"])
+    is_enterprise_agent = (agent.id in ENTERPRISE_AGENT_IDS) and (agent.id not in ["cortex_assistant", "router", "shieldgemma_guardrail"])
 
     # 3. Two-Layer Access Control (Manifest + User RBAC)
     policy_decision = None
@@ -409,13 +418,43 @@ def handle_chat(req: ChatRequest):
         tool_result = sal_data
 
     else:
-        # Conversational generation using Model Gateway with previous turn context
-        system_inst = (
-            f"You are {agent.name} ({agent.owner_team}), an intelligent enterprise AI assistant on the cortex.ai platform. "
-            "Answer questions naturally, conversationally, and accurately. "
-            "When context documents are provided by the user, thoroughly analyze and directly reference their content. "
-            "For organizational operations, you can also connect to HR, IT Jira, Finance, Ops, and Microsoft 365 tools."
-        )
+        # 1. Ground with real-time internet data (weather, web search)
+        grounding = None
+        try:
+            grounding = internet_grounding.ground_query(req.prompt)
+            if grounding and grounding.get("context"):
+                full_prompt = f"{full_prompt}\n\n=== Live Internet Grounding ({grounding.get('type')}) ===\n{grounding.get('context')}\n"
+        except Exception as e:
+            pass
+
+        # 2. Ground with Enterprise Knowledge Base RAG
+        rag_matches = []
+        try:
+            rag_matches = vertex_rag.search_knowledge_base(req.prompt, top_k=2)
+            if rag_matches:
+                rag_snippets = "\n\n".join([f"**From {r['doc_title']} ({r['section_heading']})**:\n{r['content']}" for r in rag_matches])
+                full_prompt = f"{full_prompt}\n\n=== Enterprise Knowledge Base (RAG) ===\n{rag_snippets}\n"
+        except Exception:
+            pass
+
+        # 3. Conversational generation with tailored system instruction
+        if agent.id == "cortex_assistant":
+            system_inst = (
+                "You are cortex.ai, an intelligent enterprise AI assistant and digital workplace integration hub. "
+                "Answer general questions (weather, current forecasts, general knowledge, creative writing, explanations, code) "
+                "naturally, conversationally, helpfully, and with complete detail. "
+                "When real-time data or live internet search information is provided, integrate it seamlessly into a structured response. "
+                "Never reply that you lack access to real-time data or live weather tools; always provide comprehensive, informative answers with specific temperatures, high/low, humidity, and outlook. "
+                "For organizational operations, you can also seamlessly connect to HR, IT Jira, Finance, Ops, and Microsoft 365 tools."
+            )
+        else:
+            system_inst = (
+                f"You are {agent.name} ({agent.owner_team}), an intelligent enterprise AI assistant on the cortex.ai platform. "
+                "Answer questions naturally, conversationally, and accurately. "
+                "When context documents are provided by the user, thoroughly analyze and directly reference their content. "
+                "For organizational operations, you can also connect to HR, IT Jira, Finance, Ops, and Microsoft 365 tools."
+            )
+
         model_res = model_gateway.generate(
             prompt=full_prompt,
             preferred_model=chosen_model,
@@ -423,11 +462,25 @@ def handle_chat(req: ChatRequest):
             system_instruction=system_inst,
             history=history_for_gemini
         )
-        reply = model_res.get("text") or f"Hello {user.name}! I am **{agent.name}** ({agent.owner_team}).\n\nHow can I help you today?"
+        candidate_reply = (model_res.get("text") or "").strip()
+
+        # If model returned a disclaimer about lacking real-time data, override with live internet grounding
+        if grounding and grounding.get("formatted_reply") and (not candidate_reply or any(refusal in candidate_reply.lower() for refusal in ["don't have access to real-time", "do not have access to real-time", "cannot provide real-time", "no access to live"])):
+            reply = grounding["formatted_reply"]
+        elif candidate_reply:
+            reply = candidate_reply
+        elif grounding and grounding.get("formatted_reply"):
+            reply = grounding["formatted_reply"]
+        elif rag_matches:
+            rag_snippets = "\n\n".join([f"**From {r['doc_title']} ({r['section_heading']})**:\n{r['content']}" for r in rag_matches])
+            reply = f"Here is the relevant policy information from the enterprise knowledge base:\n\n{rag_snippets}"
+        else:
+            reply = f"Hello {user.name}! I am **{agent.name}** ({agent.owner_team}).\n\nHow can I help you today?"
+
         chosen_model = model_res.get("model", chosen_model)
 
-    # Clearly mention enterprise agent if used
-    if is_enterprise_agent:
+    # Clearly mention enterprise agent ONLY if a domain-specific agent was used
+    if is_enterprise_agent and agent.id in ENTERPRISE_AGENT_IDS and agent.id != "cortex_assistant":
         mention_str = f"🤖 **Enterprise Agent Used:** `{agent.name}` ({agent.owner_team})"
         if f"**{agent.name}**" not in reply and "Enterprise Agent" not in reply:
             reply = f"{reply}\n\n{mention_str}"

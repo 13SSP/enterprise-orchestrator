@@ -175,3 +175,60 @@ def test_chat_history_api():
 
         # Verify deletion
         assert tc.get(f"/api/chat/sessions/{test_session_id}").status_code == 404
+
+def test_real_time_internet_grounding_weather_and_search():
+    with TestClient(app) as tc:
+        session_id = f"test-weather-{uuid.uuid4().hex[:8]}"
+        res = tc.post("/api/chat", json={
+            "prompt": "what is weather in Pune",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "agent_id": "auto"
+        })
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "SUCCESS"
+        assert data["handled_by"]["agent_id"] == "cortex_assistant"
+        assert data["handled_by"]["is_enterprise_agent"] is False
+        assert "Enterprise Agent Used" not in data["reply"]
+        assert "Pune" in data["reply"]
+        # Verify weather breakdown elements
+        reply_lower = data["reply"].lower()
+        assert any(k in reply_lower for k in ["temperature", "high", "low", "humidity", "outlook", "weather", "°c"])
+        db.collection("chat_sessions").document(session_id).delete()
+
+def test_smart_orchestrator_routes_general_query_even_when_agent_targeted():
+    with TestClient(app) as tc:
+        session_id = f"test-smart-route-{uuid.uuid4().hex[:8]}"
+        # User targeted HR agent, but asks a general weather question
+        res = tc.post("/api/chat", json={
+            "prompt": "what is weather in Pune",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "agent_id": "hr_agent"
+        })
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "SUCCESS"
+        # Smart orchestrator routes out-of-domain query autonomously to cortex_assistant
+        assert data["handled_by"]["agent_id"] == "cortex_assistant"
+        assert data["handled_by"]["is_enterprise_agent"] is False
+        assert "Pune" in data["reply"]
+        db.collection("chat_sessions").document(session_id).delete()
+
+def test_enterprise_knowledge_base_rag_retrieval():
+    with TestClient(app) as tc:
+        session_id = f"test-rag-{uuid.uuid4().hex[:8]}"
+        res = tc.post("/api/chat", json={
+            "prompt": "what is the primary caregiver parental leave in the policy handbook?",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "model": "offline/stub"
+        })
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "SUCCESS"
+        # RAG retrieves section from HR handbook
+        assert any(k in data["reply"].lower() for k in ["parental", "caregiver", "leave", "weeks", "policy", "handbook"])
+        db.collection("chat_sessions").document(session_id).delete()
+
