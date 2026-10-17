@@ -396,10 +396,13 @@ export class AppComponent implements OnInit {
   agentsList: any[] = [];
   toolsList: any[] = [];
   auditList: any[] = [];
-  selectedModel: string = 'google/gemini-3.8-flash';
+  selectedModel: string = 'google/gemini-flash-lite-latest';
   modelsList: any[] = [
-    { id: 'google/gemini-3.8-flash', name: 'Gemini 3.8 Flash', provider: 'Google', family: 'gemini', available: true },
-    { id: 'google/gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'Google', family: 'gemini', available: true },
+    { id: 'google/gemini-flash-lite-latest', name: 'Gemini Flash Lite (Fast & Active)', provider: 'Google', family: 'gemini', available: true },
+    { id: 'google/gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', provider: 'Google', family: 'gemini', available: true },
+    { id: 'google/gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', provider: 'Google', family: 'gemini', available: true },
+    { id: 'google/gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'Google', family: 'gemini', available: true },
+    { id: 'google/gemini-3.7-flash', name: 'Gemini 3.7 Flash (High Performance)', provider: 'Google', family: 'gemini', available: true },
     { id: 'anthropic/claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', family: 'claude', available: false, disabled_reason: 'Missing ANTHROPIC_API_KEY in .env' },
     { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus', provider: 'Anthropic', family: 'claude', available: false, disabled_reason: 'Missing ANTHROPIC_API_KEY in .env' }
   ];

@@ -255,7 +255,7 @@ def test_model_selection_and_switching_in_chat():
         assert "google/gemini-flash-lite-latest" in model_ids
         assert "google/gemini-3.5-flash-lite" in model_ids
         assert "google/gemini-3.1-flash-lite" in model_ids
-        assert m_data.get("default_model") == "google/gemini-3.7-flash"
+        assert m_data.get("default_model") == "google/gemini-flash-lite-latest"
 
         session_id = f"test-model-{uuid.uuid4().hex[:8]}"
 
@@ -279,9 +279,23 @@ def test_model_selection_and_switching_in_chat():
         })
         assert turn2.status_code == 200
         d2 = turn2.json()
-        assert "gemini-flash-lite-latest" in d2["handled_by"]["model"] or "google/" in d2["handled_by"]["model"]
+        assert d2["handled_by"]["model"] == "google/gemini-flash-lite-latest"
+        assert "(Fallback)" not in d2["handled_by"]["model"]
 
-        # 4. Verify session record in DB persists the selected model
+        # 4. Third chat turn without specifying model: verifies default model is used without (Fallback)
+        session_id_def = f"test-default-{uuid.uuid4().hex[:8]}"
+        turn_def = tc.post("/api/chat", json={
+            "prompt": "Hello there, what is your role?",
+            "persona": "bob_ops",
+            "session_id": session_id_def
+        })
+        assert turn_def.status_code == 200
+        d_def = turn_def.json()
+        assert d_def["handled_by"]["model"] == "google/gemini-flash-lite-latest"
+        assert "(Fallback)" not in d_def["handled_by"]["model"]
+        db.collection("chat_sessions").document(session_id_def).delete()
+
+        # 5. Verify session record in DB persists the selected model
         doc = db.collection("chat_sessions").document(session_id).get()
         assert doc.exists is True
         assert doc.to_dict().get("model") is not None
