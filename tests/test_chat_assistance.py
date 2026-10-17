@@ -244,3 +244,48 @@ def test_enterprise_knowledge_base_rag_retrieval():
         assert any(k in data["reply"].lower() for k in ["parental", "caregiver", "leave", "weeks", "policy", "handbook"])
         db.collection("chat_sessions").document(session_id).delete()
 
+def test_model_selection_and_switching_in_chat():
+    with TestClient(app) as tc:
+        # 1. Verify models endpoint lists working active models
+        m_res = tc.get("/api/models")
+        assert m_res.status_code == 200
+        m_data = m_res.json()
+        model_ids = [m["id"] for m in m_data.get("models", [])]
+        assert "google/gemini-3.7-flash" in model_ids
+        assert "google/gemini-flash-lite-latest" in model_ids
+        assert "google/gemini-3.5-flash-lite" in model_ids
+        assert "google/gemini-3.1-flash-lite" in model_ids
+        assert m_data.get("default_model") == "google/gemini-3.7-flash"
+
+        session_id = f"test-model-{uuid.uuid4().hex[:8]}"
+
+        # 2. First chat turn with offline/stub
+        turn1 = tc.post("/api/chat", json={
+            "prompt": "Explain quantum computing briefly",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "model": "offline/stub"
+        })
+        assert turn1.status_code == 200
+        d1 = turn1.json()
+        assert d1["handled_by"]["model"] == "offline/stub"
+
+        # 3. Second chat turn in same session switched to a different model
+        turn2 = tc.post("/api/chat", json={
+            "prompt": "Give a one-sentence follow-up",
+            "persona": "bob_ops",
+            "session_id": session_id,
+            "model": "google/gemini-flash-lite-latest"
+        })
+        assert turn2.status_code == 200
+        d2 = turn2.json()
+        assert "gemini-flash-lite-latest" in d2["handled_by"]["model"] or "google/" in d2["handled_by"]["model"]
+
+        # 4. Verify session record in DB persists the selected model
+        doc = db.collection("chat_sessions").document(session_id).get()
+        assert doc.exists is True
+        assert doc.to_dict().get("model") is not None
+
+        db.collection("chat_sessions").document(session_id).delete()
+
+

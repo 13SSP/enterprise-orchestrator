@@ -368,6 +368,7 @@ def handle_chat(req: ChatRequest):
         session_data["updated_at"] = datetime.utcnow().isoformat()
         session_data["persona"] = user.sub
         session_data["agent_id"] = agent.id
+        session_data["model"] = chosen_model
         session_ref.set(session_data)
 
         return {
@@ -529,6 +530,7 @@ def handle_chat(req: ChatRequest):
     session_data["updated_at"] = datetime.utcnow().isoformat()
     session_data["persona"] = user.sub
     session_data["agent_id"] = agent.id
+    session_data["model"] = chosen_model
     if not session_data.get("title") or session_data.get("title") in ["New Chat", "default_session"] or len(session_data["messages"]) <= 2:
         clean_t = req.prompt.strip().replace("\n", " ")
         session_data["title"] = clean_t[:38] + ("..." if len(clean_t) > 38 else "")

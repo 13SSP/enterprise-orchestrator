@@ -82,15 +82,16 @@ class VertexGeminiProvider(BaseModelProvider):
         else:
             contents_payload = prompt
 
-        # Candidate models to try in order of availability and stability
+        # Candidate models to try in order: requested model first, then verified working fallbacks
         candidate_models = [self.model_name]
         for fallback in [
-            "gemini-flash-latest",
-            "gemini-3.8-flash",
-            "gemini-3.5-flash",
+            "gemini-3.7-flash",
             "gemini-flash-lite-latest",
+            "gemini-3.5-flash-lite",
             "gemini-3.1-flash-lite",
-            "gemini-3-flash-preview"
+            "gemini-3-flash-preview",
+            "gemini-flash-latest",
+            "gemini-3.8-flash"
         ]:
             if fallback not in candidate_models:
                 candidate_models.append(fallback)
@@ -106,10 +107,13 @@ class VertexGeminiProvider(BaseModelProvider):
                     call_kwargs["config"] = config_kwargs
                 res = client.models.generate_content(**call_kwargs)
                 if res and res.text:
+                    model_label = f"google/{m}"
+                    if m != self.model_name:
+                        model_label = f"google/{m} (Fallback)"
                     return {
                         "text": res.text.strip(),
                         "provider": "vertex_gemini",
-                        "model": f"google/{m}"
+                        "model": model_label
                     }
             except Exception as e:
                 err_str = str(e)
@@ -202,7 +206,7 @@ class OfflineStubProvider(BaseModelProvider):
     """
     Guarantees deterministic, zero-dependency offline execution for evaluations and demos.
     """
-    def __init__(self, model_name: str = "offline-stub-engine"):
+    def __init__(self, model_name: str = "offline/stub"):
         self.model_name = model_name
 
     def is_available(self) -> bool:
@@ -298,7 +302,7 @@ class OfflineStubProvider(BaseModelProvider):
                 return {
                     "text": grounding["formatted_reply"],
                     "provider": "internet_grounding",
-                    "model": "google/gemini-3-flash-preview (Live Grounding)"
+                    "model": f"{self.model_name} (Live Grounding)"
                 }
         except Exception:
             pass
@@ -311,7 +315,7 @@ class OfflineStubProvider(BaseModelProvider):
                 return {
                     "text": f"Here is the relevant policy information from the enterprise knowledge base:\n\n{rag_snippets}",
                     "provider": "vertex_rag",
-                    "model": "google/gemini-3-flash-preview (Enterprise RAG)"
+                    "model": f"{self.model_name} (Enterprise RAG)"
                 }
         except Exception:
             pass
@@ -337,25 +341,27 @@ class OfflineStubProvider(BaseModelProvider):
         return {
             "text": text,
             "provider": "offline_stub",
-            "model": "google/gemini-3-flash-preview"
+            "model": self.model_name
         }
 
 
 class ModelGateway:
     def __init__(self):
         self.providers: Dict[str, BaseModelProvider] = {
+            "google/gemini-3.7-flash": VertexGeminiProvider(model_name="gemini-3.7-flash"),
+            "google/gemini-flash-lite-latest": VertexGeminiProvider(model_name="gemini-flash-lite-latest"),
+            "google/gemini-3.5-flash-lite": VertexGeminiProvider(model_name="gemini-3.5-flash-lite"),
+            "google/gemini-3.1-flash-lite": VertexGeminiProvider(model_name="gemini-3.1-flash-lite"),
+            "google/gemini-3-flash-preview": VertexGeminiProvider(model_name="gemini-3-flash-preview"),
             "google/gemini-flash-latest": VertexGeminiProvider(model_name="gemini-flash-latest"),
             "google/gemini-3.8-flash": VertexGeminiProvider(model_name="gemini-3.8-flash"),
             "google/gemini-3.5-flash": VertexGeminiProvider(model_name="gemini-3.5-flash"),
-            "google/gemini-flash-lite-latest": VertexGeminiProvider(model_name="gemini-flash-lite-latest"),
-            "google/gemini-3.1-flash-lite": VertexGeminiProvider(model_name="gemini-3.1-flash-lite"),
-            "google/gemini-3-flash-preview": VertexGeminiProvider(model_name="gemini-3-flash-preview"),
             "google/gemini-3.1-pro-preview": VertexGeminiProvider(model_name="gemini-3.1-pro-preview"),
             "anthropic/claude-3-5-sonnet": AnthropicClaudeProvider(model_name="claude-3-5-sonnet-20241022"),
             "anthropic/claude-3-opus": AnthropicClaudeProvider(model_name="claude-3-opus-20240229"),
             "offline/stub": OfflineStubProvider()
         }
-        self.default_provider_key = "google/gemini-flash-latest"
+        self.default_provider_key = "google/gemini-3.7-flash"
         self.stub_provider = self.providers["offline/stub"]
 
     def get_available_models(self) -> List[Dict[str, Any]]:
@@ -368,8 +374,48 @@ class ModelGateway:
 
         return [
             {
+                "id": "google/gemini-3.7-flash",
+                "name": "Gemini 3.7 Flash (High Performance)",
+                "provider": "Google",
+                "family": "gemini",
+                "available": bool(gemini_key),
+                "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
+            },
+            {
+                "id": "google/gemini-flash-lite-latest",
+                "name": "Gemini Flash Lite (Fast & Active)",
+                "provider": "Google",
+                "family": "gemini",
+                "available": bool(gemini_key),
+                "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
+            },
+            {
+                "id": "google/gemini-3.5-flash-lite",
+                "name": "Gemini 3.5 Flash Lite",
+                "provider": "Google",
+                "family": "gemini",
+                "available": bool(gemini_key),
+                "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
+            },
+            {
+                "id": "google/gemini-3.1-flash-lite",
+                "name": "Gemini 3.1 Flash Lite",
+                "provider": "Google",
+                "family": "gemini",
+                "available": bool(gemini_key),
+                "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
+            },
+            {
+                "id": "google/gemini-3-flash-preview",
+                "name": "Gemini 3 Flash Preview",
+                "provider": "Google",
+                "family": "gemini",
+                "available": bool(gemini_key),
+                "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
+            },
+            {
                 "id": "google/gemini-flash-latest",
-                "name": "Gemini Flash (Latest & Active)",
+                "name": "Gemini Flash Latest",
                 "provider": "Google",
                 "family": "gemini",
                 "available": bool(gemini_key),
@@ -386,22 +432,6 @@ class ModelGateway:
             {
                 "id": "google/gemini-3.5-flash",
                 "name": "Gemini 3.5 Flash",
-                "provider": "Google",
-                "family": "gemini",
-                "available": bool(gemini_key),
-                "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
-            },
-            {
-                "id": "google/gemini-flash-lite-latest",
-                "name": "Gemini Flash Lite",
-                "provider": "Google",
-                "family": "gemini",
-                "available": bool(gemini_key),
-                "disabled_reason": None if gemini_key else "Missing GEMINI_API_KEY in .env"
-            },
-            {
-                "id": "google/gemini-3-flash-preview",
-                "name": "Gemini 3 Flash Preview",
                 "provider": "Google",
                 "family": "gemini",
                 "available": bool(gemini_key),
@@ -455,22 +485,30 @@ class ModelGateway:
     ) -> Dict[str, Any]:
         candidates = []
         if preferred_model:
-            # Map legacy or generic aliases
-            if preferred_model in ["gemini", "google/gemini", "gemini-flash", "google/gemini-flash", "gemini-flash-latest", "google/gemini-flash-latest"]:
-                candidates.extend(["google/gemini-flash-latest", "google/gemini-3.8-flash", "google/gemini-3.5-flash", "google/gemini-flash-lite-latest"])
-            elif preferred_model in ["gemini-3.8-flash", "google/gemini-3.8-flash"]:
-                candidates.extend(["google/gemini-3.8-flash", "google/gemini-flash-latest", "google/gemini-3.5-flash"])
-            elif preferred_model in ["gemini-3-flash-preview", "google/gemini-3-flash-preview"]:
-                candidates.extend(["google/gemini-flash-latest", "google/gemini-3.8-flash", "google/gemini-3.5-flash", "google/gemini-3-flash-preview"])
+            m_norm = preferred_model.strip()
+            if not m_norm.startswith("google/") and not m_norm.startswith("anthropic/") and not m_norm.startswith("offline/"):
+                m_norm = f"google/{m_norm}"
+            if m_norm in self.providers:
+                candidates.append(m_norm)
             elif preferred_model in self.providers:
                 candidates.append(preferred_model)
+
         if fallback_models:
-            candidates.extend(fallback_models)
-        
-        # Add default active model if not already candidate
-        def_model = self.get_default_model()
-        if def_model not in candidates:
-            candidates.append(def_model)
+            for fb in fallback_models:
+                if fb not in candidates:
+                    candidates.append(fb)
+
+        # High-reliability working fallbacks
+        for working_fb in [
+            "google/gemini-3.7-flash",
+            "google/gemini-flash-lite-latest",
+            "google/gemini-3.5-flash-lite",
+            "google/gemini-3.1-flash-lite",
+            "google/gemini-3-flash-preview"
+        ]:
+            if working_fb not in candidates and working_fb in self.providers:
+                candidates.append(working_fb)
+
         candidates.append("offline/stub")
 
         for model_key in candidates:

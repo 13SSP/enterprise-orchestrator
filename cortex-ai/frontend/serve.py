@@ -343,11 +343,14 @@ def build_dist_html():
                 <input type="text" id="promptInput" placeholder="Ask cortex.ai anything across HR, IT, Finance, Operations, or Office documents..." class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl py-3.5 pl-4 pr-64 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs" />
                 <div class="absolute right-2 top-2 bottom-2 flex items-center gap-2">
                   <select id="modelSelect" class="bg-slate-100 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700/80 text-xs font-medium text-slate-800 dark:text-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-xs cursor-pointer transition">
-                    <option value="google/gemini-flash-latest" selected>Gemini Flash (Latest & Active)</option>
+                    <option value="google/gemini-3.7-flash" selected>Gemini 3.7 Flash (High Performance)</option>
+                    <option value="google/gemini-flash-lite-latest">Gemini Flash Lite (Fast & Active)</option>
+                    <option value="google/gemini-3.5-flash-lite">Gemini 3.5 Flash Lite</option>
+                    <option value="google/gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+                    <option value="google/gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+                    <option value="google/gemini-flash-latest">Gemini Flash Latest</option>
                     <option value="google/gemini-3.8-flash">Gemini 3.8 Flash</option>
                     <option value="google/gemini-3.5-flash">Gemini 3.5 Flash</option>
-                    <option value="google/gemini-flash-lite-latest">Gemini Flash Lite</option>
-                    <option value="google/gemini-3-flash-preview">Gemini 3 Flash Preview</option>
                     <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option>
                     <option value="anthropic/claude-3-5-sonnet" disabled>Claude 3.5 Sonnet (No API Key)</option>
                     <option value="anthropic/claude-3-opus" disabled>Claude 3 Opus (No API Key)</option>
@@ -1002,6 +1005,14 @@ def build_dist_html():
             }
           }
 
+          if (data.model) {
+            window._activeChatModel = data.model;
+            const modelSel = document.getElementById('modelSelect');
+            if (modelSel) {
+              modelSel.value = data.model;
+            }
+          }
+
           const messages = data.messages || [];
           if (messages.length === 0) {
             mc.innerHTML = `
@@ -1164,7 +1175,10 @@ def build_dist_html():
 
         try {
           const persona = document.getElementById('personaSelect').value;
-          const model = document.getElementById('modelSelect') ? document.getElementById('modelSelect').value : null;
+          const modelSel = document.getElementById('modelSelect');
+          const model = (modelSel && modelSel.value) ? modelSel.value : (window._activeChatModel || 'google/gemini-3.7-flash');
+          window._activeChatModel = model;
+          try { localStorage.setItem('cortex_selected_model', model); } catch (_) {}
           const agentSel = document.getElementById('chatAgentSelect');
           let targetAgent = agentSel ? agentSel.value : (window._activeChatAgentId || 'auto');
           if ((!targetAgent || targetAgent === 'auto') && window._activeChatAgentId && window._activeChatAgentId !== 'auto') {
@@ -5167,6 +5181,7 @@ Identity and access management microservice providing user registration, passwor
           const data = await res.json();
           const select = document.getElementById('modelSelect');
           if (data.models && select) {
+            const savedModel = window._activeChatModel || localStorage.getItem('cortex_selected_model') || data.default_model;
             select.innerHTML = '';
             data.models.forEach(m => {
               const opt = document.createElement('option');
@@ -5177,15 +5192,31 @@ Identity and access management microservice providing user registration, passwor
                 opt.textContent = `${m.name} (No API Key)`;
                 opt.disabled = true;
               }
-              if (m.id === data.default_model) {
+              if (m.id === savedModel) {
                 opt.selected = true;
               }
               select.appendChild(opt);
             });
+            if (select.value) {
+              window._activeChatModel = select.value;
+            }
           }
         } catch (e) {
           console.warn('Could not load models list from cortex backend:', e);
         }
+      }
+
+      const modelSelectEl = document.getElementById('modelSelect');
+      if (modelSelectEl) {
+        const storedModel = localStorage.getItem('cortex_selected_model');
+        if (storedModel) {
+          window._activeChatModel = storedModel;
+          modelSelectEl.value = storedModel;
+        }
+        modelSelectEl.addEventListener('change', (e) => {
+          window._activeChatModel = e.target.value;
+          try { localStorage.setItem('cortex_selected_model', e.target.value); } catch (_) {}
+        });
       }
       loadModels();
       if (typeof loadChatHistory === 'function') {
