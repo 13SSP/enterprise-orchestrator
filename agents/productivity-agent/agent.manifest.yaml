@@ -4,7 +4,7 @@ owner_team: "Executive & Productivity Operations"
 description: "Drafts emails, generates Word memos/reports (.docx), and creates PowerPoint slide decks (.pptx) by integrating cross-team operational data."
 preferred_model: "external/gpt-4o"
 fallback_models:
-  - "google/gemini-2.5-flash"
+  - "google/gemini-flash-lite-latest"
   - "offline/stub"
 allowed_tools:
   - "create_email_draft"
