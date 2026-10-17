@@ -85,6 +85,14 @@ def seed_database():
         claim_repo.save(claim)
         print(f"   ✓ [{claim.claim_id}] {claim.employee_id}: ${claim.amount:,.2f} at {claim.merchant} -> {claim.status}")
 
+    # 8. Pods & Workspaces (Normal Chat & SDD Chat)
+    try:
+        from scripts.seed_workspace_examples import seed_workspaces
+        print("\n🚀 Seeding Cortex.ai Pods (Normal Chat & SDD Chat Workspaces)...")
+        seed_workspaces()
+    except Exception as e:
+        print(f"   ⚠️ Notice: Pods seeding encountered: {e}")
+
     print("\n" + "=" * 60)
     print("✅ DATABASE SEEDING COMPLETED SUCCESSFULLY!")
     print("=" * 60)

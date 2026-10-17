@@ -78,6 +78,14 @@ def run_seed():
         db.collection("expense_claims").document(c.claim_id).set(c.model_dump())
         print(f"  + [{c.claim_id}] {c.employee_id} -> ${c.amount:,.2f} ({c.status})")
 
+    # 8. Pods & Workspaces (Normal Chat & SDD Chat)
+    try:
+        from scripts.seed_workspace_examples import seed_workspaces
+        print("\n🚀 Seeding Cortex.ai Pods (Normal Chat & SDD Chat Workspaces)...")
+        seed_workspaces()
+    except Exception as e:
+        print(f"  ⚠️ Notice: Pods seeding encountered: {e}")
+
     total = len(DEPARTMENTS) + len(EMPLOYEES) + len(SALARIES) + len(LEAVE_BALANCES) + len(LEAVE_RECORDS) + len(JIRA_TICKETS) + len(EXPENSE_CLAIMS)
     print("\n" + "=" * 60)
     print(f"SUCCESS: Seeded {total} records across 7 collections into Firestore!")
