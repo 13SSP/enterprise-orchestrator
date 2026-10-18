@@ -151,7 +151,7 @@ gcloud run deploy "$SERVICE_NAME" \
     --memory 1Gi \
     --cpu 1 \
     --timeout 300 \
-    --set-env-vars "GCP_PROJECT_ID=${PROJECT_ID},GCP_REGION=${REGION},GEMINI_API_KEY=${GEMINI_KEY},MODEL_ARMOR_ENABLED=true,GCS_BUCKET_NAME=${BUCKET_NAME},PORT=8080"
+    --set-env-vars "GCP_PROJECT_ID=${PROJECT_ID},GCP_REGION=${REGION},GEMINI_API_KEY=${GEMINI_KEY},MODEL_ARMOR_ENABLED=true,GCS_BUCKET_NAME=${BUCKET_NAME}"
 
 # 6. Retrieve and display public service URL
 PUBLIC_URL=$(gcloud run services describe "$SERVICE_NAME" --platform managed --region "$REGION" --format 'value(status.url)')

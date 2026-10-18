@@ -98,7 +98,7 @@ gcloud run deploy $ServiceName `
     --memory 1Gi `
     --cpu 1 `
     --timeout 300 `
-    --set-env-vars "GCP_PROJECT_ID=$ProjectId,GCP_REGION=$Region,GEMINI_API_KEY=$GeminiKey,MODEL_ARMOR_ENABLED=true,PORT=8080"
+    --set-env-vars "GCP_PROJECT_ID=$ProjectId,GCP_REGION=$Region,GEMINI_API_KEY=$GeminiKey,MODEL_ARMOR_ENABLED=true"
 
 $PublicUrl = gcloud run services describe $ServiceName --platform managed --region $Region --format 'value(status.url)'
 
