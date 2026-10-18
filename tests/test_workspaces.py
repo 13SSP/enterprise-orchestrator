@@ -238,3 +238,36 @@ def test_sdd_autonomous_repo_and_task_execution(client):
         client.delete(f"/api/workspaces/{ws_id}?persona=bob_ops")
         if local_path and Path(local_path).exists():
             shutil.rmtree(local_path, ignore_errors=True)
+
+
+def test_sdd_pod_contributor_list_populated(client):
+    """Verify that when an SDD Pod is created, the contributor list is populated."""
+    # 1. SDD Pod created with default contributor auto-population
+    res = client.post("/api/pods?persona=bob_ops", json={
+        "name": "Auto Contributor SDD Service",
+        "description": "Verifying contributor list auto-population on SDD pod creation",
+        "workspace_type": "sdd",
+        "visibility": "private"
+    })
+    assert res.status_code == 200
+    ws = res.json()["workspace"]
+    ws_id = ws["workspace_id"]
+    try:
+        members = ws.get("members", [])
+        m_roles = {m["user_id"]: m.get("role") for m in members}
+        assert m_roles.get("bob_ops") == "owner"
+        # Contributor list is populated with default engineering collaborators
+        assert "alex_chen" in m_roles
+        assert m_roles["alex_chen"] == "contributor"
+        assert "priya_sharma" in m_roles
+        assert m_roles["priya_sharma"] == "contributor"
+
+        # Verify get_workspace also returns the populated contributor list
+        get_res = client.get(f"/api/pods/{ws_id}?persona=bob_ops")
+        assert get_res.status_code == 200
+        get_ws = get_res.json()
+        get_contribs = [m for m in get_ws.get("members", []) if m.get("role") == "contributor"]
+        assert len(get_contribs) >= 2
+    finally:
+        client.delete(f"/api/pods/{ws_id}?persona=bob_ops")
+

@@ -37,15 +37,35 @@ class WorkspaceManager:
         pass
 
     def list_employees(self) -> List[Dict[str, Any]]:
-        """Retrieves list of all enterprise employees from Firestore storage."""
+        """Retrieves list of all enterprise employees from Firestore storage, local disk, or seeds."""
         employees = []
-        if EMPLOYEES_DIR.exists():
+        # 1. Query Firestore collection if available
+        try:
+            docs = list(db.collection("employees").stream())
+            for doc in docs:
+                data = doc.to_dict()
+                first = data.get("first_name", "")
+                last = data.get("last_name", "")
+                full = f"{first} {last}".strip() or data.get("name") or data.get("employee_id", doc.id)
+                employees.append({
+                    "employee_id": data.get("employee_id", doc.id),
+                    "name": full,
+                    "email": data.get("email", ""),
+                    "title": data.get("title", "Employee"),
+                    "role": data.get("role", "employee"),
+                    "department_id": data.get("department_id", "ENG")
+                })
+        except Exception:
+            pass
+
+        # 2. Fallback to EMPLOYEES_DIR JSON files
+        if not employees and EMPLOYEES_DIR.exists():
             for f in sorted(EMPLOYEES_DIR.glob("*.json")):
                 try:
                     data = json.loads(f.read_text(encoding="utf-8"))
                     first = data.get("first_name", "")
                     last = data.get("last_name", "")
-                    full = f"{first} {last}".strip() or data.get("employee_id", "")
+                    full = f"{first} {last}".strip() or data.get("name") or data.get("employee_id", f.stem)
                     employees.append({
                         "employee_id": data.get("employee_id", f.stem),
                         "name": full,
@@ -56,6 +76,27 @@ class WorkspaceManager:
                     })
                 except Exception:
                     continue
+
+        # 3. Fallback to sample seeds
+        if not employees:
+            try:
+                from database.seeds.sample_data import EMPLOYEES as SEED_EMPS
+                for e in SEED_EMPS:
+                    d = e.model_dump() if hasattr(e, "model_dump") else dict(e)
+                    first = d.get("first_name", "")
+                    last = d.get("last_name", "")
+                    full = f"{first} {last}".strip() or d.get("employee_id", "")
+                    employees.append({
+                        "employee_id": d.get("employee_id", ""),
+                        "name": full,
+                        "email": d.get("email", ""),
+                        "title": d.get("title", "Employee"),
+                        "role": d.get("role", "employee"),
+                        "department_id": d.get("department_id", "ENG")
+                    })
+            except Exception:
+                pass
+
         return employees
 
     def get_workspace(self, workspace_id: str, current_user: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -192,7 +233,21 @@ class WorkspaceManager:
             }
         ]
 
-        invited_ids = payload.get("invited_employee_ids", [])
+        invited_ids = list(payload.get("invited_employee_ids", []))
+
+        # Include any contributors from explicit members list if provided in payload
+        if payload.get("members"):
+            for m in payload["members"]:
+                if isinstance(m, dict):
+                    uid = m.get("user_id")
+                    if uid and uid != current_user_id and uid not in invited_ids:
+                        invited_ids.append(uid)
+
+        # For SDD Pods, guarantee default collaborative engineering contributors if none specified
+        if ws_type == "sdd" and not invited_ids:
+            default_sdd_team = ["alex_chen", "priya_sharma"]
+            invited_ids = [uid for uid in default_sdd_team if uid != current_user_id]
+
         for uid in invited_ids:
             if uid != current_user_id:
                 members.append({

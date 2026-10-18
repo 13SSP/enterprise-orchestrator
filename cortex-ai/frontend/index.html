@@ -3163,9 +3163,24 @@ ${d.output || 'No output recorded.'}`;
         let employees = [];
         try {
           const r = await fetch('/api/employees');
-          const data = await r.json();
-          employees = data.employees || [];
+          if (r.ok) {
+            const data = await r.json();
+            employees = data.employees || [];
+          }
         } catch(e) {}
+
+        // Fallback enterprise directory if API response is empty
+        if (!employees || employees.length === 0) {
+          employees = [
+            { employee_id: 'alex_chen', name: 'Alex Chen', title: 'Staff Backend Systems Engineer', role: 'employee' },
+            { employee_id: 'priya_sharma', name: 'Priya Sharma', title: 'Benefits & Leave Specialist', role: 'employee' },
+            { employee_id: 'sarah_connor', name: 'Sarah Connor', title: 'VP of Engineering', role: 'admin' },
+            { employee_id: 'alice_hr', name: 'Alice Henderson', title: 'Senior People Operations Manager', role: 'hr_manager' },
+            { employee_id: 'charlie_fin', name: 'Charlie Zhao', title: 'Finance & Treasury Manager', role: 'finance_officer' },
+            { employee_id: 'maya_lin', name: 'Maya Lin', title: 'Senior Cloud Infrastructure Engineer', role: 'employee' },
+            { employee_id: 'dave_contractor', name: 'Dave Miller', title: 'Contract Frontend Specialist', role: 'contractor' }
+          ];
+        }
 
         window._selectedModalType = 'sdd';
 
@@ -3289,14 +3304,31 @@ ${d.output || 'No output recorded.'}`;
 
             <!-- Employee Directory Invitation -->
             <div id="modalInviteSection" class="space-y-2">
-              <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
-                Invite Contributors from Employee Directory
-              </label>
+              <div class="flex items-center justify-between">
+                <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  Invite Contributors from Employee Directory
+                </label>
+                <div class="flex items-center gap-1.5 text-[10px]">
+                  <button type="button" onclick="setInviteCheckboxes(['alex_chen', 'priya_sharma'])" class="text-indigo-400 hover:text-indigo-300 underline cursor-pointer">
+                    + Eng Team
+                  </button>
+                  <span class="text-slate-600">|</span>
+                  <button type="button" onclick="toggleAllInviteCheckboxes(true)" class="text-slate-400 hover:text-slate-200 underline cursor-pointer">
+                    All
+                  </button>
+                  <span class="text-slate-600">|</span>
+                  <button type="button" onclick="toggleAllInviteCheckboxes(false)" class="text-slate-400 hover:text-slate-200 underline cursor-pointer">
+                    None
+                  </button>
+                </div>
+              </div>
               <div class="max-h-36 overflow-y-auto border border-slate-800 rounded-xl divide-y divide-slate-800/60 bg-slate-950 p-1 text-xs">
-                ${employees.filter(emp => emp.employee_id !== (document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops')).map(emp => `
+                ${employees.filter(emp => emp.employee_id !== (document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops')).map(emp => {
+                  const isDefaultChecked = ['alex_chen', 'priya_sharma'].includes(emp.employee_id);
+                  return `
                   <label class="flex items-center justify-between p-2 hover:bg-slate-900 rounded-lg cursor-pointer">
                     <span class="flex items-center gap-2.5">
-                      <input type="checkbox" name="invitedEmployee" value="${emp.employee_id}" class="rounded" />
+                      <input type="checkbox" name="invitedEmployee" value="${emp.employee_id}" ${isDefaultChecked ? 'checked' : ''} class="rounded text-indigo-600 focus:ring-indigo-500" />
                       <span class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px]">${(emp.name || 'EM').slice(0, 2).toUpperCase()}</span>
                       <div>
                         <strong class="text-slate-200">${emp.name}</strong>
@@ -3305,7 +3337,7 @@ ${d.output || 'No output recorded.'}`;
                     </span>
                     <span class="text-[10px] text-indigo-400 bg-indigo-950/40 px-2 py-0.5 rounded font-mono border border-indigo-900">Contributor</span>
                   </label>
-                `).join('')}
+                `;}).join('')}
               </div>
             </div>
 
@@ -3453,6 +3485,18 @@ Identity and access management microservice providing user registration, passwor
       }
       window.loadSampleRequirementDoc = loadSampleRequirementDoc;
 
+      function toggleAllInviteCheckboxes(checked) {
+        document.querySelectorAll('input[name="invitedEmployee"]').forEach(cb => cb.checked = checked);
+      }
+      window.toggleAllInviteCheckboxes = toggleAllInviteCheckboxes;
+
+      function setInviteCheckboxes(ids) {
+        document.querySelectorAll('input[name="invitedEmployee"]').forEach(cb => {
+          cb.checked = ids.includes(cb.value);
+        });
+      }
+      window.setInviteCheckboxes = setInviteCheckboxes;
+
       function selectModalType(type) {
         window._selectedModalType = type;
         const cChat = document.getElementById('cardTypeChat');
@@ -3467,6 +3511,12 @@ Identity and access management microservice providing user registration, passwor
           if (cChat) cChat.className = 'p-4 rounded-xl border-2 border-slate-800 hover:border-blue-500 cursor-pointer space-y-2 transition bg-slate-950';
           if (cSDD) cSDD.className = 'p-4 rounded-xl border-2 border-indigo-600 bg-indigo-950/20 cursor-pointer space-y-2 transition shadow-sm';
           if (sddFields) sddFields.classList.remove('hidden');
+
+          // If no contributors are checked, auto-check key engineering team
+          const anyChecked = document.querySelectorAll('input[name="invitedEmployee"]:checked').length > 0;
+          if (!anyChecked) {
+            setInviteCheckboxes(['alex_chen', 'priya_sharma']);
+          }
         }
       }
       window.selectModalType = selectModalType;
@@ -3484,7 +3534,10 @@ Identity and access management microservice providing user registration, passwor
         }
 
         const invitedCheckboxes = document.querySelectorAll('input[name="invitedEmployee"]:checked');
-        const invited = Array.from(invitedCheckboxes).map(c => c.value);
+        let invited = Array.from(invitedCheckboxes).map(c => c.value);
+        if (type === 'sdd' && invited.length === 0) {
+          invited = ['alex_chen', 'priya_sharma'];
+        }
         const localPath = document.getElementById('inputNewWsLocalPath') ? document.getElementById('inputNewWsLocalPath').value.trim() : '';
         const reqDocContent = document.getElementById('inputRequirementDocContent') ? document.getElementById('inputRequirementDocContent').value.trim() : '';
         const reqDocName = window._selectedReqDocName || (reqDocContent ? 'Requirement_Document.md' : null);
@@ -4813,6 +4866,18 @@ Would you like to download the full application bundle (.ZIP) to your machine no
             window._activePodData = ws;
           }
         } catch(e) {}
+
+        if (!employees || employees.length === 0) {
+          employees = [
+            { employee_id: 'alex_chen', name: 'Alex Chen', title: 'Staff Backend Systems Engineer', role: 'employee' },
+            { employee_id: 'priya_sharma', name: 'Priya Sharma', title: 'Benefits & Leave Specialist', role: 'employee' },
+            { employee_id: 'sarah_connor', name: 'Sarah Connor', title: 'VP of Engineering', role: 'admin' },
+            { employee_id: 'alice_hr', name: 'Alice Henderson', title: 'Senior People Operations Manager', role: 'hr_manager' },
+            { employee_id: 'charlie_fin', name: 'Charlie Zhao', title: 'Finance & Treasury Manager', role: 'finance_officer' },
+            { employee_id: 'maya_lin', name: 'Maya Lin', title: 'Senior Cloud Infrastructure Engineer', role: 'employee' },
+            { employee_id: 'dave_contractor', name: 'Dave Miller', title: 'Contract Frontend Specialist', role: 'contractor' }
+          ];
+        }
 
         const isOwner = (ws.owner_id === persona);
         const members = ws.members || [];

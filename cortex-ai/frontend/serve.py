@@ -15,7 +15,12 @@ FRONTEND_DIR = Path(__file__).resolve().parent
 # Generate standalone web distribution
 DIST_HTML = FRONTEND_DIR / "index.html"
 def build_dist_html():
-    src_html = (FRONTEND_DIR / "src" / "index.html").read_text(encoding="utf-8")
+    if DIST_HTML.exists():
+        return
+    src_file = FRONTEND_DIR / "src" / "index.html"
+    if not src_file.exists():
+        return
+    src_html = src_file.read_text(encoding="utf-8")
     # Write self-contained Angular web shell
     app_html = """
     <div id="app" class="flex h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
