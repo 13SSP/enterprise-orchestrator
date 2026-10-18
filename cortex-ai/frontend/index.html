@@ -655,10 +655,11 @@
           </div>
 
           <select id="personaSelect" class="hidden">
+            <option value="admin">System Administrator (Admin)</option>
             <option value="bob_ops" selected>Bob Martinez (DevOps Admin)</option>
             <option value="alice_hr">Alice Henderson (HR Manager)</option>
-            <option value="charlie_fin">Charlie Zhao (Finance Officer)</option>
-            <option value="sarah_connor">Sarah Connor (VP of Engineering)</option>
+            <option value="charlie_fin">Charlie Zhao (Finance Office)</option>
+            <option value="sarah_connor">Sarah Connor (VP of Engineering - Admin)</option>
             <option value="alex_chen">Alex Chen (Security Lead)</option>
             <option value="dave_contractor">Dave Miller (Restricted Contractor)</option>
           </select>
@@ -691,6 +692,16 @@
             <div class="px-2 py-1 text-[10px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 flex items-center justify-between">
               <span>Switch Identity</span>
               <span class="text-[9px] text-blue-600 dark:text-blue-400 font-semibold">Firebase Auth</span>
+            </div>
+            <div onclick="selectPersona('admin'); toggleSidebarUserMenu();" class="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition user-item">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-600/20 text-blue-600 dark:text-blue-400 font-bold text-[10px] flex items-center justify-center border border-blue-200 dark:border-blue-500/30">AD</div>
+                <div>
+                  <div class="text-xs font-semibold text-slate-800 dark:text-slate-200 user-name">System Administrator</div>
+                  <div class="text-[10px] text-slate-500 dark:text-slate-400 user-role">Admin</div>
+                </div>
+              </div>
+              <span id="sidebar-check-admin" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
             </div>
             <div onclick="selectPersona('bob_ops'); toggleSidebarUserMenu();" class="flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition user-item">
               <div class="flex items-center gap-2">
@@ -818,6 +829,17 @@
                       <span class="text-[9px] text-blue-600 dark:text-blue-400 font-semibold">Active Session</span>
                     </div>
                     <div class="space-y-1 mt-1 max-h-40 overflow-y-auto pr-1">
+                      <div onclick="selectPersona('admin')" id="user-opt-admin" class="flex items-center justify-between p-2 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/80 transition profile-menu-item">
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-600/30 text-blue-600 dark:text-blue-300 font-bold text-xs flex items-center justify-center border border-blue-200 dark:border-blue-500/30">AD</div>
+                          <div>
+                            <div class="text-xs font-semibold text-slate-800 dark:text-slate-200">System Administrator</div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400">Admin</div>
+                          </div>
+                        </div>
+                        <span id="check-admin" class="hidden text-blue-600 dark:text-blue-400 text-xs font-bold">✓</span>
+                      </div>
+
                       <div onclick="selectPersona('bob_ops')" id="user-opt-bob_ops" class="flex items-center justify-between p-2 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/80 transition profile-menu-item bg-slate-100/80 dark:bg-slate-800/40">
                         <div class="flex items-center gap-2.5">
                           <div class="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-600/30 text-indigo-600 dark:text-indigo-300 font-bold text-xs flex items-center justify-center border border-indigo-200 dark:border-indigo-500/30">BM</div>
@@ -1265,15 +1287,23 @@
 
       let currentTab = 'chat';
       const roleMap = {
+        admin: 'Admin',
         bob_ops: 'DevOps Admin',
         alice_hr: 'HR Manager',
-        charlie_fin: 'Finance Officer',
-        sarah_connor: 'VP of Engineering',
+        charlie_fin: 'Finance Office',
+        sarah_connor: 'Admin',
         alex_chen: 'Security Lead',
         dave_contractor: 'Restricted Contractor'
       };
 
       const userProfiles = {
+        admin: {
+          name: 'System Administrator',
+          role: 'Admin',
+          email: 'admin@company.internal',
+          initials: 'AD',
+          department: 'System Administration'
+        },
         bob_ops: {
           name: 'Bob Martinez',
           role: 'DevOps Admin',
@@ -1290,14 +1320,14 @@
         },
         charlie_fin: {
           name: 'Charlie Zhao',
-          role: 'Finance Officer',
+          role: 'Finance Office',
           email: 'charlie.fin@company.internal',
           initials: 'CZ',
           department: 'Finance & Payroll'
         },
         sarah_connor: {
           name: 'Sarah Connor',
-          role: 'VP of Engineering',
+          role: 'Admin',
           email: 's.connor@company.internal',
           initials: 'SC',
           department: 'Engineering Leadership'
@@ -1475,6 +1505,14 @@
           } else {
             loadPodsHub();
           }
+        } else if (currentTab === 'agents') {
+          if (typeof loadAgentsHub === 'function') {
+            loadAgentsHub();
+          }
+        } else if (currentTab === 'prompts') {
+          if (typeof renderPromptLibrary === 'function') {
+            renderPromptLibrary();
+          }
         }
         if (typeof loadChatHistory === 'function') {
           loadChatHistory();
@@ -1534,9 +1572,12 @@
             await loadPodsHub(window._currentPodFilter || 'all');
             return;
           } else if (tab === 'prompts') {
-            const r = await fetch('/api/prompts');
+            const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+            const r = await fetch(`/api/prompts?persona=${encodeURIComponent(persona)}`, {
+              headers: { 'x-persona': persona }
+            });
             const d = await r.json();
-            window._allPrompts = d.prompts || [];
+            window._allPrompts = d.templates || d.prompts || [];
             window._allPromptCategories = d.categories || [];
             if (!window._activePromptCat) window._activePromptCat = 'All';
             renderPromptLibrary();
@@ -1545,7 +1586,10 @@
             await loadAgentsHub();
             return;
           } else if (tab === 'tools') {
-            const r = await fetch('/api/tools');
+            const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+            const r = await fetch(`/api/tools?persona=${encodeURIComponent(persona)}`, {
+              headers: { 'x-persona': persona }
+            });
             const d = await r.json();
             let html = '<h3 class="text-base font-bold text-slate-200">Generated ADK Tools</h3><div class="overflow-x-auto rounded-xl border border-slate-800"><table class="w-full text-left text-xs font-mono"><thead class="bg-slate-900 text-slate-400 border-b border-slate-800"><tr><th class="p-3">Tool Name</th><th class="p-3">Method</th><th class="p-3">Service</th><th class="p-3">Path</th><th class="p-3">Approval</th></tr></thead><tbody class="divide-y divide-slate-800/60">';
             (d.tools || []).forEach(t => {
@@ -1685,7 +1729,10 @@
         mc.innerHTML = '<div class="text-slate-400 text-xs p-3 font-mono">Loading conversation history...</div>';
 
         try {
-          const r = await fetch('/api/chat/sessions/' + sessionId);
+          const persona = document.getElementById('personaSelect') ? document.getElementById('personaSelect').value : 'bob_ops';
+          const r = await fetch(`/api/chat/sessions/${sessionId}?persona=${encodeURIComponent(persona)}`, {
+            headers: { 'x-persona': persona }
+          });
           if (!r.ok) throw new Error('Session not found');
           const data = await r.json();
           window._activeChatSessionId = sessionId;
@@ -1930,7 +1977,10 @@
 
           const r = await fetch('/api/chat', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              'x-persona': persona
+            },
             body: JSON.stringify({
               prompt: text || 'Please review and summarize the attached document.',
               persona: persona,
@@ -1946,6 +1996,20 @@
           // Remove thinking loader before appending final response
           const loaderEl = document.getElementById(loaderId);
           if (loaderEl) loaderEl.remove();
+
+          if (!r.ok) {
+            mc.innerHTML += `
+              <div class="flex gap-3">
+                <div class="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center font-bold text-xs shrink-0 ring-2 ring-red-500/20">🚫</div>
+                <div class="chat-bubble-ai border border-red-800 bg-red-950/30 p-4 rounded-2xl max-w-2xl text-sm shadow-sm space-y-2">
+                  <div class="font-bold text-red-400">Access Denied (${r.status})</div>
+                  <div class="chat-text-content leading-relaxed text-slate-300">${data.detail || 'Access restricted by Enterprise RBAC policy.'}</div>
+                </div>
+              </div>
+            `;
+            mc.scrollTop = mc.scrollHeight;
+            return;
+          }
 
           if (data.session_id) {
             window._activeChatSessionId = data.session_id;
@@ -5704,6 +5768,22 @@ Would you like to download the full application bundle (.ZIP) to your machine no
 
       function launchAgentInChat(agentId, encodedName) {
         const name = decodeURIComponent(encodedName || agentId);
+        const personaSel = document.getElementById('personaSelect');
+        const persona = personaSel ? personaSel.value : 'bob_ops';
+        const userRole = (window._currentPersonaRole || (roleMap[persona]) || 'DevOps Admin');
+        const userRoleNorm = userRole.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const agent = (window._allAgentsList || window._availableAgentsList || []).find(a => a.id === agentId);
+        if (agent) {
+          const allowedRoles = agent.allowed_roles || ['*'];
+          const isRoleAllowed = userRoleNorm === 'admin' || allowedRoles.includes('*') || allowedRoles.some(r => {
+            const rNorm = r.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return rNorm === userRoleNorm || rNorm.includes(userRoleNorm) || userRoleNorm.includes(rNorm);
+          });
+          if (!isRoleAllowed) {
+            alert(`Access denied: You do not have permission to access "${name}"`);
+            return;
+          }
+        }
         switchTab('chat');
         startNewChatSession(agentId);
         const input = document.getElementById('promptInput');
@@ -5713,9 +5793,69 @@ Would you like to download the full application bundle (.ZIP) to your machine no
         }
       }
 
+      function toggleAllCreateRoles(allCb) {
+        if (allCb.checked) {
+          document.querySelectorAll('.create-role-specific').forEach(cb => cb.checked = false);
+        }
+      }
+
       function openCreateAgentModal() {
         const mb = document.getElementById('modalBackdrop');
         if (!mb) return;
+
+        const personaSel = document.getElementById('personaSelect');
+        const currentPersona = personaSel ? personaSel.value : 'bob_ops';
+        const currentRole = (window._currentPersonaRole || (roleMap[currentPersona]) || '').toLowerCase();
+        const isAdmin = currentRole === 'admin' || currentRole.includes('admin') || currentPersona === 'admin';
+
+        let rolesSectionHtml = '';
+        if (isAdmin) {
+          rolesSectionHtml = `
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">RBAC Access Control (Allowed Personas / Roles)</label>
+              <div class="grid grid-cols-2 gap-2 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                  <input type="checkbox" name="allowedRole" value="*" checked onchange="toggleAllCreateRoles(this)" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                  <span><strong>* (All Roles Allowed)</strong></span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                  <input type="checkbox" name="allowedRole" value="Admin" class="create-role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                  <span>Admin</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                  <input type="checkbox" name="allowedRole" value="Finance Office" class="create-role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                  <span>Finance Office</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                  <input type="checkbox" name="allowedRole" value="HR Manager" class="create-role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                  <span>HR Manager</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                  <input type="checkbox" name="allowedRole" value="DevOps Admin" class="create-role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                  <span>DevOps Admin</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer text-slate-300">
+                  <input type="checkbox" name="allowedRole" value="Restricted Contractor" class="create-role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                  <span>Restricted Contractor</span>
+                </label>
+              </div>
+            </div>
+          `;
+        } else {
+          rolesSectionHtml = `
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">RBAC Access Control (Role Limits)</label>
+              <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs space-y-2">
+                <div class="flex items-center gap-2 text-amber-400">
+                  <span>🔒</span>
+                  <span><strong>Admin Only:</strong> Allowed roles are configurable only by the Admin persona. Newly created agents default to unrestricted access (*).</span>
+                </div>
+                <input type="hidden" name="allowedRole" value="*" />
+              </div>
+            </div>
+          `;
+        }
+
         mb.classList.remove('hidden');
         mb.innerHTML = `
           <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]" onclick="event.stopPropagation()">
@@ -5750,27 +5890,7 @@ Would you like to download the full application bundle (.ZIP) to your machine no
                 </div>
               </div>
 
-              <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1.5">RBAC Access Control (Limit Roles Allowed to Call Agent & Tools)</label>
-                <div class="grid grid-cols-2 gap-2 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
-                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
-                    <input type="checkbox" name="allowedRole" value="DevOps Admin" checked class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
-                    <span>DevOps Admin</span>
-                  </label>
-                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
-                    <input type="checkbox" name="allowedRole" value="HR Manager" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
-                    <span>HR Manager</span>
-                  </label>
-                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
-                    <input type="checkbox" name="allowedRole" value="Finance Officer" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
-                    <span>Finance Officer</span>
-                  </label>
-                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
-                    <input type="checkbox" name="allowedRole" value="Restricted Contractor" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
-                    <span>Restricted Contractor</span>
-                  </label>
-                </div>
-              </div>
+              ${rolesSectionHtml}
 
               <div>
                 <div class="flex items-center justify-between mb-1">
@@ -5840,8 +5960,15 @@ Would you like to download the full application bundle (.ZIP) to your machine no
         const baseUrl = document.getElementById('newAgentBaseUrl').value.trim() || window.location.origin;
         const swaggerJson = document.getElementById('newAgentSwaggerJson').value.trim();
 
+        const personaSel = document.getElementById('personaSelect');
+        const persona = personaSel ? personaSel.value : 'bob_ops';
+
         const roleBoxes = document.querySelectorAll('input[name="allowedRole"]:checked');
-        const allowedRoles = Array.from(roleBoxes).map(cb => cb.value);
+        let allowedRoles = Array.from(roleBoxes).map(cb => cb.value);
+        if (allowedRoles.length === 0) {
+          const hiddenRole = document.querySelector('input[name="allowedRole"][type="hidden"]');
+          allowedRoles = hiddenRole ? [hiddenRole.value] : ['*'];
+        }
 
         if (!swaggerJson) {
           fb.className = 'text-xs p-3 rounded-xl font-mono bg-red-950/40 text-red-400 border border-red-900';
@@ -5855,13 +5982,17 @@ Would you like to download the full application bundle (.ZIP) to your machine no
         fb.classList.add('hidden');
 
         try {
-          const r = await fetch('/api/agents/generate-from-swagger', {
+          const r = await fetch(`/api/agents/generate-from-swagger?persona=${encodeURIComponent(persona)}`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              'x-persona': persona
+            },
             body: JSON.stringify({
               agent_name: name,
               agent_id: id || undefined,
               author: author,
+              author_id: persona,
               base_url: baseUrl,
               allowed_roles: allowedRoles.length ? allowedRoles : ['*'],
               swagger_json: swaggerJson
@@ -5899,9 +6030,52 @@ Would you like to download the full application bundle (.ZIP) to your machine no
         const mb = document.getElementById('modalBackdrop');
         if (!mb) return;
 
+        const personaSel = document.getElementById('personaSelect');
+        const currentPersona = personaSel ? personaSel.value : 'bob_ops';
+        const currentRole = (window._currentPersonaRole || (roleMap[currentPersona]) || '').toLowerCase();
+        const isAdmin = currentRole === 'admin' || currentRole.includes('admin') || currentPersona === 'admin';
+        const isOwner = (agent.author_id && agent.author_id.toLowerCase() === currentPersona.toLowerCase()) ||
+                        (agent.author && agent.author.toLowerCase() === currentPersona.toLowerCase());
+        const canEdit = isAdmin || isOwner;
+
         const currentRoles = agent.allowed_roles || ['*'];
         const isAllRoles = currentRoles.includes('*');
         const isActive = (agent.active !== false);
+
+        const hasRole = (roleName) => {
+          if (isAllRoles) return false;
+          const targetNorm = roleName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return currentRoles.some(r => {
+            const rNorm = r.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return rNorm === targetNorm || rNorm.includes(targetNorm) || targetNorm.includes(rNorm);
+          });
+        };
+
+        const isAuthorizedToView = isAdmin || isAllRoles || currentRoles.some(r => {
+          const rNorm = r.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const uNorm = currentRole.replace(/[^a-z0-9]/g, '');
+          return rNorm === uNorm || rNorm.includes(uNorm) || uNorm.includes(rNorm);
+        });
+
+        if (!isAuthorizedToView) {
+          mb.classList.remove('hidden');
+          mb.innerHTML = `
+            <div class="bg-slate-900 border border-red-800/80 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl" onclick="event.stopPropagation()">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div class="flex items-center gap-2 text-red-400 font-bold">
+                  <span>🚫</span>
+                  <h4>Access Denied (403)</h4>
+                </div>
+                <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">✕</button>
+              </div>
+              <p class="text-xs text-slate-300">You do not have permission to view or manage access limits for this agent.</p>
+              <div class="flex justify-end pt-3 border-t border-slate-800">
+                <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium">Close</button>
+              </div>
+            </div>
+          `;
+          return;
+        }
 
         mb.classList.remove('hidden');
         mb.innerHTML = `
@@ -5914,11 +6088,18 @@ Would you like to download the full application bundle (.ZIP) to your machine no
               <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-slate-200 text-lg font-bold">✕</button>
             </div>
 
+            ${!canEdit ? `
+              <div class="p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-amber-300 text-xs flex items-center gap-2">
+                <span>🔒</span>
+                <span><strong>Read-Only:</strong> Non-admin users cannot modify agent roles or limits. Only the Admin persona can update access control.</span>
+              </div>
+            ` : ''}
+
             <form onsubmit="submitAgentAccess('${agent.id}', event)" class="space-y-4">
               <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-1.5">Agent Operational State</label>
                 <div class="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
-                  <input type="checkbox" id="accessActiveToggle" ${isActive ? 'checked' : ''} class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                  <input type="checkbox" id="accessActiveToggle" ${isActive ? 'checked' : ''} ${!canEdit ? 'disabled' : ''} class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
                   <span class="text-xs text-slate-200 font-medium">Active (Turn off to deactivate agent)</span>
                 </div>
               </div>
@@ -5926,24 +6107,28 @@ Would you like to download the full application bundle (.ZIP) to your machine no
               <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-1.5">Authorized Roles (RBAC Limits)</label>
                 <div class="space-y-2 p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
-                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
-                    <input type="checkbox" name="agentLimitRole" value="*" ${isAllRoles ? 'checked' : ''} onchange="toggleAllRoles(this)" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                  <label class="flex items-center gap-2 ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed'} text-slate-300">
+                    <input type="checkbox" name="agentLimitRole" value="*" ${isAllRoles ? 'checked' : ''} ${!canEdit ? 'disabled' : ''} onchange="toggleAllRoles(this)" class="rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
                     <span><strong>* (All Roles Allowed)</strong></span>
                   </label>
-                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
-                    <input type="checkbox" name="agentLimitRole" value="DevOps Admin" ${(!isAllRoles && currentRoles.includes('DevOps Admin')) ? 'checked' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
-                    <span>DevOps Admin</span>
+                  <label class="flex items-center gap-2 ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed'} text-slate-300">
+                    <input type="checkbox" name="agentLimitRole" value="Admin" ${hasRole('Admin') ? 'checked' : ''} ${!canEdit ? 'disabled' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span>Admin</span>
                   </label>
-                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
-                    <input type="checkbox" name="agentLimitRole" value="HR Manager" ${(!isAllRoles && currentRoles.includes('HR Manager')) ? 'checked' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                  <label class="flex items-center gap-2 ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed'} text-slate-300">
+                    <input type="checkbox" name="agentLimitRole" value="Finance Office" ${hasRole('Finance Office') ? 'checked' : ''} ${!canEdit ? 'disabled' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span>Finance Office</span>
+                  </label>
+                  <label class="flex items-center gap-2 ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed'} text-slate-300">
+                    <input type="checkbox" name="agentLimitRole" value="HR Manager" ${hasRole('HR Manager') ? 'checked' : ''} ${!canEdit ? 'disabled' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
                     <span>HR Manager</span>
                   </label>
-                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
-                    <input type="checkbox" name="agentLimitRole" value="Finance Officer" ${(!isAllRoles && currentRoles.includes('Finance Officer')) ? 'checked' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
-                    <span>Finance Officer</span>
+                  <label class="flex items-center gap-2 ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed'} text-slate-300">
+                    <input type="checkbox" name="agentLimitRole" value="DevOps Admin" ${hasRole('DevOps Admin') ? 'checked' : ''} ${!canEdit ? 'disabled' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                    <span>DevOps Admin</span>
                   </label>
-                  <label class="flex items-center gap-2 cursor-pointer text-slate-300">
-                    <input type="checkbox" name="agentLimitRole" value="Restricted Contractor" ${(!isAllRoles && currentRoles.includes('Restricted Contractor')) ? 'checked' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
+                  <label class="flex items-center gap-2 ${canEdit ? 'cursor-pointer' : 'cursor-not-allowed'} text-slate-300">
+                    <input type="checkbox" name="agentLimitRole" value="Restricted Contractor" ${hasRole('Restricted Contractor') ? 'checked' : ''} ${!canEdit ? 'disabled' : ''} class="role-specific rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-blue-500" />
                     <span>Restricted Contractor</span>
                   </label>
                 </div>
@@ -5951,7 +6136,7 @@ Would you like to download the full application bundle (.ZIP) to your machine no
 
               <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-1">Authorized Teams (Comma-separated)</label>
-                <input type="text" id="accessTeamsInput" value="${(agent.allowed_teams || ['*']).join(', ')}" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="text" id="accessTeamsInput" value="${(agent.allowed_teams || ['*']).join(', ')}" ${!canEdit ? 'disabled' : ''} class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${!canEdit ? 'opacity-60 cursor-not-allowed' : ''}" />
               </div>
 
               <div id="accessFeedback" class="hidden text-xs p-3 rounded-xl font-mono"></div>
@@ -5960,9 +6145,15 @@ Would you like to download the full application bundle (.ZIP) to your machine no
                 <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
                   Cancel
                 </button>
-                <button type="submit" id="saveAccessBtn" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/30 transition">
-                  💾 Save Limits
-                </button>
+                ${canEdit ? `
+                  <button type="submit" id="saveAccessBtn" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/30 transition">
+                    💾 Save Limits
+                  </button>
+                ` : `
+                  <span class="px-4 py-2 rounded-xl bg-slate-800 text-slate-500 text-xs font-semibold border border-slate-700/80 cursor-not-allowed flex items-center gap-1.5">
+                    🔒 Admin Only
+                  </span>
+                `}
               </div>
             </form>
           </div>
@@ -5980,6 +6171,7 @@ Would you like to download the full application bundle (.ZIP) to your machine no
         const active = document.getElementById('accessActiveToggle').checked;
         const fb = document.getElementById('accessFeedback');
         const btn = document.getElementById('saveAccessBtn');
+        if (!btn) return;
 
         const roleCheckboxes = document.querySelectorAll('input[name="agentLimitRole"]:checked');
         let allowedRoles = Array.from(roleCheckboxes).map(cb => cb.value);
@@ -5988,14 +6180,21 @@ Would you like to download the full application bundle (.ZIP) to your machine no
         const teamsStr = document.getElementById('accessTeamsInput').value.trim();
         const allowedTeams = teamsStr ? teamsStr.split(',').map(s => s.trim()) : ['*'];
 
+        const personaSel = document.getElementById('personaSelect');
+        const persona = personaSel ? personaSel.value : 'bob_ops';
+
         btn.disabled = true;
         btn.innerHTML = 'Saving...';
 
         try {
-          const r = await fetch(`/api/agents/${agentId}/access`, {
+          const r = await fetch(`/api/agents/${agentId}/access?persona=${encodeURIComponent(persona)}`, {
             method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              'x-persona': persona
+            },
             body: JSON.stringify({
+              persona: persona,
               active: active,
               allowed_roles: allowedRoles,
               allowed_teams: allowedTeams
@@ -6018,8 +6217,6 @@ Would you like to download the full application bundle (.ZIP) to your machine no
           fb.innerText = 'Error: ' + err.message;
           fb.classList.remove('hidden');
           btn.disabled = false;
-          btn.innerHTML = '💾 Save Limits';
-        }
       }
 
       function openOnboardingModal() {
@@ -6207,12 +6404,12 @@ Would you like to download the full application bundle (.ZIP) to your machine no
             const userRole = (window._currentPersonaRole || (roleMap[persona]) || 'DevOps Admin');
             const userRoleNorm = userRole.toLowerCase().replace(/[^a-z0-9]/g, '');
             const allowedRoles = a.allowed_roles || ['*'];
-            const isRoleAllowed = allowedRoles.includes('*') || allowedRoles.some(r => {
+            const isRoleAllowed = userRoleNorm === 'admin' || allowedRoles.includes('*') || allowedRoles.some(r => {
               const rNorm = r.toLowerCase().replace(/[^a-z0-9]/g, '');
               return rNorm === userRoleNorm || rNorm.includes(userRoleNorm) || userRoleNorm.includes(rNorm);
             });
             if (!isRoleAllowed) {
-              opt.textContent += ' 🔒 (Role Restricted)';
+              return;
             }
 
             if (['hr_agent', 'finance_agent', 'it_support_agent', 'ops_agent', 'productivity_agent'].includes(a.id)) {
@@ -6230,13 +6427,6 @@ Would you like to download the full application bundle (.ZIP) to your machine no
 
           let matching = Array.from(select.options).find(o => o.value === currentVal);
           if (matching) {
-            select.value = currentVal;
-            window._activeChatAgentId = currentVal;
-          } else if (currentVal !== 'auto') {
-            const customOpt = document.createElement('option');
-            customOpt.value = currentVal;
-            customOpt.textContent = `🤖 ${currentVal}`;
-            select.appendChild(customOpt);
             select.value = currentVal;
             window._activeChatAgentId = currentVal;
           } else {
@@ -6316,6 +6506,53 @@ Would you like to download the full application bundle (.ZIP) to your machine no
         });
       }
 
+      // Direct Agent URL / Deep-Link RBAC Checker
+      async function checkDirectAgentUrlAccess() {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const directAgentId = params.get('agent') || (window.location.hash.startsWith('#agent=') ? window.location.hash.replace('#agent=', '').trim() : null);
+          if (!directAgentId) return;
+
+          const personaSel = document.getElementById('personaSelect');
+          const persona = personaSel ? personaSel.value : 'bob_ops';
+
+          const r = await fetch(`/api/agents/${directAgentId}?persona=${encodeURIComponent(persona)}`, {
+            headers: { 'x-persona': persona }
+          });
+
+          if (r.status === 403) {
+            const mb = document.getElementById('modalBackdrop');
+            if (mb) {
+              mb.classList.remove('hidden');
+              mb.innerHTML = `
+                <div class="bg-slate-900 border border-red-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-center" onclick="event.stopPropagation()">
+                  <div class="w-14 h-14 rounded-2xl bg-red-900/30 border border-red-700/60 text-red-400 flex items-center justify-center text-3xl mx-auto shadow-inner">🚫</div>
+                  <div>
+                    <h3 class="text-lg font-bold text-slate-100">Access Denied (403 Forbidden)</h3>
+                    <p class="text-xs text-red-400 mt-1 font-mono">Agent: ${directAgentId}</p>
+                    <p class="text-xs text-slate-400 mt-2 leading-relaxed">
+                      You do not have the required role or authorization to view or interact with this agent. Please switch to an authorized persona or contact your system administrator.
+                    </p>
+                  </div>
+                  <div class="pt-3 border-t border-slate-800 flex justify-center">
+                    <button type="button" onclick="closeModal(); if (history.pushState) { history.pushState('', document.title, window.location.pathname); }" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition cursor-pointer">
+                      Dismiss & Return to Dashboard
+                    </button>
+                  </div>
+                </div>
+              `;
+            }
+          } else if (r.ok) {
+            const data = await r.json();
+            if (data.agent) {
+              launchAgentInChat(data.agent.id, encodeURIComponent(data.agent.name));
+            }
+          }
+        } catch (e) {
+          console.warn('Direct agent URL check failed:', e);
+        }
+      }
+
       loadModels();
       if (typeof window.syncChatAgentSelect === 'function') {
         window.syncChatAgentSelect();
@@ -6323,6 +6560,7 @@ Would you like to download the full application bundle (.ZIP) to your machine no
       if (typeof loadChatHistory === 'function') {
         loadChatHistory();
       }
+      checkDirectAgentUrlAccess();
     </script>
     
 </body>

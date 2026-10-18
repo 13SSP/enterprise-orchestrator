@@ -24,7 +24,7 @@ from database.firestore_client import db
 from agent_registry.registry import agent_registry, AgentManifest
 from tool_registry.registry import tool_registry
 from model_gateway.provider import model_gateway
-from access_control.policy import DEMO_PERSONAS, UserContext, access_control
+from access_control.policy import DEMO_PERSONAS, UserContext, access_control, can_access_agent, can_edit_agent_access, resolve_user
 from guardrails.model_armor import model_armor
 from guardrails.gemma_guardrail import gemma_guardrail, GemmaGuardrailResult
 from approvals.manager import approval_manager, PendingAction
@@ -75,8 +75,12 @@ class ConfirmActionRequest(BaseModel):
     persona: str = "bob_ops"
 
 @router_api.post("/chat", tags=["Chat"])
-def handle_chat(req: ChatRequest):
-    user = DEMO_PERSONAS.get(req.persona, DEMO_PERSONAS["bob_ops"])
+def handle_chat(
+    req: ChatRequest,
+    authorization: Optional[str] = Header(None, alias="authorization"),
+    x_persona: Optional[str] = Header(None, alias="x-persona")
+):
+    user = resolve_user(persona_param=req.persona, auth_header=authorization, x_persona_header=x_persona)
     trace_id = f"trace-{str(uuid.uuid4())[:8]}"
     chosen_model = req.model or model_gateway.get_default_model()
     session_id = req.session_id or f"session-{str(uuid.uuid4())[:8]}"
@@ -168,6 +172,28 @@ def handle_chat(req: ChatRequest):
     session_prior_agent = session_data.get("agent_id")
 
     req_target = req.target_agent_id or req.agent_id
+    if req_target and req_target not in ["auto", "cortex_assistant"]:
+        cand = agent_registry.get_agent(req_target)
+        if cand and not can_access_agent(user, cand):
+            record_audit("AGENT_ACCESS_DENIED", "WARNING", user.sub, {
+                "agent_id": req_target,
+                "reason": f"User '{user.sub}' with role '{user.role}' denied access to restricted agent '{cand.name}'."
+            })
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    # Invalidate stale session targeting if the agent was recently restricted
+    if session_target_agent and session_target_agent not in ["auto", "cortex_assistant"]:
+        cand = agent_registry.get_agent(session_target_agent)
+        if cand and not can_access_agent(user, cand):
+            session_target_agent = "auto"
+            session_data["target_agent_id"] = "auto"
+
+    if session_prior_agent and session_prior_agent not in ["auto", "cortex_assistant"]:
+        cand = agent_registry.get_agent(session_prior_agent)
+        if cand and not can_access_agent(user, cand):
+            session_prior_agent = "auto"
+            session_data["agent_id"] = "auto"
+
     if req_target and req_target != "auto":
         effective_agent_id = req_target
         session_data["target_agent_id"] = req_target
@@ -221,6 +247,13 @@ def handle_chat(req: ChatRequest):
             description="Enterprise Digital Assistant & General AI Helper",
             preferred_model=chosen_model
         )
+    elif not can_access_agent(user, agent):
+        record_audit("AGENT_ACCESS_DENIED", "WARNING", user.sub, {
+            "agent_id": agent.id,
+            "reason": f"User '{user.sub}' with role '{user.role}' denied access to '{agent.name}'."
+        })
+        raise HTTPException(status_code=403, detail="Access denied")
+
     tool_name = routing.suggested_tool
     tool_args = routing.suggested_args
 
@@ -770,20 +803,30 @@ def download_chat_file(file_name: str):
     return FileResponse(path=file_path, filename=safe_name, media_type=media_type)
 
 @router_api.get("/chat/history", tags=["Chat"])
-def get_chat_history(persona: Optional[str] = "bob_ops"):
+def get_chat_history(
+    persona: Optional[str] = "bob_ops",
+    authorization: Optional[str] = Header(None, alias="authorization"),
+    x_persona: Optional[str] = Header(None, alias="x-persona")
+):
     """Lists previous chat contexts from Firebase DB."""
+    user = resolve_user(persona_param=persona, auth_header=authorization, x_persona_header=x_persona)
     sessions_ref = db.collection("chat_sessions")
     results = []
     for doc in sessions_ref.stream():
         data = doc.to_dict()
-        if persona and data.get("persona") and data.get("persona") != persona:
+        if user.sub and data.get("persona") and data.get("persona") != user.sub and user.role != "admin":
             continue
+        tgt_agent = data.get("target_agent_id") or data.get("agent_id")
+        if tgt_agent and tgt_agent not in ["auto", "cortex_assistant"]:
+            cand = agent_registry.get_agent(tgt_agent)
+            if cand and not can_access_agent(user, cand):
+                continue
         msg_count = len(data.get("messages", []))
         last_msg = data.get("messages", [])[-1]["content"] if msg_count > 0 else ""
         results.append({
             "session_id": data.get("session_id", doc.id),
             "title": data.get("title", "Chat Session"),
-            "persona": data.get("persona", persona),
+            "persona": data.get("persona", user.sub),
             "agent_id": data.get("agent_id", "auto"),
             "created_at": data.get("created_at"),
             "updated_at": data.get("updated_at"),
@@ -794,12 +837,24 @@ def get_chat_history(persona: Optional[str] = "bob_ops"):
     return {"sessions": results}
 
 @router_api.get("/chat/sessions/{session_id}", tags=["Chat"])
-def get_chat_session(session_id: str):
+def get_chat_session(
+    session_id: str,
+    persona: Optional[str] = "bob_ops",
+    authorization: Optional[str] = Header(None, alias="authorization"),
+    x_persona: Optional[str] = Header(None, alias="x-persona")
+):
     """Retrieves all messages for a specific chat context from Firebase DB."""
+    user = resolve_user(persona_param=persona, auth_header=authorization, x_persona_header=x_persona)
     doc = db.collection("chat_sessions").document(session_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Chat session not found")
-    return doc.to_dict()
+    data = doc.to_dict()
+    tgt_agent = data.get("target_agent_id") or data.get("agent_id")
+    if tgt_agent and tgt_agent not in ["auto", "cortex_assistant"]:
+        cand = agent_registry.get_agent(tgt_agent)
+        if cand and not can_access_agent(user, cand):
+            raise HTTPException(status_code=403, detail="Access denied")
+    return data
 
 @router_api.delete("/chat/sessions/{session_id}", tags=["Chat"])
 def delete_chat_session(session_id: str):
@@ -849,6 +904,7 @@ class AgentAccessUpdateRequest(BaseModel):
     allowed_roles: Optional[List[str]] = None
     allowed_teams: Optional[List[str]] = None
     active: Optional[bool] = None
+    persona: Optional[str] = None
 
 class ToolAccessUpdateRequest(BaseModel):
     allowed_roles: Optional[List[str]] = None
@@ -859,9 +915,11 @@ class ToolAccessUpdateRequest(BaseModel):
 def list_agents(
     q: Optional[str] = None,
     scope: Optional[str] = None,
-    persona: Optional[str] = "bob_ops"
+    persona: Optional[str] = "bob_ops",
+    authorization: Optional[str] = Header(None, alias="authorization"),
+    x_persona: Optional[str] = Header(None, alias="x-persona")
 ):
-    user = DEMO_PERSONAS.get(persona, DEMO_PERSONAS.get("bob_ops"))
+    user = resolve_user(persona_param=persona, auth_header=authorization, x_persona_header=x_persona)
     dept_map = {
         "dept-eng": "Operations",
         "dept-hr": "HR Operations",
@@ -874,17 +932,61 @@ def list_agents(
         query=q,
         scope=scope,
         persona_id=user_id,
-        persona_team=user_team
+        persona_team=user_team,
+        user=user
     )
-    return {"agents": [a.model_dump() for a in agents]}
+    # Strictly return only agents the authenticated persona is authorized to see
+    visible_agents = [a for a in agents if can_access_agent(user, a)]
+    return {"agents": [a.model_dump() for a in visible_agents]}
+
+@router_api.get("/agents/{agent_id}", tags=["Registry"])
+def get_agent_by_id(
+    agent_id: str,
+    persona: Optional[str] = "bob_ops",
+    authorization: Optional[str] = Header(None, alias="authorization"),
+    x_persona: Optional[str] = Header(None, alias="x-persona")
+):
+    user = resolve_user(persona_param=persona, auth_header=authorization, x_persona_header=x_persona)
+    agent = agent_registry.get_agent(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if not can_access_agent(user, agent):
+        record_audit("AGENT_ACCESS_DENIED", "WARNING", user.sub, {
+            "agent_id": agent_id,
+            "reason": f"Direct lookup of agent '{agent_id}' denied for user '{user.sub}' ({user.role})"
+        })
+        raise HTTPException(status_code=403, detail="Access denied")
+    return {"agent": agent.model_dump()}
 
 @router_api.post("/agents/onboard", tags=["Registry"])
-def onboard_agent(manifest: AgentManifest):
+def onboard_agent(
+    manifest: AgentManifest,
+    persona: Optional[str] = "bob_ops",
+    authorization: Optional[str] = Header(None, alias="authorization"),
+    x_persona: Optional[str] = Header(None, alias="x-persona")
+):
+    user = resolve_user(persona_param=persona, auth_header=authorization, x_persona_header=x_persona)
+    if user.role != "admin" and manifest.author_id != user.sub:
+        record_audit("AGENT_ONBOARD_DENIED", "WARNING", user.sub, {
+            "agent_id": manifest.id,
+            "reason": f"Non-admin user '{user.sub}' attempted to onboard agent"
+        })
+        raise HTTPException(status_code=403, detail="Access denied: Only Admin or author can onboard agents.")
     reg = agent_registry.register_agent(manifest)
+    record_audit("AGENT_ONBOARDED", "INFO", user.sub, {
+        "agent_id": manifest.id,
+        "name": manifest.name
+    })
     return {"status": "onboarded", "agent": reg.model_dump()}
 
 @router_api.post("/agents/generate-from-swagger", tags=["Registry"])
-def generate_agent_from_swagger(req: SwaggerGenerateRequest):
+def generate_agent_from_swagger(
+    req: SwaggerGenerateRequest,
+    persona: Optional[str] = "bob_ops",
+    authorization: Optional[str] = Header(None, alias="authorization"),
+    x_persona: Optional[str] = Header(None, alias="x-persona")
+):
+    user = resolve_user(persona_param=getattr(req, "author_id", None) or persona, auth_header=authorization, x_persona_header=x_persona)
     from tool_factory.generator import tool_factory
     spec = {}
     if req.swagger_json:
@@ -905,31 +1007,72 @@ def generate_agent_from_swagger(req: SwaggerGenerateRequest):
         openapi_dict=spec,
         agent_name=req.agent_name,
         agent_id=req.agent_id,
-        author=req.author or "Enterprise Developer",
-        author_id=req.author_id or "bob_ops",
+        author=req.author or user.name or "Enterprise Developer",
+        author_id=user.sub,
         owner_team=req.owner_team or "Operations",
         allowed_roles=req.allowed_roles or ["*"],
         base_url=req.base_url or os.environ.get("CORTEX_BASE_URL", "")
     )
+    record_audit("AGENT_CREATED_SWAGGER", "INFO", user.sub, {
+        "agent_id": req.agent_id,
+        "name": req.agent_name
+    })
     return res
 
 @router_api.put("/agents/{agent_id}/access", tags=["Registry"])
-def update_agent_access(agent_id: str, req: AgentAccessUpdateRequest):
+def update_agent_access(
+    agent_id: str,
+    req: AgentAccessUpdateRequest,
+    persona: Optional[str] = None,
+    authorization: Optional[str] = Header(None, alias="authorization"),
+    x_persona: Optional[str] = Header(None, alias="x-persona")
+):
+    user = resolve_user(persona_param=req.persona or persona, auth_header=authorization, x_persona_header=x_persona)
+    agent = agent_registry.get_agent(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    if not can_edit_agent_access(user, agent):
+        record_audit("AGENT_LIMIT_UPDATE_DENIED", "WARNING", user.sub, {
+            "agent_id": agent_id,
+            "attempted_roles": req.allowed_roles,
+            "reason": f"Non-admin user '{user.sub}' ({user.role}) denied permission to modify access settings."
+        })
+        raise HTTPException(status_code=403, detail="Access denied: Only Admin or agent owner can modify access limits.")
+
     res = agent_registry.update_access(
         agent_id=agent_id,
         allowed_roles=req.allowed_roles,
         allowed_teams=req.allowed_teams,
         active=req.active
     )
-    if not res:
-        raise HTTPException(status_code=404, detail="Agent not found")
+    record_audit("AGENT_LIMIT_UPDATED", "INFO", user.sub, {
+        "agent_id": agent_id,
+        "allowed_roles": req.allowed_roles,
+        "allowed_teams": req.allowed_teams,
+        "active": req.active
+    })
     return {"status": "updated", "agent": res.model_dump()}
 
 @router_api.delete("/agents/{agent_id}", tags=["Registry"])
-def delete_agent(agent_id: str):
-    success = agent_registry.delete_agent(agent_id)
-    if not success:
+def delete_agent(
+    agent_id: str,
+    persona: Optional[str] = "bob_ops",
+    authorization: Optional[str] = Header(None, alias="authorization"),
+    x_persona: Optional[str] = Header(None, alias="x-persona")
+):
+    user = resolve_user(persona_param=persona, auth_header=authorization, x_persona_header=x_persona)
+    agent = agent_registry.get_agent(agent_id)
+    if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
+    if not can_edit_agent_access(user, agent):
+        record_audit("AGENT_DELETE_DENIED", "WARNING", user.sub, {
+            "agent_id": agent_id,
+            "reason": f"Non-admin user '{user.sub}' ({user.role}) denied delete access."
+        })
+        raise HTTPException(status_code=403, detail="Access denied: Only Admin or agent owner can delete agents.")
+    success = agent_registry.delete_agent(agent_id)
+    record_audit("AGENT_DELETED", "INFO", user.sub, {"agent_id": agent_id})
     return {"status": "deleted", "agent_id": agent_id}
 
 @router_api.put("/tools/{tool_name}/access", tags=["Tool Registry"])
@@ -946,8 +1089,32 @@ def update_tool_access(tool_name: str, req: ToolAccessUpdateRequest):
 
 
 @router_api.get("/tools", tags=["Tool Registry"])
-def list_tools():
-    return {"tools": [t.model_dump() for t in tool_registry.list_tools()]}
+def list_tools(
+    persona: Optional[str] = "bob_ops",
+    authorization: Optional[str] = Header(None, alias="authorization"),
+    x_persona: Optional[str] = Header(None, alias="x-persona")
+):
+    user = resolve_user(persona_param=persona, auth_header=authorization, x_persona_header=x_persona)
+    all_tools = tool_registry.list_tools()
+    if user.role == "admin":
+        return {"tools": [t.model_dump() for t in all_tools]}
+
+    accessible_agents = [a for a in agent_registry.list_agents() if can_access_agent(user, a)]
+    accessible_tool_names = set()
+    for a in accessible_agents:
+        accessible_tool_names.update(a.allowed_tools)
+
+    restricted_tool_names = set()
+    for a in agent_registry.list_agents():
+        if not can_access_agent(user, a):
+            restricted_tool_names.update(a.allowed_tools)
+
+    # Return tools that are permitted through accessible agents or not restricted exclusively
+    visible_tools = [
+        t for t in all_tools
+        if t.name in accessible_tool_names or t.name not in restricted_tool_names
+    ]
+    return {"tools": [t.model_dump() for t in visible_tools]}
 
 @router_api.get("/models", tags=["Model Gateway"])
 def list_models():
@@ -962,9 +1129,30 @@ def get_audit_trail():
     return {"events": AUDIT_LOGS[-50:]}
 
 @router_api.get("/prompts", tags=["Prompt Library"])
-def list_prompt_library():
-    from prompts.library import get_prompt_library
-    return get_prompt_library()
+def list_prompt_library(
+    persona: Optional[str] = "bob_ops",
+    authorization: Optional[str] = Header(None, alias="authorization"),
+    x_persona: Optional[str] = Header(None, alias="x-persona")
+):
+    user = resolve_user(persona_param=persona, auth_header=authorization, x_persona_header=x_persona)
+    from prompts.library import get_prompt_library, resolve_target_agent_id
+    lib = get_prompt_library()
+    if user.role == "admin":
+        return lib
+    templates = lib.get("templates", [])
+    filtered = []
+    for t in templates:
+        target_id = t.get("target_agent_id") or resolve_target_agent_id(t.get("target_agent", ""))
+        if target_id and target_id not in ["auto", "cortex_assistant"]:
+            cand = agent_registry.get_agent(target_id)
+            if cand and not can_access_agent(user, cand):
+                continue
+        filtered.append(t)
+    return {
+        "categories": lib.get("categories", []),
+        "templates": filtered,
+        "total_prompts": len(filtered)
+    }
 
 
 # ==========================================

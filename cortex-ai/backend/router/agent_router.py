@@ -16,7 +16,7 @@ if str(backend_dir) not in sys.path:
 
 from agent_registry.registry import agent_registry
 from model_gateway.provider import model_gateway
-from access_control.policy import UserContext, access_control
+from access_control.policy import UserContext, access_control, can_access_agent
 from guardrails.model_armor import model_armor
 from approvals.manager import approval_manager
 
@@ -35,7 +35,31 @@ class RoutingResult(BaseModel):
     clarification_question: Optional[str] = None
 
 class OrchestratorRouter:
+    def _sanitize_routing_result(self, res: RoutingResult, user: UserContext) -> RoutingResult:
+        if res.selected_agent_id and res.selected_agent_id not in ["cortex_assistant", "router", "shieldgemma_guardrail"]:
+            agent = agent_registry.get_agent(res.selected_agent_id)
+            if agent and not can_access_agent(user, agent):
+                return RoutingResult(
+                    selected_agent_id="cortex_assistant",
+                    intent="CONVERSATIONAL",
+                    suggested_tool=None,
+                    suggested_args={},
+                    confidence=0.85,
+                    reasoning="Conversational / General query -> handled by cortex.ai Digital Assistant."
+                )
+        return res
+
     def route_query(
+        self,
+        prompt: str,
+        user: UserContext,
+        session_id: str = "default_session",
+        target_agent_id: Optional[str] = None
+    ) -> RoutingResult:
+        res = self._route_internal(prompt, user, session_id=session_id, target_agent_id=target_agent_id)
+        return self._sanitize_routing_result(res, user)
+
+    def _route_internal(
         self,
         prompt: str,
         user: UserContext,

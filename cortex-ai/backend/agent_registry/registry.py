@@ -154,7 +154,8 @@ class AgentRegistry:
         query: Optional[str] = None,
         scope: Optional[str] = None,
         persona_id: Optional[str] = None,
-        persona_team: Optional[str] = None
+        persona_team: Optional[str] = None,
+        user: Optional[Any] = None
     ) -> List[AgentManifest]:
         agents = list(self._agents.values())
 
@@ -174,6 +175,13 @@ class AgentRegistry:
                 or q in a.author.lower()
                 or any(q in t.lower() for t in a.allowed_tools)
             ]
+
+        if user:
+            try:
+                from access_control.policy import can_access_agent
+                agents = [a for a in agents if can_access_agent(user, a)]
+            except Exception:
+                pass
 
         return agents
 
