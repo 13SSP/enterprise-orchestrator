@@ -364,7 +364,8 @@ def seed_workspaces():
             {"user_id": "alice_hr", "user_name": "Alice Henderson", "role": "contributor", "joined_at": datetime.utcnow().isoformat()}
         ],
         "documents": [
-            {"id": "doc-eng-guidelines", "title": "Engineering Standards & Best Practices v2", "url": "/docs/engineering-standards.md"}
+            {"id": "doc-eng-guidelines", "title": "Engineering Standards & Best Practices v2", "url": "/docs/engineering-standards.md"},
+            {"id": "doc-api-standards", "title": "Cloud Microservices & API Security Standards", "url": "/docs/api-standards.md"}
         ],
         "prompts": [
             {"title": "Architecture Review Checklist", "content": "Review this design against microservices best practices."}
@@ -393,7 +394,7 @@ def seed_workspaces():
                 "sender_id": "bob_ops",
                 "sender_name": "Bob Martinez",
                 "role": "user",
-                "content": "Sounds great. Let's make sure everyone writes comprehensive Pytest suites for business logic before promoting to staging.",
+                "content": "Sounds great. What is our required test coverage and pytest standard before promoting to staging?",
                 "citations": [],
                 "timestamp": datetime.utcnow().isoformat()
             },
@@ -402,8 +403,26 @@ def seed_workspaces():
                 "sender_id": "cortex-ai",
                 "sender_name": "Engineering Copilot",
                 "role": "assistant",
-                "content": "Understood! Automated test coverage is enforced via CI pipelines, targeting minimum 85% coverage on domain models and conflict detection logic.",
+                "content": "Understood! According to Section 4.2 of our Engineering Standards & Best Practices v2, automated test coverage is strictly enforced via CI pipelines, targeting minimum 85% branch coverage on domain models and conflict detection logic. Pytest suites must execute with zero external network dependencies.",
                 "citations": ["Engineering Standards & Best Practices v2"],
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            {
+                "id": "msg-005",
+                "sender_id": "alex_chen",
+                "sender_name": "Alex Chen",
+                "role": "user",
+                "content": "What is our policy regarding logging sensitive employee PII or tokens in our service logs?",
+                "citations": [],
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            {
+                "id": "msg-006",
+                "sender_id": "cortex-ai",
+                "sender_name": "Engineering Copilot",
+                "role": "assistant",
+                "content": "Per Cloud Microservices & API Security Standards: Never log plain PII (SSNs, compensation details, bank credentials) or auth tokens. All stdout log streams must format as structured JSON for Google Cloud Logging, and sensitive parameters must pass through Model Armor masking filters.",
+                "citations": ["Cloud Microservices & API Security Standards"],
                 "timestamp": datetime.utcnow().isoformat()
             }
         ],
@@ -570,6 +589,118 @@ Layered Clean Architecture:
                 "completed_at": None
             }
         ],
+        "features": [
+            {
+                "feature_id": "feat-cal-01",
+                "title": "Calendar Event Model & Scheduling Validation",
+                "description": "Pydantic v2 data models enforcing strict ISO-8601 UTC timestamps, non-empty event titles, and mandatory end_time > start_time validation.",
+                "creation_mode": "ai_generated",
+                "active_version": "v1.1",
+                "lifecycle_state": "approved",
+                "source_doc_text": "Need data models with strict time boundaries and attendee list validation.",
+                "acceptance_criteria": [
+                    "Given valid ISO-8601 timestamps, CalendarEvent model instantiates successfully.",
+                    "Given end_time <= start_time, raises ValueError('Event end_time must be strictly after start_time').",
+                    "Given empty or whitespace title, raises ValueError('Event title cannot be empty')."
+                ],
+                "raw_markdown": "# Calendar Event Model & Invariants (v1.1)\n\n## Data Schema\n- `id: str` (UUID)\n- `title: str` (non-empty)\n- `start_time: str` (ISO UTC)\n- `end_time: str` (ISO UTC)\n- `organizer_id: str`\n- `attendee_ids: List[str]`\n- `room_id: Optional[str]`\n\n## Validation Invariants\n- `end_time` must be strictly after `start_time`.",
+                "requirements": [
+                    {
+                        "id": "REQ-01",
+                        "title": "Calendar Event Model & Invariants",
+                        "description": "Enforce data integrity, non-empty titles, and end_time > start_time validation.",
+                        "acceptance_criteria": "Given valid timestamps, CalendarEvent instantiates successfully; reversed intervals raise ValueError."
+                    }
+                ],
+                "created_by": "bob_ops",
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+                "versions": [
+                    {"version": "v1.0", "lifecycle_state": "in_review", "updated_by": "alice_hr", "timestamp": "2026-10-14T09:00:00Z"},
+                    {"version": "v1.1", "lifecycle_state": "approved", "updated_by": "bob_ops", "timestamp": "2026-10-14T10:00:00Z"}
+                ]
+            },
+            {
+                "feature_id": "feat-cal-02",
+                "title": "Interval Collision & Room Conflict Engine",
+                "description": "Microsecond interval intersection math (s1 < e2 and s2 < e1) detecting double-booking collisions for attendees and shared conference rooms.",
+                "creation_mode": "requirement_doc",
+                "active_version": "v1.0",
+                "lifecycle_state": "approved",
+                "source_doc_text": "# Collision Engine Requirements\n- Intersect intervals s1 < e2 and s2 < e1\n- Block double booking of attendees or rooms\n- Raise BookingConflictError",
+                "acceptance_criteria": [
+                    "Overlapping meetings for any attendee raises BookingConflictError with conflicting meeting titles.",
+                    "Overlapping meetings for the same conference room raises BookingConflictError.",
+                    "Non-overlapping intervals or cancelled meetings permit booking without conflict."
+                ],
+                "raw_markdown": "# Interval Collision & Room Booking Engine (v1.0)\n\n## Math Formula\nOverlap condition: `(start1 < end2) and (start2 < end1)`\n\n## Collision Behavior\n- Evaluates organizers, attendees, and room_id.\n- Excludes events where status == 'cancelled'.",
+                "requirements": [
+                    {
+                        "id": "REQ-02",
+                        "title": "Conflict Detection & Room Booking Engine",
+                        "description": "Interval intersection engine for attendees and conference rooms.",
+                        "acceptance_criteria": "Overlapping bookings for user or room raise BookingConflictError."
+                    }
+                ],
+                "created_by": "priya_sharma",
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+                "versions": [
+                    {"version": "v1.0", "lifecycle_state": "approved", "updated_by": "bob_ops", "timestamp": "2026-10-15T11:00:00Z"}
+                ]
+            },
+            {
+                "feature_id": "feat-cal-03",
+                "title": "REST API Calendar Controller & Availability Engine",
+                "description": "FastAPI endpoints exposing /api/v1/events and /api/v1/availability with RFC-7807 problem details.",
+                "creation_mode": "ai_generated",
+                "active_version": "v1.0",
+                "lifecycle_state": "in_review",
+                "source_doc_text": "REST API router exposing CRUD calendar endpoints and availability queries.",
+                "acceptance_criteria": [
+                    "POST /api/v1/events returns HTTP 201 Created on valid booking.",
+                    "POST /api/v1/events returns HTTP 409 Conflict with collision details on double booking.",
+                    "POST /api/v1/availability returns available time slots for attendee list."
+                ],
+                "raw_markdown": "# REST API Calendar Controller (v1.0)\n\n## Endpoints\n- `GET /api/v1/events`: List events for user or room\n- `POST /api/v1/events`: Create event (checks collisions)\n- `POST /api/v1/availability`: Query free time slots",
+                "requirements": [
+                    {
+                        "id": "REQ-03",
+                        "title": "REST API Calendar Controller",
+                        "description": "FastAPI router exposing /api/v1/events and /api/v1/availability.",
+                        "acceptance_criteria": "Returns HTTP 201 Created on booking, HTTP 409 on schedule conflict."
+                    }
+                ],
+                "created_by": "alex_chen",
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+                "versions": [
+                    {"version": "v1.0", "lifecycle_state": "in_review", "updated_by": "alex_chen", "timestamp": "2026-10-16T14:00:00Z"}
+                ]
+            }
+        ],
+        "prototypes": [
+            {
+                "prototype_id": "proto-calendar-app",
+                "pod_id": "ws-calendar-app",
+                "title": "Calendar Service Engine",
+                "name": "Calendar Service Engine",
+                "description": "Autonomous FastAPI microservice implementing event validation, room collision prevention, and interval overlap engine.",
+                "feature_id": "feat-cal-02",
+                "linked_feature_id": "feat-cal-02",
+                "linked_spec_version": "v1.0",
+                "storage_mode": "cloud",
+                "local_path": str(repo_path).replace("\\", "/"),
+                "tech_stack": "Python 3.11 / FastAPI / Pydantic v2 / Pytest",
+                "creator_id": "bob_ops",
+                "creator_name": "Bob Martinez",
+                "status": "online",
+                "cloud_hosted": True,
+                "test_output": "6 passed in 0.21s - 100% acceptance criteria satisfied",
+                "files": ["src/event_models.py", "src/scheduler_service.py", "tests/test_event_models.py", "tests/test_scheduler_service.py"],
+                "created_at": datetime.utcnow().isoformat()
+            }
+        ],
         "documents": [],
         "prompts": [],
         "chat_messages": [
@@ -580,6 +711,7 @@ Layered Clean Architecture:
                 "role": "user",
                 "content": "What is the acceptance criteria for scheduling conflict detection?",
                 "citations": [],
+                "linked_feature_id": "feat-cal-02",
                 "timestamp": datetime.utcnow().isoformat()
             },
             {
@@ -587,8 +719,49 @@ Layered Clean Architecture:
                 "sender_id": "cortex-ai",
                 "sender_name": "Calendar Copilot",
                 "role": "assistant",
-                "content": "According to **REQ-02: Conflict Detection & Room Booking Engine**, the system checks interval overlaps (start1 < end2 AND start2 < end1). If any attendee or the selected conference room already has a confirmed meeting during that window, a `BookingConflictError` is raised and the booking is rejected.",
-                "citations": ["REQ-02: Conflict Detection & Availability Query Engine"],
+                "content": "According to **REQ-02: Conflict Detection & Room Booking Engine**, the system checks interval overlaps using the invariant formula `(start1 < end2 AND start2 < end1)`. If any attendee or the selected conference room already has a confirmed meeting during that window, a `BookingConflictError` is raised and the booking is rejected.\n\nKey Invariants:\n1. Double-booking any attendee across overlapping intervals is rejected.\n2. Room collisions are blocked regardless of meeting organizer.\n3. Cancelled events are excluded from collision evaluation.",
+                "citations": ["REQ-02: Conflict Detection & Availability Query Engine", "Feature: Interval Collision & Room Conflict Engine (v1.0)"],
+                "linked_feature_id": "feat-cal-02",
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            {
+                "id": "msg-cal-3",
+                "sender_id": "alex_chen",
+                "sender_name": "Alex Chen",
+                "role": "user",
+                "content": "What validation happens if someone attempts to schedule an event where end_time is earlier than or equal to start_time?",
+                "citations": [],
+                "linked_feature_id": "feat-cal-01",
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            {
+                "id": "msg-cal-4",
+                "sender_id": "cortex-ai",
+                "sender_name": "Calendar Copilot",
+                "role": "assistant",
+                "content": "Under **REQ-01: Calendar Event Model & Invariants** (enforced in `src/event_models.py` via Pydantic v2 `@model_validator`), `end_time` must be strictly greater than `start_time` in normalized UTC ISO-8601 format.\n\nIf `end_dt <= start_dt`, the model immediately raises `ValueError('Event end_time must be strictly after start_time')`. Zero-duration or negative-duration meetings are impossible at the domain model boundary.",
+                "citations": ["REQ-01: Calendar Event Model & Invariants", "Feature: Calendar Event Model & Scheduling Validation (v1.1)"],
+                "linked_feature_id": "feat-cal-01",
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            {
+                "id": "msg-cal-5",
+                "sender_id": "bob_ops",
+                "sender_name": "Bob Martinez",
+                "role": "user",
+                "content": "What HTTP status code and error schema should our REST controller return when a room collision occurs?",
+                "citations": [],
+                "linked_feature_id": "feat-cal-03",
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            {
+                "id": "msg-cal-6",
+                "sender_id": "cortex-ai",
+                "sender_name": "Calendar Copilot",
+                "role": "assistant",
+                "content": "Per **REQ-03: REST API Calendar Controller** and our ADR-02 guidelines:\n- **HTTP Status**: Returns `HTTP 409 Conflict`.\n- **Error Schema**: Complies with RFC-7807 Problem Details containing `error: 'BookingConflictError'`, the colliding `event_id`, and `conflicting_titles`.\n- Successful bookings return `HTTP 201 Created` with the persisted event payload.",
+                "citations": ["REQ-03: REST API Calendar Controller", "Feature: REST API Calendar Controller & Availability Engine (v1.0)"],
+                "linked_feature_id": "feat-cal-03",
                 "timestamp": datetime.utcnow().isoformat()
             }
         ],
