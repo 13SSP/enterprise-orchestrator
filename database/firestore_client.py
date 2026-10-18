@@ -180,10 +180,19 @@ class FirestoreClient:
                 from google.cloud import firestore
                 self._native_client = firestore.Client(project=self._project_id)
                 self._mode = "GOOGLE_CLOUD_FIRESTORE_LIVE"
-                logger.info("Connected to Live Google Cloud Firestore")
+                logger.info("Connected to Live Google Cloud Firestore via credentials file")
                 return
             except Exception as e:
-                logger.warning(f"Failed to connect to Google Cloud Firestore: {e}")
+                logger.warning(f"Failed to connect to Google Cloud Firestore via credentials: {e}")
+        elif os.getenv("K_SERVICE") or (os.getenv("GCP_PROJECT_ID") and os.getenv("GCP_PROJECT_ID") != "cortex-ai-demo"):
+            try:
+                from google.cloud import firestore
+                self._native_client = firestore.Client(project=self._project_id)
+                self._mode = "GOOGLE_CLOUD_FIRESTORE_LIVE"
+                logger.info("Connected to Live Google Cloud Firestore via ADC")
+                return
+            except Exception as e:
+                logger.info(f"Live Firestore not directly reachable via ADC, using local storage: {e}")
 
         # 3. Fallback to Local Storage Engine
         self._mode = "FIRESTORE_LOCAL_ENGINE"

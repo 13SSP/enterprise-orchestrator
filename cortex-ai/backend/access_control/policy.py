@@ -6,7 +6,10 @@ Enforces:
 """
 
 import re
-import jwt
+try:
+    import jwt
+except ImportError:
+    jwt = None
 import sys
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -124,20 +127,21 @@ def resolve_user(
     # 1. Bearer JWT Token if present
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
-        try:
-            payload = jwt.decode(token, options={"verify_signature": False})
-            sub = payload.get("sub", "")
-            if sub in DEMO_PERSONAS:
-                return DEMO_PERSONAS[sub]
-            return UserContext(
-                sub=sub or "anon",
-                name=payload.get("name", "Anonymous"),
-                email=payload.get("email", ""),
-                role=payload.get("role", "employee"),
-                department_id=payload.get("department_id", "dept-eng")
-            )
-        except Exception:
-            pass
+        if jwt is not None:
+            try:
+                payload = jwt.decode(token, options={"verify_signature": False})
+                sub = payload.get("sub", "")
+                if sub in DEMO_PERSONAS:
+                    return DEMO_PERSONAS[sub]
+                return UserContext(
+                    sub=sub or "anon",
+                    name=payload.get("name", "Anonymous"),
+                    email=payload.get("email", ""),
+                    role=payload.get("role", "employee"),
+                    department_id=payload.get("department_id", "dept-eng")
+                )
+            except Exception:
+                pass
 
     # 2. X-Persona header
     if x_persona_header and x_persona_header.strip() in DEMO_PERSONAS:

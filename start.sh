@@ -46,8 +46,8 @@ while [[ "$#" -gt 0 ]]; do
             PROJECT_ID="${GCP_PROJECT_ID:-cortex-ai-hackathon}"
             REGION="${GCP_REGION:-us-central1}"
             echo "Building and pushing container images to Google Artifact Registry..."
-            gcloud builds submit --tag "${REGION}-docker.pkg.dev/${PROJECT_ID}/cortex-repo/cortex-hub:latest" cortex-ai/backend
-            gcloud run deploy cortex-hub --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/cortex-repo/cortex-hub:latest" --region "$REGION" --platform managed --allow-unauthenticated
+            gcloud builds submit --tag "${REGION}-docker.pkg.dev/${PROJECT_ID}/cortex-repo/cortex-hub:latest" .
+            gcloud run deploy cortex-hub --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/cortex-repo/cortex-hub:latest" --region "$REGION" --port 8080 --platform managed --allow-unauthenticated
             echo "Deploying frontend to Firebase Hosting..."
             firebase deploy --only hosting
             echo "✅ Deployment complete!"

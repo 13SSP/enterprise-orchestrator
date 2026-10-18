@@ -1139,7 +1139,7 @@ def list_prompt_library(
     lib = get_prompt_library()
     if user.role == "admin":
         return lib
-    templates = lib.get("templates", [])
+    templates = lib.get("prompts") or lib.get("templates", [])
     filtered = []
     for t in templates:
         target_id = t.get("target_agent_id") or resolve_target_agent_id(t.get("target_agent", ""))
@@ -1151,6 +1151,8 @@ def list_prompt_library(
     return {
         "categories": lib.get("categories", []),
         "templates": filtered,
+        "prompts": filtered,
+        "total_count": len(filtered),
         "total_prompts": len(filtered)
     }
 

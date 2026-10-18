@@ -17,4 +17,4 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "python cortex-ai/backend/main.py"]
+CMD ["python", "cortex-ai/backend/main.py"]
