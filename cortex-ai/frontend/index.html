@@ -3223,7 +3223,7 @@ ${d.output || 'No output recorded.'}`;
             <div class="space-y-3">
               <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-1">Application / Pod Name</label>
-                <input type="text" id="inputNewWsName" placeholder="e.g. Order & Inventory Management System" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <input type="text" id="inputNewWsName" oninput="validateCreatePodForm()" placeholder="e.g. Order & Inventory Management System" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500" />
               </div>
               <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-1">Description</label>
@@ -3237,16 +3237,21 @@ ${d.output || 'No output recorded.'}`;
 
             <!-- SDD Fields -->
             <div id="modalSDDFields" class="p-4 bg-indigo-950/30 border border-indigo-900 rounded-xl space-y-3 text-xs">
-              <div class="font-bold text-indigo-300 flex items-center gap-1.5">
-                <span>⚙️</span>
-                <span>SDD Local Repository Configuration</span>
+              <div class="font-bold text-indigo-300 flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                  <span>⚙️</span>
+                  <span>SDD Local Repository Configuration</span>
+                </div>
+                <span class="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider">Required for SDD</span>
               </div>
 
               <div>
-                <label class="block font-semibold text-slate-300 mb-1">Local Space Working Directory</label>
+                <label class="block font-semibold text-slate-300 mb-1">
+                  Local Space Working Directory <span class="text-amber-400 font-bold">*</span>
+                </label>
                 <div class="flex items-center gap-2">
                   <div class="relative flex-1">
-                    <input type="text" id="inputNewWsLocalPath" value="" placeholder="e.g. D:/Projects/calculator or /Users/name/projects/my-app" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    <input type="text" id="inputNewWsLocalPath" value="" oninput="validateCreatePodForm()" onchange="validateCreatePodForm()" onkeyup="validateCreatePodForm()" placeholder="e.g. D:/Projects/calculator or /Users/name/projects/my-app" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                   </div>
                   <button type="button" onclick="browseFolderForSDD()" id="btnBrowseSDD" class="px-3.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md shrink-0">
                     <span id="browseIcon">📂</span>
@@ -3254,7 +3259,10 @@ ${d.output || 'No output recorded.'}`;
                   </button>
                   <input type="file" id="clientDirPickerInput" webkitdirectory directory multiple class="hidden" onchange="onClientDirPicked(event)" />
                 </div>
-                <span class="text-[11px] text-slate-400 mt-1 block">Click Browse Folder to choose from your device file explorer, or type a custom path.</span>
+                <div class="flex items-center justify-between mt-1 text-[11px]">
+                  <span class="text-slate-400">Click Browse Folder to choose from your device file explorer, or type a custom path.</span>
+                  <span id="sddFolderRequiredNotice" class="text-amber-400 font-medium">⚠️ Working directory required</span>
+                </div>
               </div>
 
               <!-- Requirement Document Selection & Analysis -->
@@ -3346,13 +3354,17 @@ ${d.output || 'No output recorded.'}`;
               <span class="text-xs text-slate-400">Owner role held by You</span>
               <div class="flex items-center gap-2">
                 <button type="button" onclick="closeModal()" class="px-4 py-2 text-slate-400 hover:text-white text-xs font-semibold cursor-pointer">Cancel</button>
-                <button type="button" id="btnSubmitCreatePod" onclick="submitCreatePod()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md transition cursor-pointer flex items-center gap-1.5">
+                <button type="button" id="btnSubmitCreatePod" onclick="submitCreatePod()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-md transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600">
                   Create Application Pod
                 </button>
               </div>
             </div>
           </div>
         `;
+
+        if (typeof validateCreatePodForm === 'function') {
+          validateCreatePodForm();
+        }
       }
       window.openNewWorkspaceModal = openNewPodModal;
       window.openNewPodModal = openNewPodModal;
@@ -3383,6 +3395,7 @@ ${d.output || 'No output recorded.'}`;
           if (textarea) textarea.value = content;
         };
         reader.readAsText(file);
+        if (typeof validateCreatePodForm === 'function') validateCreatePodForm();
       }
       window.onRequirementDocFileSelected = onRequirementDocFileSelected;
 
@@ -3482,6 +3495,7 @@ Identity and access management microservice providing user registration, passwor
 4. The system must enforce role-based access control (admin, member, contributor).`;
           }
         }
+        if (typeof validateCreatePodForm === 'function') validateCreatePodForm();
       }
       window.loadSampleRequirementDoc = loadSampleRequirementDoc;
 
@@ -3496,6 +3510,44 @@ Identity and access management microservice providing user registration, passwor
         });
       }
       window.setInviteCheckboxes = setInviteCheckboxes;
+
+      function validateCreatePodForm() {
+        const btn = document.getElementById('btnSubmitCreatePod');
+        if (!btn) return;
+
+        const type = window._selectedModalType || 'sdd';
+        const pathInput = document.getElementById('inputNewWsLocalPath');
+        const localPath = pathInput ? pathInput.value.trim() : '';
+        const notice = document.getElementById('sddFolderRequiredNotice');
+
+        if (type === 'sdd') {
+          const hasFolder = (localPath.length > 0);
+          if (notice) {
+            if (hasFolder) {
+              const displayPath = localPath.split(/[/\\]/).filter(Boolean).pop() || localPath;
+              notice.innerHTML = `<span class="text-emerald-400 font-semibold flex items-center gap-1">✓ Folder ready: ${displayPath}</span>`;
+            } else {
+              notice.innerHTML = `<span class="text-amber-400 font-medium flex items-center gap-1">⚠️ Working directory required</span>`;
+            }
+          }
+          if (!hasFolder) {
+            btn.disabled = true;
+            btn.classList.add('opacity-40', 'cursor-not-allowed');
+            btn.classList.remove('hover:bg-blue-500', 'cursor-pointer');
+            btn.title = 'Please select or enter a Local Space Working Directory before creating an SDD Pod';
+            return false;
+          }
+        } else {
+          if (notice) notice.innerHTML = '';
+        }
+
+        btn.disabled = false;
+        btn.classList.remove('opacity-40', 'cursor-not-allowed');
+        btn.classList.add('hover:bg-blue-500', 'cursor-pointer');
+        btn.title = 'Create Application Pod';
+        return true;
+      }
+      window.validateCreatePodForm = validateCreatePodForm;
 
       function selectModalType(type) {
         window._selectedModalType = type;
@@ -3518,6 +3570,7 @@ Identity and access management microservice providing user registration, passwor
             setInviteCheckboxes(['alex_chen', 'priya_sharma']);
           }
         }
+        validateCreatePodForm();
       }
       window.selectModalType = selectModalType;
 
@@ -3530,6 +3583,17 @@ Identity and access management microservice providing user registration, passwor
 
         if (!name) {
           Toast.show('Please enter a pod or application name', 'error');
+          const nameEl = document.getElementById('inputNewWsName');
+          if (nameEl) nameEl.focus();
+          return;
+        }
+
+        const localPath = document.getElementById('inputNewWsLocalPath') ? document.getElementById('inputNewWsLocalPath').value.trim() : '';
+        if (type === 'sdd' && !localPath) {
+          Toast.show('Please select or specify a Local Space Working Directory before creating an SDD Pod.', 'warning');
+          validateCreatePodForm();
+          const pathEl = document.getElementById('inputNewWsLocalPath');
+          if (pathEl) pathEl.focus();
           return;
         }
 
@@ -3538,7 +3602,6 @@ Identity and access management microservice providing user registration, passwor
         if (type === 'sdd' && invited.length === 0) {
           invited = ['alex_chen', 'priya_sharma'];
         }
-        const localPath = document.getElementById('inputNewWsLocalPath') ? document.getElementById('inputNewWsLocalPath').value.trim() : '';
         const reqDocContent = document.getElementById('inputRequirementDocContent') ? document.getElementById('inputRequirementDocContent').value.trim() : '';
         const reqDocName = window._selectedReqDocName || (reqDocContent ? 'Requirement_Document.md' : null);
 
@@ -3552,7 +3615,7 @@ Identity and access management microservice providing user registration, passwor
           requirement_doc_name: reqDocName,
           requirement_doc_content: reqDocContent,
           sdd_config: type === 'sdd' ? {
-            local_space_path: localPath || (name ? ('workspace-projects/' + name.toLowerCase().replace(/\s+/g, '-')) : ''),
+            local_space_path: localPath,
             git_action: 'init'
           } : null
         };
@@ -5285,6 +5348,7 @@ Would you like to download the full application bundle (.ZIP) to your machine no
               if (input) {
                 input.value = dirHandle.name;
                 input.focus();
+                if (typeof validateCreatePodForm === 'function') validateCreatePodForm();
               }
               Toast.show(`Selected device folder: ${dirHandle.name}`, 'success');
             }
@@ -5300,6 +5364,7 @@ Would you like to download the full application bundle (.ZIP) to your machine no
             if (btn) btn.disabled = false;
             if (icon) icon.innerText = '📂';
             if (txt) txt.innerText = 'Browse Folder';
+            if (typeof validateCreatePodForm === 'function') validateCreatePodForm();
           }
         }
 
@@ -5319,6 +5384,7 @@ Would you like to download the full application bundle (.ZIP) to your machine no
             if (d.path && input) {
               input.value = d.path;
               input.focus();
+              if (typeof validateCreatePodForm === 'function') validateCreatePodForm();
               Toast.show(`Selected path: ${d.path}`, 'success');
               return;
             }
@@ -5328,6 +5394,7 @@ Would you like to download the full application bundle (.ZIP) to your machine no
             if (btn) btn.disabled = false;
             if (icon) icon.innerText = '📂';
             if (txt) txt.innerText = 'Browse Folder';
+            if (typeof validateCreatePodForm === 'function') validateCreatePodForm();
           }
         }
 
@@ -5350,6 +5417,7 @@ Would you like to download the full application bundle (.ZIP) to your machine no
           if (input && folderName) {
             input.value = folderName;
             input.focus();
+            if (typeof validateCreatePodForm === 'function') validateCreatePodForm();
           }
           Toast.show(`Selected device folder: ${folderName}`, 'success');
         }
