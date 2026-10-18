@@ -6217,6 +6217,8 @@ Would you like to download the full application bundle (.ZIP) to your machine no
           fb.innerText = 'Error: ' + err.message;
           fb.classList.remove('hidden');
           btn.disabled = false;
+          btn.innerHTML = '💾 Save Limits';
+        }
       }
 
       function openOnboardingModal() {
