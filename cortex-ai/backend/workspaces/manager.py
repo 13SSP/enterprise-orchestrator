@@ -22,6 +22,7 @@ from typing import Dict, Any, List, Optional, Tuple
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 DB_DIR = ROOT_DIR / "database" / "firestore_storage"
 EMPLOYEES_DIR = DB_DIR / "employees"
+WORKSPACES_DIR = DB_DIR / "workspaces"
 
 # Add cortex-ai/backend to sys.path for model_gateway import
 backend_dir = Path(__file__).resolve().parent.parent
@@ -100,41 +101,66 @@ class WorkspaceManager:
         return employees
 
     def get_workspace(self, workspace_id: str, current_user: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Retrieves single workspace record from Firestore, strictly filtering local prototypes by current_user."""
-        doc = db.collection("workspaces").document(workspace_id).get()
-        if not doc.exists:
-            return None
-        d = doc.to_dict()
-        if d:
-            d["id"] = d.get("workspace_id", workspace_id)
-            d["workspace_id"] = d.get("workspace_id", workspace_id)
-            # Ensure features, prototypes, and members lists exist
-            d.setdefault("features", [])
-            d.setdefault("prototypes", [])
-            d.setdefault("members", [])
-            d.setdefault("pod_type", d.get("workspace_type", "chat"))
-            
-            # Populate user_role for active user
-            if current_user:
-                is_owner = (d.get("owner_id") == current_user)
-                is_contrib = any(m.get("user_id") == current_user for m in d.get("members", []) if isinstance(m, dict))
-                d["user_role"] = "owner" if is_owner else ("contributor" if is_contrib else "none")
+        """Retrieves single workspace record from Firestore or local disk, strictly filtering local prototypes by current_user."""
+        d = None
+        try:
+            doc = db.collection("workspaces").document(workspace_id).get()
+            if doc and doc.exists:
+                d = doc.to_dict()
+        except Exception:
+            d = None
 
-            # Strict Visibility Enforcement: local prototypes visible ONLY to creator
-            if current_user and "prototypes" in d and isinstance(d["prototypes"], list):
-                d["prototypes"] = [
-                    p for p in d["prototypes"]
-                    if p.get("storage_mode") != "local" or p.get("creator_id") == current_user
-                ]
+        if not d and WORKSPACES_DIR.exists():
+            f = WORKSPACES_DIR / f"{workspace_id}.json"
+            if f.exists():
+                try:
+                    d = json.loads(f.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+
+        if not d:
+            return None
+
+        d["id"] = d.get("workspace_id", workspace_id)
+        d["workspace_id"] = d.get("workspace_id", workspace_id)
+        # Ensure features, prototypes, and members lists exist
+        d.setdefault("features", [])
+        d.setdefault("prototypes", [])
+        d.setdefault("members", [])
+        d.setdefault("pod_type", d.get("workspace_type", "chat"))
+        
+        # Populate user_role for active user
+        if current_user:
+            is_owner = (d.get("owner_id") == current_user)
+            is_contrib = any(m.get("user_id") == current_user for m in d.get("members", []) if isinstance(m, dict))
+            d["user_role"] = "owner" if is_owner else ("contributor" if is_contrib else "none")
+
+        # Strict Visibility Enforcement: local prototypes visible ONLY to creator
+        if current_user and "prototypes" in d and isinstance(d["prototypes"], list):
+            d["prototypes"] = [
+                p for p in d["prototypes"]
+                if p.get("storage_mode") != "local" or p.get("creator_id") == current_user
+            ]
         return d
 
     def save_workspace(self, workspace_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Saves workspace record into Firestore."""
+        """Saves workspace record into Firestore and local backup."""
         data["updated_at"] = datetime.utcnow().isoformat()
         data["workspace_id"] = workspace_id
         data["id"] = workspace_id
         data.setdefault("pod_type", data.get("workspace_type", "chat"))
-        db.collection("workspaces").document(workspace_id).set(data)
+        try:
+            db.collection("workspaces").document(workspace_id).set(data)
+        except Exception:
+            pass
+
+        try:
+            WORKSPACES_DIR.mkdir(parents=True, exist_ok=True)
+            with open(WORKSPACES_DIR / f"{workspace_id}.json", "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, default=str)
+        except Exception:
+            pass
+
         return data
 
     def delete_workspace(self, workspace_id: str, current_user: str = "bob_ops") -> bool:
@@ -144,7 +170,18 @@ class WorkspaceManager:
             return False
         if ws.get("owner_id") != current_user:
             raise PermissionError("Only the workspace Owner can delete this workspace")
-        db.collection("workspaces").document(workspace_id).delete()
+        try:
+            db.collection("workspaces").document(workspace_id).delete()
+        except Exception:
+            pass
+
+        try:
+            f = WORKSPACES_DIR / f"{workspace_id}.json"
+            if f.exists():
+                f.unlink()
+        except Exception:
+            pass
+
         return True
 
     def list_workspaces(self, filter_type: str = "public", current_user: str = "bob_ops", search: str = "") -> List[Dict[str, Any]]:
@@ -156,13 +193,43 @@ class WorkspaceManager:
         """
         results = []
         search_lower = search.lower().strip() if search else ""
+        raw_workspaces = []
+        seen_ids = set()
 
-        for doc in db.collection("workspaces").stream():
+        # 1. Query Firestore collection
+        try:
+            for doc in db.collection("workspaces").stream():
+                try:
+                    ws = doc.to_dict()
+                    if ws:
+                        ws_id = ws.get("workspace_id") or ws.get("id") or doc.id
+                        ws["id"] = ws_id
+                        ws["workspace_id"] = ws_id
+                        raw_workspaces.append(ws)
+                        seen_ids.add(ws_id)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        # 2. Fallback / supplement with local JSON files if empty or to ensure seeds exist
+        if WORKSPACES_DIR.exists():
+            for f in sorted(WORKSPACES_DIR.glob("*.json")):
+                try:
+                    if f.stem in seen_ids:
+                        continue
+                    ws = json.loads(f.read_text(encoding="utf-8"))
+                    if isinstance(ws, dict):
+                        ws_id = ws.get("workspace_id") or ws.get("id") or f.stem
+                        ws["id"] = ws_id
+                        ws["workspace_id"] = ws_id
+                        raw_workspaces.append(ws)
+                        seen_ids.add(ws_id)
+                except Exception:
+                    continue
+
+        for ws in raw_workspaces:
             try:
-                ws = doc.to_dict()
-                ws_id = ws.get("workspace_id") or doc.id
-                ws["id"] = ws_id
-                ws["workspace_id"] = ws_id
                 name = ws.get("name", "")
                 desc = ws.get("description", "")
                 visibility = ws.get("visibility", "private")
@@ -174,7 +241,7 @@ class WorkspaceManager:
                         continue
 
                 is_owner = (owner_id == current_user)
-                is_contributor = any(m.get("user_id") == current_user for m in members)
+                is_contributor = any(m.get("user_id") == current_user for m in members if isinstance(m, dict))
                 user_role = "owner" if is_owner else ("contributor" if is_contributor else "none")
 
                 # Filter prototypes for this user

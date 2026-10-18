@@ -7,6 +7,7 @@ import os
 import uuid
 import json
 import time
+import logging
 import httpx
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -15,6 +16,8 @@ from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel, Field
 import sys
 from pathlib import Path
+
+logger = logging.getLogger("cortex.api")
 
 backend_dir = Path(__file__).resolve().parent.parent
 if str(backend_dir) not in sys.path:
@@ -1278,8 +1281,12 @@ def list_company_employees():
 @router_api.get("/workspaces", tags=["Workspaces"])
 @router_api.get("/pods", tags=["Pods"])
 def list_workspaces(filter: str = "public", persona: str = "bob_ops", search: str = ""):
-    workspaces = workspace_manager.list_workspaces(filter_type=filter, current_user=persona, search=search)
-    return {"workspaces": workspaces, "filter": filter, "count": len(workspaces)}
+    try:
+        workspaces = workspace_manager.list_workspaces(filter_type=filter, current_user=persona, search=search)
+        return {"workspaces": workspaces, "filter": filter, "count": len(workspaces)}
+    except Exception as e:
+        logger.error(f"Error in list_workspaces endpoint: {e}", exc_info=True)
+        return {"workspaces": [], "filter": filter, "count": 0, "error": str(e)}
 
 
 @router_api.post("/workspaces", tags=["Workspaces"])

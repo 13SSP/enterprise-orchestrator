@@ -151,6 +151,137 @@ class LocalCollectionReference:
                 logger.error(f"Failed to read file {file}: {e}")
 
 
+class ResilientDocumentReference:
+    def __init__(self, native_doc, local_doc: LocalDocumentReference):
+        self._native_doc = native_doc
+        self._local_doc = local_doc
+        self.id = local_doc.id
+
+    def set(self, data: Dict[str, Any], merge: bool = False) -> None:
+        self._local_doc.set(data, merge=merge)
+        if self._native_doc is not None:
+            try:
+                self._native_doc.set(data, merge=merge)
+            except Exception as e:
+                logger.warning(f"Error persisting doc {self.id} to Live Firestore: {e}")
+
+    def get(self) -> DocumentSnapshot:
+        if self._native_doc is not None:
+            try:
+                native_snap = self._native_doc.get()
+                if native_snap.exists:
+                    return native_snap
+            except Exception as e:
+                logger.warning(f"Error fetching doc {self.id} from Live Firestore ({e}), using local disk")
+        return self._local_doc.get()
+
+    def update(self, field_updates: Dict[str, Any]) -> None:
+        self._local_doc.update(field_updates)
+        if self._native_doc is not None:
+            try:
+                self._native_doc.update(field_updates)
+            except Exception as e:
+                logger.warning(f"Error updating doc {self.id} on Live Firestore: {e}")
+
+    def delete(self) -> None:
+        self._local_doc.delete()
+        if self._native_doc is not None:
+            try:
+                self._native_doc.delete()
+            except Exception as e:
+                logger.warning(f"Error deleting doc {self.id} from Live Firestore: {e}")
+
+
+class ResilientQuery:
+    def __init__(self, native_query, local_query: LocalQuery):
+        self._native_query = native_query
+        self._local_query = local_query
+
+    def where(self, field: str, op: str, value: Any):
+        nq = None
+        if self._native_query is not None:
+            try:
+                nq = self._native_query.where(field, op, value)
+            except Exception:
+                nq = None
+        lq = self._local_query.where(field, op, value)
+        return ResilientQuery(nq, lq)
+
+    def limit(self, count: int):
+        nq = None
+        if self._native_query is not None:
+            try:
+                nq = self._native_query.limit(count)
+            except Exception:
+                nq = None
+        lq = self._local_query.limit(count)
+        return ResilientQuery(nq, lq)
+
+    def stream(self) -> Generator[DocumentSnapshot, None, None]:
+        docs_found = 0
+        if self._native_query is not None:
+            try:
+                for doc in self._native_query.stream():
+                    docs_found += 1
+                    yield doc
+            except Exception as e:
+                logger.warning(f"Live Firestore query stream failed: {e}")
+                docs_found = 0
+
+        if docs_found == 0:
+            for doc in self._local_query.stream():
+                yield doc
+
+
+class ResilientCollectionReference:
+    def __init__(self, native_col, local_col: LocalCollectionReference):
+        self._native_col = native_col
+        self._local_col = local_col
+        self.id = local_col.id
+
+    def document(self, doc_id: str) -> ResilientDocumentReference:
+        nd = None
+        if self._native_col is not None:
+            try:
+                nd = self._native_col.document(doc_id)
+            except Exception:
+                nd = None
+        return ResilientDocumentReference(nd, self._local_col.document(doc_id))
+
+    def where(self, field: str, op: str, value: Any) -> ResilientQuery:
+        nq = None
+        if self._native_col is not None:
+            try:
+                nq = self._native_col.where(field, op, value)
+            except Exception:
+                nq = None
+        return ResilientQuery(nq, self._local_col.where(field, op, value))
+
+    def limit(self, count: int) -> ResilientQuery:
+        nq = None
+        if self._native_col is not None:
+            try:
+                nq = self._native_col.limit(count)
+            except Exception:
+                nq = None
+        return ResilientQuery(nq, self._local_col.limit(count))
+
+    def stream(self) -> Generator[DocumentSnapshot, None, None]:
+        docs_found = 0
+        if self._native_col is not None:
+            try:
+                for doc in self._native_col.stream():
+                    docs_found += 1
+                    yield doc
+            except Exception as e:
+                logger.warning(f"Live Firestore stream failed on collection '{self.id}' ({e}), falling back to local files")
+                docs_found = 0
+
+        if docs_found == 0:
+            for doc in self._local_col.stream():
+                yield doc
+
+
 class FirestoreClient:
     def __init__(self):
         self._native_client = None
@@ -203,9 +334,15 @@ class FirestoreClient:
         return self._mode
 
     def collection(self, collection_name: str):
+        local_col = LocalCollectionReference(self._storage_dir, collection_name)
         if self._native_client:
-            return self._native_client.collection(collection_name)
-        return LocalCollectionReference(self._storage_dir, collection_name)
+            try:
+                native_col = self._native_client.collection(collection_name)
+                return ResilientCollectionReference(native_col, local_col)
+            except Exception as e:
+                logger.warning(f"Error accessing native collection '{collection_name}': {e}")
+                return local_col
+        return local_col
 
     def get_status(self) -> Dict[str, Any]:
         return {

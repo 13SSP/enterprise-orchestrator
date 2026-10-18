@@ -75,7 +75,24 @@ generated_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/downloads", StaticFiles(directory=str(generated_dir)), name="downloads")
 
 # Serve Frontend Web Shell for Cloud Run evaluators
-from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.requests import Request
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, StarletteHTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail}
+        )
+    import logging
+    logging.getLogger("cortex.hub").error(f"Unhandled exception on {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "error": str(exc), "path": request.url.path}
+    )
+
 frontend_file = root_dir / "cortex-ai" / "frontend" / "index.html"
 if frontend_file.exists():
     @app.get("/", tags=["Frontend"], response_class=FileResponse)
